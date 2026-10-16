@@ -6,9 +6,9 @@ Phase 3.13A publishes **application images only**. There is **no Mini PC deploy 
 
 | Application | Image | Platform |
 |---|---|---|
-| API Gateway | `ghcr.io/m3mora/memora-api-gateway` | `linux/amd64` (Mini PC x86_64) |
-| IAM Service | `ghcr.io/m3mora/memora-iam-service` | `linux/amd64` |
-| IAM migrate/seed/RBAC job | `ghcr.io/m3mora/memora-iam-migrate` | `linux/amd64` |
+| API Gateway | `ghcr.io/mainhankiet/memora-api-gateway` | `linux/amd64` (Mini PC x86_64) |
+| IAM Service | `ghcr.io/mainhankiet/memora-iam-service` | `linux/amd64` |
+| IAM migrate/seed/RBAC job | `ghcr.io/mainhankiet/memora-iam-migrate` | `linux/amd64` |
 
 **Tag:** Git commit SHA (`github.sha`). Do **not** rely on `latest`.
 
@@ -61,8 +61,8 @@ Package visibility follows the **private** org repo. The Mini PC pulls with a Gi
 
 ```bash
 echo "$GHCR_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
-docker pull ghcr.io/m3mora/memora-api-gateway:<git-sha>
-docker pull ghcr.io/m3mora/memora-iam-service:<git-sha>
+docker pull ghcr.io/mainhankiet/memora-api-gateway:<git-sha>
+docker pull ghcr.io/mainhankiet/memora-iam-service:<git-sha>
 ```
 
 Grant the Actions `GITHUB_TOKEN` write access to GHCR (org/repo **Actions** permissions → **Read and write** for packages, or package workflow access on first publish).
@@ -99,7 +99,7 @@ Do not migrate or re-seed to roll back an application image.
 | Symptom | Check |
 |---|---|
 | Publish job skipped | Push was not `main`, or Quality/Security failed, or event was a PR |
-| `denied` pushing GHCR | `packages: write`, org package permissions, lowercase `m3mora` |
+| `denied` pushing GHCR | `packages: write`, org package permissions, lowercase `mainhankiet` |
 | IAM never becomes ready | `IAM_HEALTH_HOST=0.0.0.0`; Postgres database name must be `memora` and schema `iam` (migrate is **out of band**) |
 | Gateway ready 503 | `IAM_GRPC_URL` must be the Compose service DNS, not `localhost` |
 | Image contains secrets | `.dockerignore` must keep `.env` out; publish job fails if `.env` is found |

@@ -115,9 +115,9 @@ PAT fine-grained **owner = user** không thấy repo org `M3MORA` → GHCR `deni
 
 Push `main` → job **Publish GHCR** đẩy:
 
-- `ghcr.io/m3mora/memora-api-gateway:<git-sha>`
-- `ghcr.io/m3mora/memora-iam-service:<git-sha>`
-- `ghcr.io/m3mora/memora-iam-migrate:<git-sha>`
+- `ghcr.io/mainhankiet/memora-api-gateway:<git-sha>`
+- `ghcr.io/mainhankiet/memora-iam-service:<git-sha>`
+- `ghcr.io/mainhankiet/memora-iam-migrate:<git-sha>`
 
 Tag = SHA commit. Digest `sha256:` + 64 hex = vân tay image (form Bootstrap cần digest, không phải lệnh `docker pull …:tag`).
 

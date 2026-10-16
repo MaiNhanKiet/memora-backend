@@ -40,9 +40,9 @@ On application health failure the helper rolls **images** back to `previous-rele
 
 | Name | GHCR |
 |---|---|
-| Gateway | `ghcr.io/m3mora/memora-api-gateway@sha256:…` |
-| IAM | `ghcr.io/m3mora/memora-iam-service@sha256:…` |
-| Migrate job | `ghcr.io/m3mora/memora-iam-migrate@sha256:…` |
+| Gateway | `ghcr.io/mainhankiet/memora-api-gateway@sha256:…` |
+| IAM | `ghcr.io/mainhankiet/memora-iam-service@sha256:…` |
+| Migrate job | `ghcr.io/mainhankiet/memora-iam-migrate@sha256:…` |
 
 Copy digests from the CI **Publish GHCR** job summary for the chosen SHA.
 

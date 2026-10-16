@@ -157,7 +157,7 @@ run_migrate_container() {
   [[ "$entrypoint" == "npx" ]] || die "migrate entrypoint must be npx"
   load_env_file "${RELEASE_ENV}"
   load_env_file "${MEMORA_SECRETS_DIR}/iam.env"
-  [[ "${MIGRATE_IMAGE:-}" == ghcr.io/m3mora/memora-iam-migrate@sha256:* ]] || die "MIGRATE_IMAGE is not a pinned GHCR digest"
+  [[ "${MIGRATE_IMAGE:-}" == ghcr.io/mainhankiet/memora-iam-migrate@sha256:* ]] || die "MIGRATE_IMAGE is not a pinned GHCR digest"
   docker run --rm \
     --network "${MEMORA_NETWORK}" \
     --env-file "${MEMORA_SECRETS_DIR}/iam.env" \
@@ -300,9 +300,9 @@ cmd_bootstrap() {
 resolve_digests_from_sha_tags() {
   validate_sha "${RELEASE_SHA}"
   ghcr_login
-  GATEWAY_DIGEST="$(image_digest_after_pull "ghcr.io/m3mora/memora-api-gateway:${RELEASE_SHA}" gateway)"
-  IAM_DIGEST="$(image_digest_after_pull "ghcr.io/m3mora/memora-iam-service:${RELEASE_SHA}" iam)"
-  MIGRATE_DIGEST="$(image_digest_after_pull "ghcr.io/m3mora/memora-iam-migrate:${RELEASE_SHA}" migrate)"
+  GATEWAY_DIGEST="$(image_digest_after_pull "ghcr.io/mainhankiet/memora-api-gateway:${RELEASE_SHA}" gateway)"
+  IAM_DIGEST="$(image_digest_after_pull "ghcr.io/mainhankiet/memora-iam-service:${RELEASE_SHA}" iam)"
+  MIGRATE_DIGEST="$(image_digest_after_pull "ghcr.io/mainhankiet/memora-iam-migrate:${RELEASE_SHA}" migrate)"
 }
 
 cmd_deploy() {

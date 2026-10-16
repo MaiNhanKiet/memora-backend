@@ -131,9 +131,9 @@ wait_healthy() {
 image_digest_after_pull() {
   local ref="$1"
   local label="$2"
-  [[ "$ref" == ghcr.io/m3mora/memora-* ]] || die "ref ${label} is not a MEMORA GHCR image"
+  [[ "$ref" == ghcr.io/mainhankiet/memora-* ]] || die "ref ${label} is not a MEMORA GHCR image"
   if ! docker pull "${ref}" >/dev/null; then
-    die "docker pull ${label} failed (${ref}); GHCR login cannot read ghcr.io/m3mora"
+    die "docker pull ${label} failed (${ref}); GHCR login cannot read ghcr.io/mainhankiet"
   fi
   local raw digest=""
   raw="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${ref}")"
@@ -186,9 +186,9 @@ write_release_env() {
   umask 077
   cat > "${RELEASE_ENV}" <<EOF
 MEMORA_RELEASE_SHA=${sha}
-GATEWAY_IMAGE=ghcr.io/m3mora/memora-api-gateway@${gateway}
-IAM_IMAGE=ghcr.io/m3mora/memora-iam-service@${iam}
-MIGRATE_IMAGE=ghcr.io/m3mora/memora-iam-migrate@${migrate}
+GATEWAY_IMAGE=ghcr.io/mainhankiet/memora-api-gateway@${gateway}
+IAM_IMAGE=ghcr.io/mainhankiet/memora-iam-service@${iam}
+MIGRATE_IMAGE=ghcr.io/mainhankiet/memora-iam-migrate@${migrate}
 MEMORA_SECRETS_DIR=${MEMORA_SECRETS_DIR}
 TAILSCALE_IPV4=${TAILSCALE_IPV4:-100.78.222.34}
 EOF

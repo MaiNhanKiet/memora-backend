@@ -57,7 +57,7 @@ Idempotent: existing managed containers are not recreated; volumes are never `-v
 
 ## Prisma / RBAC
 
-Runtime Gateway/IAM images **do not** include Prisma CLI. Migrations run in `ghcr.io/m3mora/memora-iam-migrate@digest`.
+Runtime Gateway/IAM images **do not** include Prisma CLI. Migrations run in `ghcr.io/mainhankiet/memora-iam-migrate@digest`.
 
 RBAC apply on Mini PC requires `MEMORA_RBAC_PRODUCTION_CONFIRM=MEMORA_RBAC_V1_2026_10_15` (same marker) so `NODE_ENV=production` and host `postgres` are allowed. Grants/checksums are unchanged.
 
