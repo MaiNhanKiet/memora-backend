@@ -1,0 +1,9 @@
+# Install as root:
+#   visudo -c -f deploy/host/sudoers.memora-deploy.example
+#   install -m 0440 deploy/host/sudoers.memora-deploy.example /etc/sudoers.d/memora-deploy
+# Replace runner-memora-backend with the OS user of Runner.Listener if different.
+# Do not add that user to group docker.
+
+Defaults:runner-memora-backend env_reset
+Defaults:runner-memora-backend env_keep+="GITHUB_TOKEN GITHUB_ACTOR"
+runner-memora-backend ALL=(root) NOPASSWD: /opt/memora/bin/memora-deploy

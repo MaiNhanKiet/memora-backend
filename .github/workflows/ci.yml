@@ -1,0 +1,333 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_ENV: test
+  CI: true
+  REDIS_PASSWORD: ci-redis-pass-ok16
+  IAM_REDIS_HOST: 127.0.0.1
+  IAM_REDIS_PORT: '6379'
+  IAM_REDIS_PASSWORD: ci-redis-pass-ok16
+  IAM_REDIS_DB: '0'
+  CACHE_REDIS_HOST: 127.0.0.1
+  CACHE_REDIS_PORT: '6379'
+  CACHE_REDIS_PASSWORD: ci-redis-pass-ok16
+  CACHE_REDIS_DB: '1'
+  QUEUE_REDIS_HOST: 127.0.0.1
+  QUEUE_REDIS_PORT: '6379'
+  QUEUE_REDIS_PASSWORD: ci-redis-pass-ok16
+  QUEUE_REDIS_DB: '2'
+  IAM_DATABASE_URL: postgresql://memora_ci:memora_ci_pg@127.0.0.1:5432/memora_ci?schema=iam
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: memora_ci
+          POSTGRES_PASSWORD: memora_ci_pg
+          POSTGRES_DB: memora_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U memora_ci -d memora_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Start CI Redis
+        run: |
+          docker run -d --name memora-ci-redis -p 6379:6379 redis:7-alpine \
+            redis-server --requirepass "$REDIS_PASSWORD" --appendonly no --maxmemory-policy noeviction
+          for i in $(seq 1 20); do
+            if docker exec memora-ci-redis redis-cli -a "$REDIS_PASSWORD" ping | grep -q PONG; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "CI Redis did not become ready" >&2
+          exit 1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Engineering kit
+        run: |
+          npm run kit:validate
+          npm run boundaries
+          npm run ci:deploy-layout
+
+      - name: Load gRPC protos
+        run: npm run proto:check
+
+      - name: Prisma validate and generate
+        run: |
+          npm run prisma:iam:validate
+          npm run prisma:iam:generate
+
+      - name: Prisma migrate deploy (CI database only)
+        run: npm run prisma:iam:migrate:deploy
+
+      - name: Lint
+        run: npm run lint:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build applications
+        run: |
+          npx nest build api-gateway
+          npm run build:iam
+
+      - name: Unit and IAM refresh regression tests
+        run: npx jest --runInBand --testPathIgnorePatterns=live.spec.ts
+
+      - name: Redis integration tests
+        env:
+          MEMORA_REDIS_TEST: '1'
+        run: npx jest --runInBand --testPathPatterns=live.spec.ts
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Reject tracked secrets
+        run: npm run ci:secrets
+
+      - name: Production dependency audit
+        run: npm run ci:audit
+
+  publish:
+    name: Publish GHCR (${{ matrix.app }})
+    needs: [quality, security]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: api-gateway
+            image: memora-api-gateway
+            file: docker/api-gateway.Dockerfile
+          - app: iam-service
+            image: memora-iam-service
+            file: docker/iam-service.Dockerfile
+          - app: iam-migrate
+            image: memora-iam-migrate
+            file: docker/iam-migrate.Dockerfile
+    env:
+      IMAGE: ghcr.io/m3mora/${{ matrix.image }}
+      TAG: ${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (linux/amd64, no push)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=${{ matrix.image }}
+
+      - name: Record local image identity
+        run: |
+          echo "image=${IMAGE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "tag=${TAG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "commit=${GITHUB_SHA}" >> "$GITHUB_STEP_SUMMARY"
+          docker image inspect "${IMAGE}:${TAG}" --format 'id={{.Id}} size={{.Size}} os={{.Os}} arch={{.Architecture}}' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Reject secrets inside image
+        run: |
+          docker run --rm --entrypoint sh "${IMAGE}:${TAG}" -c '
+            set -eu
+            if [ -e /app/.env ] || [ -e /.env ]; then
+              echo "FAIL: .env present in image" >&2
+              exit 1
+            fi
+            found="$(find /app -name ".env" -o -name ".env.*" -o -name "credentials.json" -o -name "*.pem" 2>/dev/null | grep -v ".env.example" || true)"
+            if [ -n "$found" ]; then
+              echo "FAIL: secret-like paths:" >&2
+              echo "$found" >&2
+              exit 1
+            fi
+            echo "no .env or credential files in /app"
+          '
+
+      - name: Verify Gateway entrypoint and live probe
+        if: matrix.app == 'api-gateway'
+        run: |
+          docker run --rm --entrypoint sh "${IMAGE}:${TAG}" -c 'test -f /app/dist/apps/api-gateway/main.js && test -f /app/proto/iam/v1/iam.proto'
+          cid="$(docker run -d --name memora-gw-smoke \
+            -e NODE_ENV=production \
+            -e API_GATEWAY_PORT=3000 \
+            -e SWAGGER_ENABLED=false \
+            -e IAM_GRPC_URL=iam-service:50051 \
+            -e IAM_INTERNAL_GRPC_SECRET=0123456789abcdef0123456789abcdef \
+            -p 127.0.0.1:3000:3000 \
+            "${IMAGE}:${TAG}")"
+          cleanup() { docker rm -f "$cid" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health/live | grep -q '"ok"'; then
+              echo "gateway live ok"
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$cid" >&2
+          echo "gateway live probe failed" >&2
+          exit 1
+
+      - name: Verify IAM entrypoint and Prisma client
+        if: matrix.app == 'iam-service'
+        run: |
+          docker run --rm --entrypoint sh "${IMAGE}:${TAG}" -c '
+            set -eu
+            test -f /app/dist/apps/iam-service/main.js
+            test -f /app/proto/iam/v1/iam.proto
+            test -f /app/proto/grpc/health/v1/health.proto
+            test -f /app/apps/iam-service/generated/prisma/client.ts
+            ls /app/apps/iam-service/generated/prisma >/dev/null
+            echo "iam entrypoint and prisma client present"
+          '
+
+      - name: Verify migrate image Prisma CLI
+        if: matrix.app == 'iam-migrate'
+        run: |
+          docker run --rm --entrypoint sh "${IMAGE}:${TAG}" -c '
+            set -eu
+            test -f /app/apps/iam-service/prisma/schema.prisma
+            test -f /app/apps/iam-service/generated/prisma/client.ts
+            npx prisma -v
+            echo "migrate image ok"
+          '
+
+      - name: Scan image (fail on CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ env.TAG }}
+          scan-type: image
+          scanners: vuln
+          vuln-type: os,library
+          format: table
+          severity: CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          # Nested npm CLI inside the official Node image is not the app lockfile.
+          skip-dirs: /usr/local/lib/node_modules/npm
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64
+          push: true
+          load: false
+          provenance: false
+          sbom: false
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=${{ matrix.image }}
+
+      - name: Publish digest
+        run: |
+          echo "digest=${{ steps.push.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "pushed ${IMAGE}:${TAG} digest=${{ steps.push.outputs.digest }} commit=${GITHUB_SHA}"
+
+  deploy:
+    name: Deploy Mini PC
+    needs: [quality, security, publish]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Refuse GitHub-hosted execution
+        run: |
+          if [[ "${RUNNER_NAME:-}" == "GitHub Actions"* ]] || [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" ]]; then
+            echo "Mini PC deploy must use the self-hosted runner" >&2
+            exit 1
+          fi
+
+      - name: Deploy published SHA
+        run: |
+          set -euo pipefail
+          sudo -n /opt/memora/bin/memora-deploy deploy \
+            --release-sha "${GITHUB_SHA}" \
+            --from-sha-tags \
+            --confirm-migrate MIGRATE

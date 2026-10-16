@@ -1,0 +1,138 @@
+name: memora-infra
+
+# Arcane: Create Project name `memora-infra`, paste this file, add `.env` from
+# deploy/infra/.env.example (real passwords + TAILSCALE_IPV4 + CLOUDFLARE_TUNNEL_TOKEN).
+# Do not paste compose.local.yaml (laptop ports; it also skips cloudflared).
+# Host ports bind only the Tailscale IP (not 0.0.0.0 / LAN). IAM still uses Docker DNS postgres/redis.
+# Cloudflare Zero Trust public hostname origin: http://api-gateway:3000 (Docker DNS).
+# Connector can run before Gateway exists; origin 502 until memora-backend is up.
+# Stop a host systemd cloudflared using the same token (duplicate connector).
+
+networks:
+  memora-network:
+    name: memora-network
+    driver: bridge
+
+volumes:
+  pgdata:
+    name: memora-infra_pgdata
+  redisdata:
+    name: memora-infra_redisdata
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    container_name: memora-postgres
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-memora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-memora}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - '${TAILSCALE_IPV4:-100.78.222.34}:5432:5432'
+    networks:
+      memora-network:
+        aliases:
+          - postgres
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+    labels:
+      com.memora.stack: infra
+      com.memora.managed: 'true'
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: memora-redis
+    restart: unless-stopped
+    stop_grace_period: 20s
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --appendonly
+      - 'yes'
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redisdata:/data
+    ports:
+      - '${TAILSCALE_IPV4:-100.78.222.34}:6379:6379'
+    networks:
+      memora-network:
+        aliases:
+          - redis
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+    labels:
+      com.memora.stack: infra
+      com.memora.managed: 'true'
+
+  cloudflared:
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:2026.10.0}
+    container_name: memora-cloudflared
+    restart: unless-stopped
+    stop_grace_period: 15s
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      memora-network:
+        aliases:
+          - cloudflared
+    healthcheck:
+      test: ['CMD', 'cloudflared', '--version']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+    labels:
+      com.memora.stack: infra
+      com.memora.managed: 'true'

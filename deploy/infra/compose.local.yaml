@@ -1,0 +1,15 @@
+# Laptop only. Do not paste into Arcane.
+#   docker compose -f deploy/infra/compose.yaml -f deploy/infra/compose.local.yaml --env-file .env up -d
+#
+# Replaces Tailscale-bound ports with loopback. Skips cloudflared (no tunnel token on a laptop).
+
+services:
+  postgres:
+    ports: !override
+      - '127.0.0.1:5432:5432'
+  redis:
+    ports: !override
+      - '127.0.0.1:6379:6379'
+  cloudflared:
+    profiles:
+      - mini-pc-only
