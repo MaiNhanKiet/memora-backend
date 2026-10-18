@@ -59,6 +59,7 @@ export class AuthController {
       fullName: body.fullName,
       email: body.email,
       password: body.password,
+      ...(body.phone === undefined ? {} : { phone: body.phone }),
     });
     this.cookies.attachSession(
       response,

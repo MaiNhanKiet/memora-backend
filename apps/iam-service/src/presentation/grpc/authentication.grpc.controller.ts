@@ -25,6 +25,7 @@ import { PasswordRecoveryService } from '../../application/auth/password-recover
 import {
   requireCredential,
   requireGoogleIdToken,
+  optionalText,
   requireText,
 } from './grpc-request';
 import { InternalGrpcAuthGuard } from './internal-grpc-auth.guard';
@@ -49,6 +50,7 @@ export class AuthenticationGrpcController {
       fullName: requireText(request.fullName, 'Full name', 150),
       email: requireText(request.email, 'Email', 255),
       password: requireText(request.password, 'Password', 128),
+      phone: optionalText(request.phone, 'Phone', 30),
     });
     return toAuthSessionResponse(session);
   }

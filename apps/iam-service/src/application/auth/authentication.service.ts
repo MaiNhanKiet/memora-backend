@@ -25,6 +25,7 @@ import {
   type PublicUser,
   type UserAuthRecord,
 } from '../users/users.mapper';
+import { assertPasswordLength, assertValidPassword } from './identity-input';
 import { PasswordHasher } from './password-hasher';
 import {
   RefreshTokenService,
@@ -33,8 +34,7 @@ import {
 import { UsersService } from '../users/users.service';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_SECRET_LENGTH = 8;
-const MAX_SECRET_LENGTH = 128;
+const PHONE_PATTERN = /^\+?[0-9]{8,15}$/;
 const MAX_FULL_NAME_LENGTH = 150;
 const INVALID_CREDENTIALS = 'Invalid credentials';
 
@@ -42,6 +42,7 @@ export type RegisterCustomerInput = {
   fullName: string;
   email: string;
   password: string;
+  phone?: string;
 };
 
 export type LoginInput = {
@@ -89,6 +90,7 @@ export class AuthenticationService {
   async registerCustomer(input: RegisterCustomerInput): Promise<AuthSession> {
     const fullName = normalizeFullName(input.fullName);
     const email = normalizeEmail(input.email);
+    const phone = normalizePhone(input.phone);
     assertValidPassword(input.password);
 
     const existing = await this.users.findAuthByEmail(email);
@@ -116,6 +118,7 @@ export class AuthenticationService {
         {
           email,
           fullName,
+          phone,
           passwordHash,
           authProvider: AUTH_PROVIDER.LOCAL,
           status: USER_STATUS.ACTIVE,
@@ -135,7 +138,7 @@ export class AuthenticationService {
 
   async login(input: LoginInput): Promise<AuthSession> {
     const email = normalizeEmail(input.email);
-    assertValidPassword(input.password);
+    assertPasswordLength(input.password);
 
     const record = await this.users.findAuthByEmail(email);
     if (!canAttemptLocalLogin(record)) {
@@ -232,21 +235,26 @@ function normalizeEmail(email: string): string {
   return normalized;
 }
 
+function normalizePhone(phone: string | undefined): string | null {
+  if (phone === undefined) {
+    return null;
+  }
+  const compact = phone.trim().replace(/[\s().-]/g, '');
+  if (compact.length === 0) {
+    return null;
+  }
+  if (!PHONE_PATTERN.test(compact)) {
+    throw new BadRequestException('Phone is invalid');
+  }
+  return compact;
+}
+
 function normalizeFullName(fullName: string): string {
   const normalized = fullName.trim().replace(/\s+/g, ' ');
   if (normalized.length === 0 || normalized.length > MAX_FULL_NAME_LENGTH) {
     throw new BadRequestException('Full name is invalid');
   }
   return normalized;
-}
-
-function assertValidPassword(password: string): void {
-  if (
-    password.length < MIN_SECRET_LENGTH ||
-    password.length > MAX_SECRET_LENGTH
-  ) {
-    throw new BadRequestException('Credentials do not meet requirements');
-  }
 }
 
 function canAttemptLocalLogin(

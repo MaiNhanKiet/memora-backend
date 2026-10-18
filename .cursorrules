@@ -1,0 +1,14 @@
+
+When generating Git commit messages:
+
+- Follow Conventional Commits.
+- Format: <type>(<scope>): <summary>
+- Types: feat, fix, refactor, test, docs, ci, infra, chore.
+- Use the owning MEMORA domain as scope.
+- Write in English.
+- Use lowercase imperative summaries.
+- Keep the subject within 72 characters.
+- Do not generate long paragraphs by default.
+- Add a short body only for complex changes.
+- Generate messages based on staged changes.
+- Never include credentials or secrets.

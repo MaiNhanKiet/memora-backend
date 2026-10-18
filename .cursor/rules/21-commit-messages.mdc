@@ -1,0 +1,149 @@
+---
+description: MEMORA Conventional Commit message format, scope naming, breaking changes, and safe Git commit behavior
+alwaysApply: true
+---
+
+# MEMORA — Commit Message Rules
+
+## 1. Required format
+
+Every Git commit MUST use Conventional Commits:
+
+```text
+<type>(<scope>): <summary>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+For a breaking change:
+
+```text
+<type>(<scope>)!: <summary>
+
+BREAKING CHANGE: <what breaks, impact, and migration path>
+```
+
+- `type` and `scope` are REQUIRED.
+- Use lowercase ASCII for `type` and `scope`; do not use spaces or Vietnamese accents.
+- Write the summary in English, in imperative form (e.g., `add`, `fix`, `prevent`, `remove`, `update`).
+- Summary begins with a lowercase verb; no period, emoji, or trailing whitespace.
+- Keep the entire first line at most 72 characters where practical; shorten rather than use vague wording.
+- State the actual behavior/change, not an activity like `update code`, `fix bug`, `done`, or `wip`.
+- One commit = one cohesive change; separate unrelated changes.
+- Preserve a blank line between subject, body, and footer.
+
+## 2. Allowed types
+
+| Type | Use |
+| --- | --- |
+| `feat` | New business feature, endpoint, or user-facing capability |
+| `fix` | Correct a defect |
+| `refactor` | Internal restructuring without changing external behavior |
+| `perf` | Performance improvement |
+| `test` | Add or improve tests |
+| `docs` | Documentation only |
+| `build` | Build tooling, packaging, dependencies, Docker image build |
+| `ci` | GitHub Actions and CI/CD pipeline definitions |
+| `infra` | Docker Compose, host deployment, Cloudflare, server infrastructure |
+| `chore` | Non-feature maintenance |
+| `revert` | Explicitly revert a prior commit |
+
+Do not use arbitrary new types without user approval.
+
+## 3. Scope selection (MEMORA ownership)
+
+Use the PRIMARY owning business domain whenever possible:
+
+| Service | Allowed domain scopes |
+| --- | --- |
+| `iam-service` | `iam` |
+| `commerce-service` | `catalog`, `pricing`, `inventory`, `design`, `ordering` |
+| `operations-service` | `personalization`, `production`, `fulfillment`, `after-sales` |
+| `experience-service` | `memory`, `platform` |
+
+Technical or cross-cutting scopes:
+
+`gateway`, `contracts`, `grpc`, `db`, `cache`, `queue`, `security`, `observability`, `architecture`, `docs`, `deps`, `ci`, `deploy`, `infra`, `monorepo`.
+
+- Use `after-sales` as a Git commit scope even though the SQL schema is `after_sales`.
+- If one feature changes Gateway + proto + one or more services, use the PRIMARY business domain; explain secondary impacts in the body.
+- For an infrastructure-only or repository-wide change, use the closest technical scope.
+- Do not use service names as scopes when a more specific owning domain exists.
+
+## 4. When a commit body is required
+
+Add a body explaining **what and why**, and operational implications, when the change includes any of:
+
+- Database schema or Prisma migration; include rollout/backward-compatibility notes.
+- Changes to HTTP/gRPC/event contracts, authentication, authorization, or ownership checks.
+- Behavior spanning multiple MEMORA services or multiple main flows (MF01–MF06).
+- Production deployment, bootstrap, secret-handling behavior, or CI/CD release changes.
+- Changes that are not obvious from the summary alone.
+
+When applicable, include relevant flow references (`MF01`–`MF06`), impacted services, and related GitHub issues (`Refs #123`) in the body/footer. Do not invent issue numbers.
+
+## 5. Breaking changes
+
+A breaking change MUST be explicitly marked with `!` immediately before `:` and include a `BREAKING CHANGE:` footer describing:
+
+- Which API, gRPC message, event, schema, or consumer is affected.
+- Compatibility impact and required migration/rollout order.
+- How existing clients or records should be handled.
+
+Never label a change as backward compatible unless verified.
+
+## 6. Valid examples
+
+```text
+feat(catalog): add ring template listing endpoint
+feat(design): persist guest cart after add to cart
+feat(ordering): create orders from selected drafts
+feat(personalization): validate fingerprint capture attempts
+feat(production): assign work orders by jeweler skill
+feat(memory): add memory card PIN verification
+fix(iam): prevent refresh token replay
+fix(ordering): reject duplicate payment webhook events
+refactor(gateway): centralize grpc error mapping
+test(fulfillment): cover recipient verification failures
+docs(architecture): document four service boundaries
+ci(deploy): publish images only from main
+infra(deploy): validate Mini PC secrets before bootstrap
+build(deps): update NestJS dependencies
+```
+
+Breaking example:
+
+```text
+feat(ordering)!: require verified identity for guest checkout
+
+Ensure guest order ownership is verified before creating an order.
+Affects commerce-service and Gateway; MF02.
+
+BREAKING CHANGE: Guest checkout requests without verified ownership
+proof are rejected. Update clients before rollout.
+```
+
+## 7. Rejected examples
+
+```text
+update code
+fix bug
+WIP
+feat: add cart
+feat(Commerce): Added cart.
+feat(ordering): 🔥 done
+```
+
+Reasons: missing type/scope, vague summary, wrong casing/tense, trailing period, or emoji.
+
+## 8. Safe commit workflow / Cursor behavior
+
+- MEMORA currently uses `dev` for development integration and `main` for release; the release CI/CD pipeline runs when `main` is updated.
+- These rules govern commit messages only. Do not infer permission to change branches, run commits, push, merge, or deploy.
+- Before suggesting a commit, inspect `git status`, current branch, and staged diff; check for unrelated files.
+- Never stage/commit `.env`, credentials, tokens, secrets, private keys, raw biometric data, or production data.
+- Propose a precise commit message based on the REAL staged diff, not on the initial user request or presumed implementation.
+- Do not execute `git add`, `git commit`, `git push`, `git merge`, `git rebase`, or force-push unless expressly authorized by the user.
+- When squash-merging a PR into `dev` or releasing `dev` to `main`, use a Conventional Commit-style squash subject reflecting the actual changes.

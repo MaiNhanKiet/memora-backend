@@ -21,6 +21,24 @@ export function requireText(
   return value;
 }
 
+export function optionalText(
+  value: string | undefined,
+  field: string,
+  maxLength: number,
+): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+  if (trimmed.length > maxLength) {
+    throw new BadRequestException(`${field} is invalid`);
+  }
+  return trimmed;
+}
+
 export function requireCredential(value: string | undefined): string {
   return requireText(value, 'Credential', MAX_CREDENTIAL_LENGTH);
 }

@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsStrongPassword } from '../../decorators/is-strong-password.decorator';
 
 export class ResetPasswordRequestDto {
   @ApiProperty({
@@ -14,5 +15,6 @@ export class ResetPasswordRequestDto {
   @IsString()
   @MinLength(8)
   @MaxLength(128)
+  @IsStrongPassword()
   password!: string;
 }
