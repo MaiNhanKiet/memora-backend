@@ -8,7 +8,6 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, SuccessMessage } from '@app/common';
 import type { Request, Response } from 'express';
@@ -36,6 +35,7 @@ import {
   toPublicUserResponse,
 } from '../mappers/auth-http.mapper';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
+import { AuthRateLimit } from '../decorators/auth-rate-limit.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -47,7 +47,7 @@ export class AuthController {
 
   @Post('register')
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  @AuthRateLimit(5, 15)
   @HttpCode(201)
   @SuccessMessage('Registered')
   @ApiAuthSessionDocs('Register a local customer account')
@@ -70,7 +70,7 @@ export class AuthController {
 
   @Post('login')
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 900_000 } })
+  @AuthRateLimit(10, 15)
   @HttpCode(200)
   @SuccessMessage('Authenticated')
   @ApiAuthSessionDocs('Log in with email and password')
@@ -92,7 +92,6 @@ export class AuthController {
 
   @Get('csrf')
   @Public()
-  @HttpCode(200)
   @SuccessMessage('CSRF token')
   @ApiOperation({
     summary:
@@ -178,7 +177,7 @@ export class AuthController {
   }
 
   @Post('resend-verification')
-  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  @AuthRateLimit(5, 15)
   @HttpCode(200)
   @ApiResendVerificationDocs()
   async resendVerification(
@@ -192,7 +191,7 @@ export class AuthController {
 
   @Post('forgot-password')
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  @AuthRateLimit(5, 15)
   @HttpCode(200)
   @ApiAcceptedDocs('Request a password reset email')
   forgotPassword(@Body() body: ForgotPasswordRequestDto) {
@@ -201,7 +200,7 @@ export class AuthController {
 
   @Post('reset-password')
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 900_000 } })
+  @AuthRateLimit(10, 15)
   @HttpCode(200)
   @SuccessMessage('Password updated')
   @ApiLogoutDocs('Reset password with a recovery credential')

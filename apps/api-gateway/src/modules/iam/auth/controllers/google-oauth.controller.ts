@@ -7,7 +7,6 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GoogleOAuthGuard } from '@app/auth/google-oauth';
@@ -16,6 +15,7 @@ import { Public, SkipResponseTransform } from '@app/common';
 import type { Request, Response } from 'express';
 import { AuthCookieService } from '../cookies/auth-cookie.service';
 import { IamGrpcClient } from '../../clients/iam-grpc.client';
+import { AuthRateLimit } from '../decorators/auth-rate-limit.decorator';
 import { GoogleOAuthRedirectFilter } from '../filters/google-oauth-redirect.filter';
 
 @ApiTags('Auth')
@@ -29,7 +29,7 @@ export class GoogleOAuthController {
 
   @Get('google')
   @Public()
-  @Throttle({ default: { limit: 20, ttl: 900_000 } })
+  @AuthRateLimit(20, 15)
   @SkipResponseTransform()
   @UseGuards(GoogleOAuthGuard)
   @ApiOperation({ summary: 'Start Google OAuth Authorization Code flow' })
@@ -39,7 +39,7 @@ export class GoogleOAuthController {
 
   @Get('google/callback')
   @Public()
-  @Throttle({ default: { limit: 20, ttl: 900_000 } })
+  @AuthRateLimit(20, 15)
   @SkipResponseTransform()
   @UseFilters(GoogleOAuthRedirectFilter)
   @UseGuards(GoogleOAuthGuard)
