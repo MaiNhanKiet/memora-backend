@@ -1,0 +1,34 @@
+---
+description: Creating a new Nest owning service, Prisma/DB, GHCR image and Mini PC deploy.
+globs: nest-cli.json,apps/**/*,docker/**/*,deploy/**/*,proto/**/*,.github/workflows/*.yml
+alwaysApply: false
+---
+
+# New owning service, database and deploy
+
+Ask first if the change would add a Nest app, a new Postgres/Redis instance, a new GHCR image, or a new Compose service. Current live apps are **only** `api-gateway` and `iam-service`. Do not recreate Catalog/Consultation.
+
+## Service shape
+
+- One Nest application per bounded context (`apps/<name>-service`), not per transport. Mirror `iam-service`: `main.ts`, feature modules, gRPC presentation, repositories, Prisma only if this context owns data.
+- Gateway stays HTTP/DTO/Swagger/orchestration. New public REST goes in Gateway; domain writes stay in the owning service. No Prisma in Gateway.
+- Add `nest-cli.json` project, `tsconfig.app.json`, webpack if IAM-style, handwritten contracts in `libs/contracts` plus `proto/` if gRPC. Use `create-grpc-rpc` / `implement-http-api` skills when those files change.
+- Internal gRPC: verify caller secret from config; never trust client actor IDs. Reuse `IAM_INTERNAL_GRPC_SECRET` pattern or a dedicated shared secret in **both** Gateway and the new service env.
+
+## Database
+
+- Read the service Prisma config and existing Mini PC topology before adding a database. Today Mini PC is **one** Postgres (`memora-postgres`) with IAM using schema `iam` on database `memora`, plus Redis. Do **not** assume database-per-service is approved.
+- Prefer a **new Postgres schema** on the existing instance when that matches approval. A second Postgres container/volume requires an explicit product decision (rule `23-database-rbac`).
+- Schema/DDL => versioned Prisma migrations in **that** service. Catalogs => idempotent seed. Do not put another domain’s tables in `apps/iam-service/prisma`.
+- New migrate image if the service has Prisma CLI work (`docker/iam-migrate.Dockerfile` is the pattern). Runtime app images must not rely on `prisma migrate deploy` at start. Preserve order: migrate → approved seed → start.
+- Never `migrate reset`, never `compose down -v`, never recreate `memora-infra_*` volumes unless the user explicitly authorizes data loss.
+
+## Deploy / CI / Mini PC
+
+- Add `docker/<app>.Dockerfile` (Node 20.20.x bookworm-slim, linux/amd64). Add a **Publish GHCR** matrix row. Image name `ghcr.io/<lowercase-github-owner>/memora-<app>`. Owner is **not** hardcoded `m3mora`; derive lowercase `github.repository_owner` in CI and keep helper pull refs in sync.
+- `deploy/backend/compose.yaml`: new service on external `memora-network`, `env_file` under `/opt/memora/secrets`, Docker DNS names (`postgres`, `redis`, `iam-service`). No host `0.0.0.0`. Tailscale/loopback publish only if this process is meant to be reached from the host.
+- `deploy/scripts/lib.sh` and `memora-deploy.sh`: pull/pin digest, `write_release_env`, health. After changing helper files, Mini PC must **reinstall** helper from a fresh `deploy/` copy; leftover `/opt/memora/lib/lib.sh` will keep old image prefixes.
+- New secrets: `*.env.example` in git only. Live files on Mini PC `/opt/memora/secrets/` (root, `600`). Never commit `deploy/secrets/*.env`, `.env`, or `deploy/infra/.env`.
+- Extra infra in `deploy/infra/compose.yaml` only when a new **shared** dependency is approved. Daily CD must not recreate Postgres/Redis/cloudflared. First app bring-up = Bootstrap; later SHA = Deploy. GHCR private packages need `packages: write` (publish) and PAT/`GITHUB_TOKEN` **read:packages** (Mini PC pull).
+- Copy `deploy/` to Mini PC via SFTP; `sudo bash deploy/host/install-deploy-helper.sh` does not overwrite existing `*.env`.
+- Summarize in Vietnamese: new app/DB decision, files, GHCR names, Mini PC helper/secret steps, unverified live deploy.

@@ -1,0 +1,109 @@
+---
+description: MEMORA Git branching, Conventional Commits, pull requests, and safe CI/CD workflow
+alwaysApply: true
+---
+
+# MEMORA — Git Branching & Commit Rules
+
+## 1. Architecture Context
+- MEMORA uses a NestJS monorepo with **4 microservices + 1 API Gateway**.
+- Domain ownership:
+  - `iam-service`: `iam`
+  - `commerce-service`: `catalog`, `pricing`, `inventory`, `design`, `ordering`
+  - `operations-service`: `personalization`, `production`, `fulfillment`, `after_sales`
+  - `experience-service`: `memory`, `platform`
+- `api-gateway` is an entry point, not a business microservice.
+- Follow `docs/architecture/memora-backend-architecture.md` for architecture decisions.
+- Do not create new microservices or change domain ownership without explicit approval.
+
+## 2. Branching Model
+- Use **GitHub Flow**: `main` plus short-lived task branches.
+- Branch format: `<type>/<domain>-<feature>`.
+- Allowed branch types: `feat`, `fix`, `refactor`, `test`, `docs`, `ci`, `infra`, `chore`.
+- Use lowercase ASCII kebab-case; no spaces or Vietnamese accents.
+- Name the branch for the **owning business domain**, not for the technical service.
+- For service-wide foundation tasks, the service name is acceptable (for example, `feat/commerce-foundation`).
+- For cross-service features, use the primary owning domain. A single cohesive feature may change multiple apps, libraries, contracts, and migrations in one branch.
+- Do **not** use permanent branches per service or automatically create `develop` / `release` branches.
+- Do not directly develop on `main`.
+
+### Examples
+- `feat/iam-customer-identity`
+- `feat/catalog-ring-templates`
+- `feat/pricing-price-versions`
+- `feat/design-guest-cart`
+- `feat/ordering-create-order`
+- `feat/personalization-fingerprint-capture`
+- `feat/production-work-orders`
+- `feat/memory-digital-card`
+- `feat/commerce-foundation`
+- `fix/iam-refresh-rotation`
+- `refactor/gateway-grpc-client`
+- `test/ordering-payments`
+- `docs/service-architecture`
+- `ci/ghcr-publish`
+- `infra/mini-pc-deploy`
+- `chore/upgrade-nestjs`
+
+## 3. Commit Convention
+- Use **Conventional Commits**:
+  - `<type>(<scope>): <imperative summary>`
+  - `scope` should normally be the owning domain (`iam`, `catalog`, `pricing`, `inventory`, `design`, `ordering`, `personalization`, `production`, `fulfillment`, `after-sales`, `memory`, `platform`) or a technical scope (`gateway`, `ci`, `infra`, `docs`, `deps`).
+- Recommended commit types: `feat`, `fix`, `refactor`, `test`, `docs`, `build`, `ci`, `perf`, `chore`, `revert`.
+- Write a short, specific English summary in imperative/present-tense style; do not append a period.
+- One commit should represent one coherent change. Avoid mixing unrelated code, formatting, and dependency updates.
+- For a breaking change, use `!` and explain the break in the commit body (for example, `feat(ordering)!: change quote contract`).
+- For database changes, mention migration and backward-compatibility implications in the commit body or PR.
+- Never put tokens, passwords, credentials, user data, or `.env` values into commit messages.
+
+### Commit examples
+```text
+feat(catalog): add ring template query endpoints
+feat(design): implement guest cart creation
+feat(ordering): create order from selected drafts
+fix(iam): prevent refresh token replay
+refactor(gateway): centralize grpc error mapping
+test(personalization): cover capture attempt limits
+ci(ghcr): publish immutable image digests
+infra(deploy): validate production environment files
+docs(architecture): record service domain ownership
+```
+
+## 4. Safe Worktree and Branch Operations
+Before proposing code changes:
+1. Inspect the current repository and branch (`git rev-parse --show-toplevel`, `git branch --show-current`, `git status`).
+2. Inspect existing remote (`git remote -v`) before assuming it is configured.
+3. Propose an appropriate branch name using the rules above.
+4. Only switch branches, create a branch, commit, push, merge, or rebase **when the user explicitly authorizes it**.
+5. Start new task branches from an up-to-date `main` if it can be updated without losing local work.
+6. Preserve uncommitted changes. Never reset, discard, force-push, or overwrite local commits without explicit authorization.
+7. Never run `git init` or replace `.git` without explicit authorization. A missing `.git` in the current folder is not proof that the GitHub repository does not exist.
+
+## 5. Pull Request Rules
+- Target `main`.
+- Use a descriptive title consistent with Conventional Commits where practical.
+- PR description must cover:
+  - Owning domain and relevant Main Flow (`MF01`–`MF06`, when applicable).
+  - User-visible behavior and affected apps/services.
+  - HTTP/gRPC/event-contract changes and compatibility.
+  - Database schema/migration changes, including rollback considerations.
+  - Tests executed, CI results, and operational risks.
+- Require applicable lint, type-check, tests, build, and security checks before merge.
+- Prefer squash merge for short-lived feature branches; delete the feature branch after merge.
+- Do not claim branch protection or mandatory reviews are enforced unless GitHub settings actually confirm it.
+
+## 6. Secrets and Production Safety
+- Never commit `.env`, `.env.*` containing secrets, keys, credentials, tokens, or production configuration values.
+- Commit only sanitized templates such as `.env.example` and `deploy/secrets/*.env.example`.
+- Review `git status` and staged diffs before commit; verify no secrets are staged.
+- Keep production secrets on the Mini PC under its protected secret directory; do not embed them in images or GitHub workflows.
+- Do not run migrations, bootstrap, deploy, rollback, delete Docker volumes, or modify production databases without explicit authorization.
+- Feature branches must not deploy to production.
+- Production images should be traceable to an approved commit SHA and immutable image digest; follow the repository's configured approval and deployment process.
+
+## 7. Cursor Behavior
+- At the start of a coding request, identify the owning domain and suggest the branch name.
+- Explain cross-domain or cross-service impacts before implementation.
+- Do not create extra services solely because a new database domain or API module exists.
+- Do not automatically perform Git actions. Provide commands first and wait for authorization.
+- If the repository state, release workflow, or secret handling is unclear, inspect the local files and report uncertainty rather than guessing.
