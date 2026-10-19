@@ -9,6 +9,7 @@ import { EMAIL_SENDER, UnconfiguredEmailSender } from './auth/email-sender';
 import { EmailVerificationService } from './auth/email-verification.service';
 import { PasswordHasher } from './auth/password-hasher';
 import { PasswordRecoveryService } from './auth/password-recovery.service';
+import { SecurityAuditService } from './auth/security-audit.service';
 import { RefreshTokenService } from './auth/refresh-token.service';
 import { AuthorizationService } from './authorization/authorization.service';
 import { CustomerIdentitiesService } from './users/customer-identities.service';
@@ -32,6 +33,7 @@ import { UsersService } from './users/users.service';
     },
     EmailVerificationService,
     PasswordRecoveryService,
+    SecurityAuditService,
   ],
   exports: [
     UsersService,

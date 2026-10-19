@@ -33,15 +33,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     const body = this.toErrorResponse(exception, request);
-    if (body.statusCode >= 500) {
-      const requestIdSuffix =
-        body.requestId === undefined ? '' : ` requestId=${body.requestId}`;
-      this.logger.error(
-        `Unexpected HTTP error on ${request.method} ${publicRequestPath(request)}${requestIdSuffix}`,
-        exception instanceof Error ? exception.stack : exception,
-      );
-    }
-
     response.status(body.statusCode).json(body);
   }
 

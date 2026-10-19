@@ -40,6 +40,14 @@ export class UserRepository {
           roleId,
         },
       });
+      await tx.securityAuditEvent.create({
+        data: {
+          userId: user.id,
+          action: 'role_assigned',
+          outcome: 'success',
+          metadata: { roleId },
+        },
+      });
       return user;
     });
   }

@@ -1,0 +1,9 @@
+---
+description: Delete test files created for the current task after the test command finishes.
+alwaysApply: true
+---
+# Delete task tests after the run
+
+- After the test command for the current task finishes, delete the test files created for that task. Report the command result first, then delete the files in the same turn.
+- Delete only files this task added, such as a new `*.spec.ts` or `*.test.ts`. Leave test files that already existed in the repository.
+- Do this whether the run passed or failed. Do not leave the new test files for a later cleanup request.

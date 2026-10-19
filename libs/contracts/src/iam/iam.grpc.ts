@@ -78,6 +78,7 @@ export interface AccessPrincipalResponse {
   userId: string;
   tokenId: string;
   emailVerified: boolean;
+  customerIdentityId?: string;
 }
 
 export interface CheckRolesRequest {

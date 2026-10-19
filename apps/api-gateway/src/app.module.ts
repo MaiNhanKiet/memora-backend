@@ -7,7 +7,8 @@ import {
   createServiceConfigModule,
   validateApiGatewayEnv,
 } from '@app/config';
-import { LoggingInterceptor, ObservabilityModule } from '@app/observability';
+import { LoggingInterceptor } from '@app/logger';
+import { ObservabilityModule } from '@app/observability';
 import { GatewayThrottlerGuard } from './common/guards/gateway-throttler.guard';
 import { ResponseTransformInterceptor } from './common/interceptors/response-transform.interceptor';
 import { HealthModule } from './modules/health/health.module';

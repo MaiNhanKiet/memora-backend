@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 export const REQUEST_ID_HEADER = 'x-request-id';
 export const REQUEST_ID_METADATA_KEY = 'x-request-id';
+export const ACTOR_ID_METADATA_KEY = 'x-actor-id';
+export const ACTOR_TYPE_METADATA_KEY = 'x-actor-type';
+export const CUSTOMER_IDENTITY_METADATA_KEY = 'x-customer-identity-id';
 
 const MAX_REQUEST_ID_LENGTH = 128;
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,128}$/;

@@ -39,6 +39,7 @@ model User {
   userRoles              UserRole[]         @relation("UserRoleAssignments")
   assignedUserRoles      UserRole[]         @relation("UserRoleAssignedBy")
   grantedRolePermissions RolePermission[]   @relation("RolePermissionGrantedBy")
+  securityAuditEvents    SecurityAuditEvent[]
 
   @@map("users")
   @@schema("iam")
@@ -148,5 +149,21 @@ model RbacBootstrapExecution {
   appliedBy      String?  @map("applied_by") @db.VarChar(200)
 
   @@map("rbac_bootstrap_executions")
+  @@schema("iam")
+}
+
+/// Append-only IAM security audit. Business history stays in the owning domain.
+model SecurityAuditEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  action    String   @map("action") @db.VarChar(80)
+  outcome   String   @map("outcome") @db.VarChar(20)
+  metadata  Json     @default("{}") @map("metadata")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId, createdAt])
+  @@map("security_audit_events")
   @@schema("iam")
 }

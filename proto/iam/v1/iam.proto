@@ -99,6 +99,7 @@ message AccessPrincipalResponse {
   string user_id = 1;
   string token_id = 2;
   bool email_verified = 3;
+  string customer_identity_id = 4;
 }
 
 message CheckRolesRequest {

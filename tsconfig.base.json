@@ -33,6 +33,8 @@
       "@app/contracts/*": ["libs/contracts/src/*"],
       "@app/observability": ["libs/observability/src/index.ts"],
       "@app/observability/*": ["libs/observability/src/*"],
+      "@app/logger": ["libs/logger/src/index.ts"],
+      "@app/logger/*": ["libs/logger/src/*"],
       "@app/cache": ["libs/cache/src/index.ts"],
       "@app/cache/*": ["libs/cache/src/*"],
       "@app/queue": ["libs/queue/src/index.ts"],

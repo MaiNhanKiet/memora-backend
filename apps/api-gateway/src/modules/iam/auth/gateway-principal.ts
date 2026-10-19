@@ -4,6 +4,7 @@ export type GatewayAuthenticatedPrincipal = AuthenticatedPrincipal & {
   readonly accessCredential: string;
   readonly emailVerified: boolean;
   readonly tokenId: string;
+  readonly customerIdentityId?: string;
 };
 
 export function hasAccessCredential(

@@ -132,6 +132,7 @@
       "^@app/config(|/.*)$": "<rootDir>/libs/config/src/$1",
       "^@app/contracts(|/.*)$": "<rootDir>/libs/contracts/src/$1",
       "^@app/observability(|/.*)$": "<rootDir>/libs/observability/src/$1",
+      "^@app/logger(|/.*)$": "<rootDir>/libs/logger/src/$1",
       "^@app/cache(|/.*)$": "<rootDir>/libs/cache/src/$1",
       "^@app/queue(|/.*)$": "<rootDir>/libs/queue/src/$1",
       "^(\\.{1,2}/.*)\\.js$": "$1"

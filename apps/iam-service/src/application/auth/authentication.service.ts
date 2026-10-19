@@ -31,6 +31,8 @@ import {
   type IssuedRefreshSession,
 } from './refresh-token.service';
 import { UsersService } from '../users/users.service';
+import { SECURITY_AUDIT_ACTION } from './security-audit';
+import { SecurityAuditService } from './security-audit.service';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_SECRET_LENGTH = 8;
@@ -84,6 +86,7 @@ export class AuthenticationService {
     private readonly passwords: PasswordHasher,
     private readonly accessTokens: AccessTokenService,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly securityAudit: SecurityAuditService,
   ) {}
 
   async registerCustomer(input: RegisterCustomerInput): Promise<AuthSession> {
@@ -130,6 +133,10 @@ export class AuthenticationService {
       throw error;
     }
 
+    await this.securityAudit.record({
+      userId: created.id,
+      action: SECURITY_AUDIT_ACTION.REGISTER,
+    });
     return this.issueSession(created);
   }
 
@@ -152,6 +159,11 @@ export class AuthenticationService {
 
     const updated = await this.userRepository.updateById(record.id, {
       lastLoginAt: new Date(),
+    });
+    await this.securityAudit.record({
+      userId: updated.id,
+      action: SECURITY_AUDIT_ACTION.LOGIN,
+      metadata: { method: 'local' },
     });
 
     return this.issueSession(updated);

@@ -22,6 +22,8 @@ import {
   RefreshTokenService,
   type IssuedRefreshSession,
 } from './refresh-token.service';
+import { SECURITY_AUDIT_ACTION } from './security-audit';
+import { SecurityAuditService } from './security-audit.service';
 
 const EMAIL_ALREADY_REGISTERED =
   'This email is already registered. Sign in with your existing account.';
@@ -38,6 +40,7 @@ export class GoogleAuthService {
     private readonly roles: RoleRepository,
     private readonly accessTokens: AccessTokenService,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly securityAudit: SecurityAuditService,
   ) {}
 
   async authenticate(idToken: string): Promise<AuthSession> {
@@ -57,6 +60,11 @@ export class GoogleAuthService {
     }
     const updated = await this.userRepository.updateById(user.id, {
       lastLoginAt: new Date(),
+    });
+    await this.securityAudit.record({
+      userId: updated.id,
+      action: SECURITY_AUDIT_ACTION.LOGIN,
+      metadata: { method: 'google' },
     });
     return this.issueSession(updated);
   }
@@ -94,6 +102,11 @@ export class GoogleAuthService {
         },
         customerRole.id,
       );
+      await this.securityAudit.record({
+        userId: created.id,
+        action: SECURITY_AUDIT_ACTION.LOGIN,
+        metadata: { method: 'google' },
+      });
       return this.issueSession(created);
     } catch (error) {
       if (!isUniqueViolation(error)) {
