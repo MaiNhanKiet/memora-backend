@@ -5,6 +5,7 @@ export type GoogleOAuthStart = {
   codeVerifier: string;
   codeChallenge: string;
   expiresAtMs: number;
+  linkIntentId?: string;
 };
 
 export type VerifiedGoogleOAuthIdentity = {

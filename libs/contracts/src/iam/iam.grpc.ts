@@ -9,6 +9,15 @@ export interface RegisterRequest {
   phone?: string;
 }
 
+export interface RegisterChallengeResponse {
+  expiresInSeconds: number;
+}
+
+export interface ConfirmRegistrationRequest {
+  email: string;
+  otp: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -32,12 +41,8 @@ export interface LogoutAllRequest {
 
 export type LogoutResponse = Record<string, never>;
 
-export interface VerifyEmailRequest {
-  verificationCredential: string;
-}
-
 export interface ResendVerificationEmailRequest {
-  accessCredential: string;
+  email: string;
 }
 
 export interface ResendVerificationEmailResponse {
@@ -58,6 +63,44 @@ export interface ResetPasswordRequest {
 }
 
 export type ResetPasswordResponse = Record<string, never>;
+
+export interface ChangePasswordRequest {
+  accessCredential: string;
+  currentPassword: string;
+  password: string;
+}
+
+export type ChangePasswordResponse = Record<string, never>;
+
+export interface StartGoogleLinkRequest {
+  accessCredential: string;
+  password: string;
+}
+
+export interface StartGoogleLinkResponse {
+  intentId: string;
+}
+
+export interface CompleteGoogleLinkRequest {
+  intentId: string;
+  idToken: string;
+}
+
+export interface CompleteGoogleLinkResponse {
+  confirmationRequired: boolean;
+  confirmationId: string;
+  user?: PublicUserMessage;
+}
+
+export interface ConfirmGoogleLinkRequest {
+  accessCredential: string;
+  confirmationId: string;
+}
+
+export interface UnlinkGoogleAccountRequest {
+  accessCredential: string;
+  password: string;
+}
 
 export interface GetCurrentUserRequest {
   accessCredential: string;
@@ -119,7 +162,10 @@ export interface PublicUserMessage {
 }
 
 export interface IamServiceHandler {
-  register(request: RegisterRequest): Promise<AuthSessionResponse>;
+  register(request: RegisterRequest): Promise<RegisterChallengeResponse>;
+  confirmRegistration(
+    request: ConfirmRegistrationRequest,
+  ): Promise<AuthSessionResponse>;
   login(request: LoginRequest): Promise<AuthSessionResponse>;
   authenticateGoogle(
     request: AuthenticateGoogleRequest,
@@ -127,7 +173,6 @@ export interface IamServiceHandler {
   refreshToken(request: RefreshTokenRequest): Promise<AuthSessionResponse>;
   logout(request: LogoutRequest): Promise<LogoutResponse>;
   logoutAll(request: LogoutAllRequest): Promise<LogoutResponse>;
-  verifyEmail(request: VerifyEmailRequest): Promise<UserResponse>;
   resendVerificationEmail(
     request: ResendVerificationEmailRequest,
   ): Promise<ResendVerificationEmailResponse>;
@@ -135,6 +180,19 @@ export interface IamServiceHandler {
     request: ForgotPasswordRequest,
   ): Promise<ForgotPasswordResponse>;
   resetPassword(request: ResetPasswordRequest): Promise<ResetPasswordResponse>;
+  changePassword(
+    request: ChangePasswordRequest,
+  ): Promise<ChangePasswordResponse>;
+  startGoogleLink(
+    request: StartGoogleLinkRequest,
+  ): Promise<StartGoogleLinkResponse>;
+  completeGoogleLink(
+    request: CompleteGoogleLinkRequest,
+  ): Promise<CompleteGoogleLinkResponse>;
+  confirmGoogleLink(request: ConfirmGoogleLinkRequest): Promise<UserResponse>;
+  unlinkGoogleAccount(
+    request: UnlinkGoogleAccountRequest,
+  ): Promise<UserResponse>;
   getCurrentUser(request: GetCurrentUserRequest): Promise<UserResponse>;
   getUserById(request: GetUserByIdRequest): Promise<UserResponse>;
   validateAccessToken(

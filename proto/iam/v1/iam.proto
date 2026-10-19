@@ -3,17 +3,22 @@ syntax = "proto3";
 package memora.iam.v1;
 
 service IamService {
-  rpc Register (RegisterRequest) returns (AuthSessionResponse);
+  rpc Register (RegisterRequest) returns (RegisterChallengeResponse);
+  rpc ConfirmRegistration (ConfirmRegistrationRequest) returns (AuthSessionResponse);
   rpc Login (LoginRequest) returns (AuthSessionResponse);
   rpc AuthenticateGoogle (AuthenticateGoogleRequest) returns (AuthSessionResponse);
   rpc RefreshToken (RefreshTokenRequest) returns (AuthSessionResponse);
   rpc Logout (LogoutRequest) returns (LogoutResponse);
   rpc LogoutAll (LogoutAllRequest) returns (LogoutResponse);
 
-  rpc VerifyEmail (VerifyEmailRequest) returns (UserResponse);
   rpc ResendVerificationEmail (ResendVerificationEmailRequest) returns (ResendVerificationEmailResponse);
   rpc ForgotPassword (ForgotPasswordRequest) returns (ForgotPasswordResponse);
   rpc ResetPassword (ResetPasswordRequest) returns (ResetPasswordResponse);
+  rpc ChangePassword (ChangePasswordRequest) returns (ChangePasswordResponse);
+  rpc StartGoogleLink (StartGoogleLinkRequest) returns (StartGoogleLinkResponse);
+  rpc CompleteGoogleLink (CompleteGoogleLinkRequest) returns (CompleteGoogleLinkResponse);
+  rpc ConfirmGoogleLink (ConfirmGoogleLinkRequest) returns (UserResponse);
+  rpc UnlinkGoogleAccount (UnlinkGoogleAccountRequest) returns (UserResponse);
 
   rpc GetCurrentUser (GetCurrentUserRequest) returns (UserResponse);
   rpc GetUserById (GetUserByIdRequest) returns (UserResponse);
@@ -28,6 +33,15 @@ message RegisterRequest {
   string email = 2;
   string password = 3;
   optional string phone = 4;
+}
+
+message RegisterChallengeResponse {
+  int32 expires_in_seconds = 1;
+}
+
+message ConfirmRegistrationRequest {
+  string email = 1;
+  string otp = 2;
 }
 
 message LoginRequest {
@@ -53,12 +67,10 @@ message LogoutAllRequest {
 
 message LogoutResponse {}
 
-message VerifyEmailRequest {
-  string verification_credential = 1;
-}
-
 message ResendVerificationEmailRequest {
-  string access_credential = 1;
+  reserved 1;
+  reserved "access_credential";
+  string email = 2;
 }
 
 message ResendVerificationEmailResponse {
@@ -79,6 +91,44 @@ message ResetPasswordRequest {
 }
 
 message ResetPasswordResponse {}
+
+message ChangePasswordRequest {
+  string access_credential = 1;
+  string current_password = 2;
+  string password = 3;
+}
+
+message ChangePasswordResponse {}
+
+message StartGoogleLinkRequest {
+  string access_credential = 1;
+  string password = 2;
+}
+
+message StartGoogleLinkResponse {
+  string intent_id = 1;
+}
+
+message CompleteGoogleLinkRequest {
+  string intent_id = 1;
+  string id_token = 2;
+}
+
+message CompleteGoogleLinkResponse {
+  bool confirmation_required = 1;
+  string confirmation_id = 2;
+  PublicUser user = 3;
+}
+
+message ConfirmGoogleLinkRequest {
+  string access_credential = 1;
+  string confirmation_id = 2;
+}
+
+message UnlinkGoogleAccountRequest {
+  string access_credential = 1;
+  string password = 2;
+}
 
 message GetCurrentUserRequest {
   string access_credential = 1;

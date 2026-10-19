@@ -8,6 +8,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
+import {
+  appendAuthFailureCode,
+  resolveAuthFailureCode,
+} from './auth-failure-redirect';
 
 @Catch(HttpException)
 @Injectable()
@@ -29,7 +33,18 @@ export class GoogleOAuthRedirectFilter implements ExceptionFilter {
       response.status(status).json(exception.getResponse());
       return;
     }
-    response.redirect(302, failureUrl);
+    const errorCode = resolveAuthFailureCode(
+      status,
+      oauthFailureReason(exception),
+    );
+    let location = failureUrl;
+    try {
+      location = appendAuthFailureCode(failureUrl, errorCode);
+    } catch {
+      response.status(status).json(exception.getResponse());
+      return;
+    }
+    response.redirect(302, location);
   }
 }
 

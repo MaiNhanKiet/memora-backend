@@ -96,6 +96,22 @@ export class IamEnvironment extends NodeEnvironment {
   IAM_EMAIL_ACTION_BASE_URL!: string;
 
   @Expose()
+  @EnvSecret(20)
+  RESEND_EMAIL_API_KEY!: string;
+
+  @Expose()
+  @EnvNonEmptyText()
+  RESEND_TEMPLATE_VERIFY!: string;
+
+  @Expose()
+  @EnvNonEmptyText()
+  RESEND_TEMPLATE_RESET!: string;
+
+  @Expose()
+  @EnvNonEmptyText()
+  EMAIL_FROM!: string;
+
+  @Expose()
   @EnvDurationSeconds(300, 604_800)
   IAM_EMAIL_VERIFICATION_TTL_SECONDS!: number;
 
@@ -148,6 +164,10 @@ export interface IamEnv {
   IAM_REFRESH_REUSE_GRACE_SECONDS: number;
   IAM_PURPOSE_TOKEN_PEPPER: string;
   IAM_EMAIL_ACTION_BASE_URL: string;
+  RESEND_EMAIL_API_KEY: string;
+  RESEND_TEMPLATE_VERIFY: string;
+  RESEND_TEMPLATE_RESET: string;
+  EMAIL_FROM: string;
   IAM_EMAIL_VERIFICATION_TTL_SECONDS: number;
   IAM_EMAIL_VERIFICATION_COOLDOWN_SECONDS: number;
   IAM_PASSWORD_RESET_TTL_SECONDS: number;
@@ -213,6 +233,10 @@ export function validateIamEnv(
     IAM_REFRESH_REUSE_GRACE_SECONDS: validated.IAM_REFRESH_REUSE_GRACE_SECONDS,
     IAM_PURPOSE_TOKEN_PEPPER: validated.IAM_PURPOSE_TOKEN_PEPPER,
     IAM_EMAIL_ACTION_BASE_URL: validated.IAM_EMAIL_ACTION_BASE_URL,
+    RESEND_EMAIL_API_KEY: validated.RESEND_EMAIL_API_KEY,
+    RESEND_TEMPLATE_VERIFY: validated.RESEND_TEMPLATE_VERIFY,
+    RESEND_TEMPLATE_RESET: validated.RESEND_TEMPLATE_RESET,
+    EMAIL_FROM: validated.EMAIL_FROM,
     IAM_EMAIL_VERIFICATION_TTL_SECONDS:
       validated.IAM_EMAIL_VERIFICATION_TTL_SECONDS,
     IAM_EMAIL_VERIFICATION_COOLDOWN_SECONDS:
@@ -257,6 +281,10 @@ export const iamConfig = registerAs('iam', () => {
     refreshReuseGraceSeconds: env.IAM_REFRESH_REUSE_GRACE_SECONDS,
     purposeTokenPepper: env.IAM_PURPOSE_TOKEN_PEPPER,
     emailActionBaseUrl: env.IAM_EMAIL_ACTION_BASE_URL,
+    resendApiKey: env.RESEND_EMAIL_API_KEY,
+    resendTemplateVerify: env.RESEND_TEMPLATE_VERIFY,
+    resendTemplateReset: env.RESEND_TEMPLATE_RESET,
+    emailFrom: env.EMAIL_FROM,
     emailVerificationTtlSeconds: env.IAM_EMAIL_VERIFICATION_TTL_SECONDS,
     emailVerificationCooldownSeconds:
       env.IAM_EMAIL_VERIFICATION_COOLDOWN_SECONDS,

@@ -38,7 +38,7 @@ export class SignedCookieOAuthStateStore implements GoogleOAuthStateStore {
       throw new UnauthorizedException();
     }
     if (isGoogleOAuthStartExpired(start)) {
-      throw new ForbiddenException();
+      throw new ForbiddenException('Google sign-in expired');
     }
     return start;
   }
@@ -117,6 +117,9 @@ function isStart(value: unknown): value is SignedPayload {
     record.codeVerifier.length > 0 &&
     typeof record.codeChallenge === 'string' &&
     record.codeChallenge.length > 0 &&
-    typeof record.expiresAtMs === 'number'
+    typeof record.expiresAtMs === 'number' &&
+    (record.linkIntentId === undefined ||
+      (typeof record.linkIntentId === 'string' &&
+        record.linkIntentId.length > 0))
   );
 }

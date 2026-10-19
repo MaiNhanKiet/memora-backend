@@ -26,6 +26,7 @@ import {
   type UserAuthRecord,
 } from '../users/users.mapper';
 import { assertPasswordLength, assertValidPassword } from './identity-input';
+import { EmailVerificationService } from './email-verification.service';
 import { PasswordHasher } from './password-hasher';
 import {
   RefreshTokenService,
@@ -48,6 +49,10 @@ export type RegisterCustomerInput = {
 export type LoginInput = {
   email: string;
   password: string;
+};
+
+export type RegisterChallenge = {
+  expiresInSeconds: number;
 };
 
 export type AuthSession = {
@@ -85,9 +90,12 @@ export class AuthenticationService {
     private readonly passwords: PasswordHasher,
     private readonly accessTokens: AccessTokenService,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly emailVerification: EmailVerificationService,
   ) {}
 
-  async registerCustomer(input: RegisterCustomerInput): Promise<AuthSession> {
+  async registerCustomer(
+    input: RegisterCustomerInput,
+  ): Promise<RegisterChallenge> {
     const fullName = normalizeFullName(input.fullName);
     const email = normalizeEmail(input.email);
     const phone = normalizePhone(input.phone);
@@ -133,7 +141,25 @@ export class AuthenticationService {
       throw error;
     }
 
-    return this.issueSession(created);
+    try {
+      return await this.emailVerification.issue(created.id, created.email);
+    } catch (error) {
+      try {
+        await this.userRepository.deleteWithAssignments(created.id);
+      } catch (rollbackError) {
+        this.logger.error(
+          rollbackError instanceof Error
+            ? rollbackError.message
+            : 'Registration rollback failed',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async confirmRegistration(email: string, otp: string): Promise<AuthSession> {
+    const user = await this.emailVerification.confirm(email, otp);
+    return this.issueSession(user);
   }
 
   async login(input: LoginInput): Promise<AuthSession> {
@@ -152,6 +178,9 @@ export class AuthenticationService {
     if (!matches || !isActiveUserStatus(record.status)) {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
+    if (!hasVerifiedEmail(record.emailVerifiedAt)) {
+      throw new UnauthorizedException('Email is not verified');
+    }
 
     const updated = await this.userRepository.updateById(record.id, {
       lastLoginAt: new Date(),
@@ -163,7 +192,11 @@ export class AuthenticationService {
   async refresh(refreshToken: string): Promise<AuthSession> {
     const rotated = await this.refreshTokens.rotate(refreshToken);
     const user = await this.users.findById(rotated.userId);
-    if (user === null || !isActiveUserStatus(user.status)) {
+    if (
+      user === null ||
+      !isActiveUserStatus(user.status) ||
+      !hasVerifiedEmail(user.emailVerifiedAt)
+    ) {
       await this.refreshTokens.logoutAll(rotated.userId);
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -190,7 +223,11 @@ export class AuthenticationService {
   async verifyAccessToken(token: string): Promise<AccessPrincipal> {
     const claims = this.accessTokens.verify(token);
     const user = await this.users.findById(claims.sub);
-    if (user === null || !isActiveUserStatus(user.status)) {
+    if (
+      user === null ||
+      !isActiveUserStatus(user.status) ||
+      !hasVerifiedEmail(user.emailVerifiedAt)
+    ) {
       throw new UnauthorizedException('Unauthenticated');
     }
 

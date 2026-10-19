@@ -44,10 +44,63 @@ export class UserRepository {
     });
   }
 
+  async deleteWithAssignments(id: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({ where: { userId: id } });
+      await tx.user.delete({ where: { id } });
+    });
+  }
+
   updateById(id: string, data: Prisma.UserUncheckedUpdateInput): Promise<User> {
     return this.prisma.user.update({
       where: { id },
       data,
+    });
+  }
+
+  attachGoogleAccount(
+    userId: string,
+    googleSub: string,
+    emailDiffers: boolean,
+  ): Promise<User> {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: {
+          googleSub,
+          authProvider: 'HYBRID',
+        },
+      });
+      await tx.securityAuditEvent.create({
+        data: {
+          userId,
+          action: 'google_account_linked',
+          outcome: 'success',
+          metadata: { emailDiffers },
+        },
+      });
+      return user;
+    });
+  }
+
+  detachGoogleAccount(userId: string): Promise<User> {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: {
+          googleSub: null,
+          authProvider: 'LOCAL',
+        },
+      });
+      await tx.securityAuditEvent.create({
+        data: {
+          userId,
+          action: 'google_account_unlinked',
+          outcome: 'success',
+          metadata: {},
+        },
+      });
+      return user;
     });
   }
 }

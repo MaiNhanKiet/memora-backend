@@ -10,20 +10,28 @@ import type {
   AuthenticateGoogleRequest,
   AuthorizationDecisionResponse,
   AuthSessionResponse,
+  ChangePasswordRequest,
   CheckPermissionsRequest,
+  CompleteGoogleLinkRequest,
+  CompleteGoogleLinkResponse,
+  ConfirmGoogleLinkRequest,
+  StartGoogleLinkRequest,
+  StartGoogleLinkResponse,
+  UnlinkGoogleAccountRequest,
   CheckRolesRequest,
+  ConfirmRegistrationRequest,
   ForgotPasswordResponse,
   GetCurrentUserRequest,
   LoginRequest,
   LogoutAllRequest,
   LogoutRequest,
   RefreshTokenRequest,
+  RegisterChallengeResponse,
   RegisterRequest,
   ResendVerificationEmailRequest,
   ResendVerificationEmailResponse,
   ResetPasswordRequest,
   UserResponse,
-  VerifyEmailRequest,
 } from '@app/contracts';
 import { createOutgoingGrpcMetadata } from '@app/observability';
 import type { Metadata } from '@grpc/grpc-js';
@@ -35,6 +43,10 @@ const IAM_RPC_TIMEOUT_MS = 5000;
 interface IamServiceClient {
   register(
     request: RegisterRequest,
+    metadata?: Metadata,
+  ): Observable<RegisterChallengeResponse>;
+  confirmRegistration(
+    request: ConfirmRegistrationRequest,
     metadata?: Metadata,
   ): Observable<AuthSessionResponse>;
   login(
@@ -51,10 +63,6 @@ interface IamServiceClient {
   ): Observable<AuthSessionResponse>;
   logout(request: LogoutRequest, metadata?: Metadata): Observable<object>;
   logoutAll(request: LogoutAllRequest, metadata?: Metadata): Observable<object>;
-  verifyEmail(
-    request: VerifyEmailRequest,
-    metadata?: Metadata,
-  ): Observable<UserResponse>;
   resendVerificationEmail(
     request: ResendVerificationEmailRequest,
     metadata?: Metadata,
@@ -67,6 +75,26 @@ interface IamServiceClient {
     request: ResetPasswordRequest,
     metadata?: Metadata,
   ): Observable<object>;
+  changePassword(
+    request: ChangePasswordRequest,
+    metadata?: Metadata,
+  ): Observable<object>;
+  startGoogleLink(
+    request: StartGoogleLinkRequest,
+    metadata?: Metadata,
+  ): Observable<StartGoogleLinkResponse>;
+  completeGoogleLink(
+    request: CompleteGoogleLinkRequest,
+    metadata?: Metadata,
+  ): Observable<CompleteGoogleLinkResponse>;
+  confirmGoogleLink(
+    request: ConfirmGoogleLinkRequest,
+    metadata?: Metadata,
+  ): Observable<UserResponse>;
+  unlinkGoogleAccount(
+    request: UnlinkGoogleAccountRequest,
+    metadata?: Metadata,
+  ): Observable<UserResponse>;
   getCurrentUser(
     request: GetCurrentUserRequest,
     metadata?: Metadata,
@@ -105,9 +133,18 @@ export class IamGrpcClient implements OnModuleInit {
       this.grpcClient.getService<IamServiceClient>('IamService');
   }
 
-  register(request: RegisterRequest): Promise<AuthSessionResponse> {
+  register(request: RegisterRequest): Promise<RegisterChallengeResponse> {
     return this.unary((metadata) =>
       this.iamService.register(request, metadata),
+    );
+  }
+
+  confirmRegistration(
+    email: string,
+    otp: string,
+  ): Promise<AuthSessionResponse> {
+    return this.unary((metadata) =>
+      this.iamService.confirmRegistration({ email, otp }, metadata),
     );
   }
 
@@ -139,17 +176,11 @@ export class IamGrpcClient implements OnModuleInit {
     ).then(() => undefined);
   }
 
-  verifyEmail(verificationCredential: string): Promise<UserResponse> {
-    return this.unary((metadata) =>
-      this.iamService.verifyEmail({ verificationCredential }, metadata),
-    );
-  }
-
   resendVerificationEmail(
-    accessCredential: string,
+    email: string,
   ): Promise<ResendVerificationEmailResponse> {
     return this.unary((metadata) =>
-      this.iamService.resendVerificationEmail({ accessCredential }, metadata),
+      this.iamService.resendVerificationEmail({ email }, metadata),
     );
   }
 
@@ -162,6 +193,61 @@ export class IamGrpcClient implements OnModuleInit {
   resetPassword(recoveryCredential: string, password: string): Promise<void> {
     return this.unary((metadata) =>
       this.iamService.resetPassword({ recoveryCredential, password }, metadata),
+    ).then(() => undefined);
+  }
+
+  startGoogleLink(
+    accessCredential: string,
+    password: string,
+  ): Promise<StartGoogleLinkResponse> {
+    return this.unary((metadata) =>
+      this.iamService.startGoogleLink({ accessCredential, password }, metadata),
+    );
+  }
+
+  completeGoogleLink(
+    intentId: string,
+    idToken: string,
+  ): Promise<CompleteGoogleLinkResponse> {
+    return this.unary((metadata) =>
+      this.iamService.completeGoogleLink({ intentId, idToken }, metadata),
+    );
+  }
+
+  confirmGoogleLink(
+    accessCredential: string,
+    confirmationId: string,
+  ): Promise<UserResponse> {
+    return this.unary((metadata) =>
+      this.iamService.confirmGoogleLink(
+        { accessCredential, confirmationId },
+        metadata,
+      ),
+    );
+  }
+
+  unlinkGoogleAccount(
+    accessCredential: string,
+    password: string,
+  ): Promise<UserResponse> {
+    return this.unary((metadata) =>
+      this.iamService.unlinkGoogleAccount(
+        { accessCredential, password },
+        metadata,
+      ),
+    );
+  }
+
+  changePassword(
+    accessCredential: string,
+    currentPassword: string,
+    password: string,
+  ): Promise<void> {
+    return this.unary((metadata) =>
+      this.iamService.changePassword(
+        { accessCredential, currentPassword, password },
+        metadata,
+      ),
     ).then(() => undefined);
   }
 

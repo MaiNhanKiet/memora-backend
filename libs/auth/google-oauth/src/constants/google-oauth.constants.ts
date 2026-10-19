@@ -9,4 +9,5 @@ export const GOOGLE_OAUTH_SCOPES = ['openid', 'email', 'profile'] as const;
 export const GOOGLE_OAUTH_REQUEST = {
   START: 'memoraGoogleOAuthStart',
   CODE_VERIFIER: 'memoraGoogleOAuthCodeVerifier',
+  LINK_INTENT_ID: 'memoraGoogleOAuthLinkIntentId',
 } as const;

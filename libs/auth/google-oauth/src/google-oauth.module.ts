@@ -58,6 +58,7 @@ export class GoogleOAuthModule {
         GoogleOAuthGuard,
       ],
       exports: [
+        GoogleStrategy,
         GoogleOAuthGuard,
         GOOGLE_OAUTH_OPTIONS,
         GOOGLE_OAUTH_STATE_STORE,
@@ -101,6 +102,7 @@ export class GoogleOAuthModule {
         GoogleOAuthGuard,
       ],
       exports: [
+        GoogleStrategy,
         GoogleOAuthGuard,
         GOOGLE_OAUTH_OPTIONS,
         GOOGLE_OAUTH_STATE_STORE,

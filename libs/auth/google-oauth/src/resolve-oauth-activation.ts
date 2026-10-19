@@ -22,7 +22,11 @@ export function resolveGoogleOAuthActivation(
 
   if (typeof query.error === 'string' && query.error.length > 0) {
     states.clear(response);
-    throw new ForbiddenException();
+    throw new ForbiddenException(
+      query.error === 'access_denied'
+        ? 'Google sign-in was cancelled'
+        : 'Google sign-in was denied',
+    );
   }
 
   const code = query.code;
@@ -41,11 +45,21 @@ export function resolveGoogleOAuthActivation(
     presentedState.length === 0 ||
     !sameCredential(saved.state, presentedState)
   ) {
-    throw new UnauthorizedException();
+    throw new UnauthorizedException('Google sign-in state is invalid');
   }
 
   request[GOOGLE_OAUTH_REQUEST.CODE_VERIFIER] = saved.codeVerifier;
+  if (typeof saved.linkIntentId === 'string' && saved.linkIntentId.length > 0) {
+    request[GOOGLE_OAUTH_REQUEST.LINK_INTENT_ID] = saved.linkIntentId;
+  }
   return { phase: 'callback' };
+}
+
+export function readGoogleLinkIntentId(request: Request): string | undefined {
+  const value = (request as GoogleOAuthRequest)[
+    GOOGLE_OAUTH_REQUEST.LINK_INTENT_ID
+  ];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 function queryOf(request: Request): Record<string, string> {

@@ -39,6 +39,16 @@ export function optionalText(
   return trimmed;
 }
 
+const OTP_PATTERN = /^\d{6}$/;
+
+export function requireOtp(value: string | undefined): string {
+  const otp = requireText(value, 'Verification code', 6);
+  if (!OTP_PATTERN.test(otp)) {
+    throw new BadRequestException('Verification code is invalid');
+  }
+  return otp;
+}
+
 export function requireCredential(value: string | undefined): string {
   return requireText(value, 'Credential', MAX_CREDENTIAL_LENGTH);
 }

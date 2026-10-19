@@ -5,8 +5,9 @@ import { AccessTokenService } from './auth/access-token.service';
 import { AuthenticationService } from './auth/authentication.service';
 import { GoogleAuthService } from './auth/google-auth.service';
 import { GoogleIdTokenVerifier } from './auth/google-id-token.verifier';
-import { EMAIL_SENDER, UnconfiguredEmailSender } from './auth/email-sender';
+import { EMAIL_SENDER } from './auth/email-sender';
 import { EmailVerificationService } from './auth/email-verification.service';
+import { ResendEmailSender } from './auth/resend-email.sender';
 import { PasswordHasher } from './auth/password-hasher';
 import { PasswordRecoveryService } from './auth/password-recovery.service';
 import { RefreshTokenService } from './auth/refresh-token.service';
@@ -28,7 +29,7 @@ import { UsersService } from './users/users.service';
     GoogleAuthService,
     {
       provide: EMAIL_SENDER,
-      useClass: UnconfiguredEmailSender,
+      useClass: ResendEmailSender,
     },
     EmailVerificationService,
     PasswordRecoveryService,

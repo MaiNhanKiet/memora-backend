@@ -14,5 +14,6 @@ export type {
   VerifiedGoogleOAuthIdentity,
 } from './interfaces/google-oauth.interfaces';
 export { createGoogleOAuthStart } from './oauth-start';
+export { readGoogleLinkIntentId } from './resolve-oauth-activation';
 export { SignedCookieOAuthStateStore } from './signed-cookie-state.store';
 export type { SignedCookieOAuthStateStoreOptions } from './signed-cookie-state.store';

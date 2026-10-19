@@ -11,7 +11,7 @@ export function isActiveUserStatus(status: string): boolean {
 }
 
 export const UNVERIFIED_ACCOUNT_POLICY =
-  'Unverified accounts may receive access tokens after register/login but must not perform sensitive operations until emailVerifiedAt is set.';
+  'Local registration stores the account without a session. Access and refresh credentials are issued only after the email code is confirmed.';
 
 export function hasVerifiedEmail(emailVerifiedAt: Date | null): boolean {
   return emailVerifiedAt !== null;

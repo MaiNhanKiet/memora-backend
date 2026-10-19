@@ -27,16 +27,36 @@ export class GoogleStrategy extends PassportStrategy(
   GOOGLE_OAUTH_STRATEGY,
   true,
 ) {
+  private readonly clientId: string;
+  private readonly callbackUrl: string;
+
   constructor(@Inject(GOOGLE_OAUTH_OPTIONS) options: GoogleOAuthModuleOptions) {
+    const clientId = options.enabled ? options.clientId : 'disabled';
+    const callbackUrl = options.enabled
+      ? options.callbackUrl
+      : 'http://127.0.0.1/disabled';
     super({
-      clientID: options.enabled ? options.clientId : 'disabled',
+      clientID: clientId,
       clientSecret: options.enabled ? options.clientSecret : 'disabled-secret',
-      callbackURL: options.enabled
-        ? options.callbackUrl
-        : 'http://127.0.0.1/disabled',
+      callbackURL: callbackUrl,
       scope: [...GOOGLE_OAUTH_SCOPES],
       passReqToCallback: true,
     });
+    this.clientId = clientId;
+    this.callbackUrl = callbackUrl;
+  }
+
+  authorizationUrl(state: string, codeChallenge: string): string {
+    const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('client_id', this.clientId);
+    url.searchParams.set('redirect_uri', this.callbackUrl);
+    url.searchParams.set('scope', GOOGLE_OAUTH_SCOPES.join(' '));
+    url.searchParams.set('state', state);
+    url.searchParams.set('code_challenge', codeChallenge);
+    url.searchParams.set('code_challenge_method', 'S256');
+    url.searchParams.set('prompt', 'select_account');
+    return url.toString();
   }
 
   authorizationParams(

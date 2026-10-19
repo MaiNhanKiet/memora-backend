@@ -7,37 +7,44 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomInt } from 'node:crypto';
+import type { User } from '../../../generated/prisma/client';
+import {
+  OTP_MAX_ATTEMPTS,
+  OTP_TTL_SECONDS,
+  RedisRegistrationOtpStore,
+} from '../../persistence/redis/registration-otp.store';
 import {
   PURPOSE_EMAIL_VERIFICATION,
   RedisPurposeTokenStore,
 } from '../../persistence/redis/purpose-token.store';
 import { UserRepository } from '../../repositories/user.repository';
-import { USER_STATUS, hasVerifiedEmail } from '../constants/iam-status';
+import { AUTH_PROVIDER } from '../constants/iam-auth';
+import { hasVerifiedEmail, isActiveUserStatus } from '../constants/iam-status';
 import { EMAIL_SENDER, type EmailSender } from './email-sender';
-import { toPublicUser, type PublicUser } from '../users/users.mapper';
+import { normalizeEmail } from './identity-input';
 
-const INVALID_REQUEST = 'Invalid verification request';
+const INVALID_CODE = 'Invalid verification code';
+
+export type RegistrationOtpChallenge = {
+  expiresInSeconds: number;
+};
 
 @Injectable()
 export class EmailVerificationService {
   private readonly pepper: string;
-  private readonly ttlSeconds: number;
   private readonly cooldownSeconds: number;
   private readonly rateMax: number;
   private readonly rateWindowSeconds: number;
-  private readonly actionBaseUrl: string;
 
   constructor(
     private readonly userRepository: UserRepository,
+    private readonly otps: RedisRegistrationOtpStore,
     private readonly tokens: RedisPurposeTokenStore,
     @Inject(EMAIL_SENDER) private readonly emailSender: EmailSender,
     configService: ConfigService,
   ) {
     this.pepper = configService.getOrThrow<string>('iam.purposeTokenPepper');
-    this.ttlSeconds = configService.getOrThrow<number>(
-      'iam.emailVerificationTtlSeconds',
-    );
     this.cooldownSeconds = configService.getOrThrow<number>(
       'iam.emailVerificationCooldownSeconds',
     );
@@ -45,35 +52,19 @@ export class EmailVerificationService {
     this.rateWindowSeconds = configService.getOrThrow<number>(
       'iam.emailRateLimitWindowSeconds',
     );
-    this.actionBaseUrl = configService.getOrThrow<string>(
-      'iam.emailActionBaseUrl',
-    );
   }
 
-  async request(userId: string): Promise<{ alreadyVerified: boolean }> {
-    const user = await this.userRepository.findById(userId);
-    if (user === null || user.status === USER_STATUS.DISABLED) {
-      throw new UnauthorizedException(INVALID_REQUEST);
-    }
-    if (hasVerifiedEmail(user.emailVerifiedAt)) {
-      return { alreadyVerified: true };
-    }
-
-    await this.enforceLimits(user.id);
-    const secret = randomBytes(32).toString('base64url');
-    const tokenHash = hashToken(this.pepper, secret);
-    await this.tokens.issue(
-      PURPOSE_EMAIL_VERIFICATION,
-      user.id,
-      tokenHash,
-      this.ttlSeconds,
-    );
-
+  async issue(
+    userId: string,
+    email: string,
+  ): Promise<RegistrationOtpChallenge> {
+    const otp = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    await this.otps.save(userId, hashOtp(this.pepper, otp), OTP_TTL_SECONDS);
     try {
       await this.emailSender.send({
-        to: user.email,
+        to: email,
         template: 'email-verification',
-        actionUrl: `${this.actionBaseUrl}/verify-email?token=${secret}`,
+        code: otp,
       });
     } catch (error) {
       if (error instanceof ServiceUnavailableException) {
@@ -81,48 +72,64 @@ export class EmailVerificationService {
       }
       throw new ServiceUnavailableException('Email delivery is unavailable');
     }
+    return { expiresInSeconds: OTP_TTL_SECONDS };
+  }
 
+  async resend(email: string): Promise<{ alreadyVerified: boolean }> {
+    const normalized = normalizeEmail(email);
+    await this.enforceLimits(
+      createHash('sha256').update(normalized).digest('hex'),
+    );
+    const user = await this.userRepository.findByEmail(normalized);
+    if (user === null || user.authProvider !== AUTH_PROVIDER.LOCAL) {
+      return { alreadyVerified: false };
+    }
+    if (hasVerifiedEmail(user.emailVerifiedAt)) {
+      return { alreadyVerified: true };
+    }
+    if (!isActiveUserStatus(user.status) || user.passwordHash === null) {
+      return { alreadyVerified: false };
+    }
+    await this.issue(user.id, user.email);
     return { alreadyVerified: false };
   }
 
-  async confirm(token: string): Promise<PublicUser> {
-    const tokenHash = hashToken(this.pepper, token);
-    const claimed = await this.tokens.claim(
-      PURPOSE_EMAIL_VERIFICATION,
-      tokenHash,
+  async confirm(email: string, otp: string): Promise<User> {
+    const user = await this.userRepository.findByEmail(normalizeEmail(email));
+    if (
+      user === null ||
+      user.authProvider !== AUTH_PROVIDER.LOCAL ||
+      !isActiveUserStatus(user.status) ||
+      user.passwordHash === null ||
+      hasVerifiedEmail(user.emailVerifiedAt)
+    ) {
+      throw new UnauthorizedException(INVALID_CODE);
+    }
+
+    const result = await this.otps.verify(
+      user.id,
+      hashOtp(this.pepper, otp),
+      OTP_MAX_ATTEMPTS,
     );
-    if (claimed.status === 'in_flight') {
+    if (result === 'locked') {
       throw new HttpException(
-        'Please try again later',
+        'Too many attempts',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
-    if (claimed.status === 'missing') {
-      throw new UnauthorizedException(INVALID_REQUEST);
+    if (result !== 'ok') {
+      throw new UnauthorizedException(INVALID_CODE);
     }
 
-    const user = await this.userRepository.findById(claimed.userId);
-    if (user === null || user.status === USER_STATUS.DISABLED) {
-      await this.tokens.complete(tokenHash);
-      throw new UnauthorizedException(INVALID_REQUEST);
-    }
-
-    if (hasVerifiedEmail(user.emailVerifiedAt)) {
-      await this.tokens.complete(tokenHash);
-      return toPublicUser(user);
-    }
-
-    const updated = await this.userRepository.updateById(user.id, {
+    return this.userRepository.updateById(user.id, {
       emailVerifiedAt: new Date(),
     });
-    await this.tokens.complete(tokenHash);
-    return toPublicUser(updated);
   }
 
-  private async enforceLimits(userId: string): Promise<void> {
+  private async enforceLimits(email: string): Promise<void> {
     const count = await this.tokens.incrementRate(
       PURPOSE_EMAIL_VERIFICATION,
-      userId,
+      email,
       this.rateWindowSeconds,
     );
     if (count > this.rateMax) {
@@ -133,7 +140,7 @@ export class EmailVerificationService {
     }
     const allowed = await this.tokens.acquireCooldown(
       PURPOSE_EMAIL_VERIFICATION,
-      userId,
+      email,
       this.cooldownSeconds,
     );
     if (!allowed) {
@@ -145,6 +152,6 @@ export class EmailVerificationService {
   }
 }
 
-function hashToken(pepper: string, secret: string): string {
-  return createHmac('sha256', pepper).update(secret).digest('base64url');
+function hashOtp(pepper: string, otp: string): string {
+  return createHmac('sha256', pepper).update(otp).digest('base64url');
 }

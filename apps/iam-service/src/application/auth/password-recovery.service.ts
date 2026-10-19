@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   HttpException,
   HttpStatus,
   Inject,
@@ -13,7 +14,7 @@ import {
 } from '../../persistence/redis/purpose-token.store';
 import { UserRepository } from '../../repositories/user.repository';
 import { AUTH_PROVIDER } from '../constants/iam-auth';
-import { USER_STATUS } from '../constants/iam-status';
+import { USER_STATUS, isActiveUserStatus } from '../constants/iam-status';
 import { EMAIL_SENDER, type EmailSender } from './email-sender';
 import { assertValidPassword, normalizeEmail } from './identity-input';
 import { PasswordHasher } from './password-hasher';
@@ -143,6 +144,43 @@ export class PasswordRecoveryService {
     await this.userRepository.updateById(user.id, { passwordHash });
     await this.refreshTokens.logoutAll(user.id);
     await this.tokens.complete(tokenHash);
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    assertValidPassword(newPassword);
+    const user = await this.userRepository.findById(userId);
+    if (
+      user === null ||
+      user.authProvider === AUTH_PROVIDER.GOOGLE ||
+      !isActiveUserStatus(user.status) ||
+      user.passwordHash === null
+    ) {
+      throw new BadRequestException('Password change is unavailable');
+    }
+
+    const currentMatches = await this.passwords.verify(
+      user.passwordHash,
+      currentPassword,
+    );
+    if (!currentMatches) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const samePassword = await this.passwords.verify(
+      user.passwordHash,
+      newPassword,
+    );
+    if (samePassword) {
+      throw new BadRequestException('New password must be different');
+    }
+
+    const passwordHash = await this.passwords.hash(newPassword);
+    await this.userRepository.updateById(user.id, { passwordHash });
+    await this.refreshTokens.logoutAll(user.id);
   }
 }
 
