@@ -18,6 +18,8 @@ import { USER_STATUS, isActiveUserStatus } from '../constants/iam-status';
 import { EMAIL_SENDER, type EmailSender } from './email-sender';
 import { assertValidPassword, normalizeEmail } from './identity-input';
 import { PasswordHasher } from './password-hasher';
+import { SECURITY_AUDIT_ACTION } from './security-audit';
+import { SecurityAuditService } from './security-audit.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { UsersService } from '../users/users.service';
 
@@ -39,6 +41,7 @@ export class PasswordRecoveryService {
     private readonly tokens: RedisPurposeTokenStore,
     private readonly passwords: PasswordHasher,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly securityAudit: SecurityAuditService,
     @Inject(EMAIL_SENDER) private readonly emailSender: EmailSender,
     configService: ConfigService,
   ) {
@@ -142,6 +145,10 @@ export class PasswordRecoveryService {
 
     const passwordHash = await this.passwords.hash(newPassword);
     await this.userRepository.updateById(user.id, { passwordHash });
+    await this.securityAudit.record({
+      userId: user.id,
+      action: SECURITY_AUDIT_ACTION.PASSWORD_CHANGED,
+    });
     await this.refreshTokens.logoutAll(user.id);
     await this.tokens.complete(tokenHash);
   }
@@ -180,6 +187,10 @@ export class PasswordRecoveryService {
 
     const passwordHash = await this.passwords.hash(newPassword);
     await this.userRepository.updateById(user.id, { passwordHash });
+    await this.securityAudit.record({
+      userId: user.id,
+      action: SECURITY_AUDIT_ACTION.PASSWORD_CHANGED,
+    });
     await this.refreshTokens.logoutAll(user.id);
   }
 }

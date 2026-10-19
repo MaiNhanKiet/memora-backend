@@ -1,7 +1,6 @@
 import {
   Catch,
   HttpException,
-  Logger,
   type ArgumentsHost,
   type RpcExceptionFilter,
 } from '@nestjs/common';
@@ -23,19 +22,9 @@ export interface GrpcErrorPayload {
 
 @Catch()
 export class GrpcExceptionFilter implements RpcExceptionFilter {
-  private readonly logger = new Logger(GrpcExceptionFilter.name);
-
   catch(exception: unknown, host: ArgumentsHost): Observable<never> {
     void host;
-    const payload = this.toGrpcError(exception);
-    if (payload.code === GrpcStatus.INTERNAL) {
-      this.logger.error(
-        'Unexpected gRPC error',
-        exception instanceof Error ? exception.stack : undefined,
-      );
-    }
-
-    return throwError(() => payload);
+    return throwError(() => this.toGrpcError(exception));
   }
 
   private toGrpcError(exception: unknown): GrpcErrorPayload {

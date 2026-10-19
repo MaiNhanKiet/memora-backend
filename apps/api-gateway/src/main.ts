@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createHttpValidationPipe, HttpExceptionFilter } from '@app/common';
 import type { NodeEnvName } from '@app/config';
-import { createMemoraLogger, requestIdMiddleware } from '@app/observability';
+import { createMemoraLogger, requestIdMiddleware } from '@app/logger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import {
@@ -32,6 +32,7 @@ async function bootstrap() {
   app.useLogger(
     createMemoraLogger({
       service: 'api-gateway',
+      domain: 'gateway',
       nodeEnv,
     }),
   );

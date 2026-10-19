@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { GrpcExceptionFilter } from '@app/common';
 import { loadIamRuntimeConfig } from '@app/config';
-import { createMemoraLogger } from '@app/observability';
+import { createMemoraLogger } from '@app/logger';
 import {
   createServer,
   type IncomingMessage,
@@ -24,6 +24,7 @@ async function bootstrap() {
   const grpcUrl = `${iam.IAM_GRPC_HOST}:${iam.IAM_GRPC_PORT}`;
   const logger = createMemoraLogger({
     service: 'iam-service',
+    domain: 'iam',
     nodeEnv: iam.NODE_ENV,
   });
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(

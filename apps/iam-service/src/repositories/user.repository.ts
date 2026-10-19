@@ -40,12 +40,21 @@ export class UserRepository {
           roleId,
         },
       });
+      await tx.securityAuditEvent.create({
+        data: {
+          userId: user.id,
+          action: 'role_assigned',
+          outcome: 'success',
+          metadata: { roleId },
+        },
+      });
       return user;
     });
   }
 
   async deleteWithAssignments(id: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await tx.securityAuditEvent.deleteMany({ where: { userId: id } });
       await tx.userRole.deleteMany({ where: { userId: id } });
       await tx.user.delete({ where: { id } });
     });

@@ -33,7 +33,7 @@ import type {
   ResetPasswordRequest,
   UserResponse,
 } from '@app/contracts';
-import { createOutgoingGrpcMetadata } from '@app/observability';
+import { createOutgoingGrpcMetadata } from '@app/logger';
 import type { Metadata } from '@grpc/grpc-js';
 import { Observable, firstValueFrom, timeout } from 'rxjs';
 

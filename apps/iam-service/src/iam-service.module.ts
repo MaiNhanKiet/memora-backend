@@ -5,7 +5,8 @@ import {
   iamConfig,
   validateIamEnv,
 } from '@app/config';
-import { LoggingInterceptor, ObservabilityModule } from '@app/observability';
+import { LoggingInterceptor } from '@app/logger';
+import { ObservabilityModule } from '@app/observability';
 import { ApplicationModule } from './application/application.module';
 import { PrismaModule } from './persistence/prisma/prisma.module';
 import { RedisModule } from './persistence/redis/redis.module';

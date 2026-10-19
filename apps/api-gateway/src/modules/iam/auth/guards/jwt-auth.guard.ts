@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AUTH_METADATA } from '@app/common';
+import { ACTOR_TYPE, parseActorContext, setActorContext } from '@app/logger';
 import type { Request } from 'express';
 import { IamGrpcClient } from '../../clients/iam-grpc.client';
 import type { GatewayAuthenticatedPrincipal } from '../gateway-principal';
@@ -37,14 +38,26 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<RequestWithPrincipal>();
     const accessCredential = readBearerCredential(request);
     const principal = await this.iam.validateAccessToken(accessCredential);
+    const customerIdentityId = optionalId(principal.customerIdentityId);
     request.user = {
       userId: principal.userId,
       accessCredential,
       emailVerified: principal.emailVerified,
       tokenId: principal.tokenId,
+      ...(customerIdentityId === undefined ? {} : { customerIdentityId }),
     };
+    setActorContext(
+      parseActorContext(ACTOR_TYPE.USER, principal.userId, customerIdentityId),
+    );
     return true;
   }
+}
+
+function optionalId(value: string | undefined): string | undefined {
+  if (value === undefined || value.length === 0) {
+    return undefined;
+  }
+  return value;
 }
 
 function readBearerCredential(request: Request): string {

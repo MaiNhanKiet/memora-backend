@@ -53,16 +53,38 @@ export class UserRoleRepository {
   }
 
   assign(data: Prisma.UserRoleUncheckedCreateInput): Promise<UserRole> {
-    return this.prisma.userRole.create({ data });
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.userRole.create({ data });
+      await tx.securityAuditEvent.create({
+        data: {
+          userId: created.userId,
+          action: 'role_assigned',
+          outcome: 'success',
+          metadata: { roleId: created.roleId },
+        },
+      });
+      return created;
+    });
   }
 
   revoke(id: string, revokeReason?: string): Promise<UserRole> {
-    return this.prisma.userRole.update({
-      where: { id },
-      data: {
-        revokedAt: new Date(),
-        revokeReason: revokeReason ?? null,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const revoked = await tx.userRole.update({
+        where: { id },
+        data: {
+          revokedAt: new Date(),
+          revokeReason: revokeReason ?? null,
+        },
+      });
+      await tx.securityAuditEvent.create({
+        data: {
+          userId: revoked.userId,
+          action: 'role_revoked',
+          outcome: 'success',
+          metadata: { roleId: revoked.roleId },
+        },
+      });
+      return revoked;
     });
   }
 }

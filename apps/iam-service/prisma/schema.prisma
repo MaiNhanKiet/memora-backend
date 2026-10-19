@@ -152,7 +152,7 @@ model RbacBootstrapExecution {
   @@schema("iam")
 }
 
-/// Append-only record of security-sensitive account changes.
+/// Append-only IAM security audit for account changes.
 model SecurityAuditEvent {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
   userId    String   @map("user_id") @db.Uuid

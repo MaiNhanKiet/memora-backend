@@ -15,7 +15,12 @@ import {
   runWithCorrelation,
   type CorrelationStore,
 } from '../correlation/correlation-context';
-import { readIncomingGrpcRequestId } from '../grpc/grpc-request-id';
+import {
+  readIncomingActor,
+  readIncomingGrpcRequestId,
+} from '../grpc/grpc-request-id';
+import { getActorContext } from '../correlation/correlation-context';
+import type { MemoraLogEvent } from '../logger/memora-logger';
 
 type TransportName = 'http' | 'grpc';
 
@@ -29,10 +34,10 @@ export class LoggingInterceptor implements NestInterceptor {
   ): Observable<unknown> {
     const type = context.getType<string>();
     if (type === 'rpc') {
+      const rpcContext: unknown = context.switchToRpc().getContext();
       const store: CorrelationStore = {
-        requestId: readIncomingGrpcRequestId(
-          context.switchToRpc().getContext(),
-        ),
+        requestId: readIncomingGrpcRequestId(rpcContext),
+        actor: readIncomingActor(rpcContext),
       };
       return bindObservableToContext(store, this.trace(context, next, 'grpc'));
     }
@@ -72,6 +77,8 @@ export class LoggingInterceptor implements NestInterceptor {
           durationMs: Date.now() - started,
           outcome: 'failure',
           errorKind: resolveErrorKind(status),
+          errorCode: readErrorCode(error, status, transport),
+          stack: error instanceof Error ? error.stack : undefined,
         });
         return throwError(() => error);
       }),
@@ -85,15 +92,60 @@ export class LoggingInterceptor implements NestInterceptor {
     durationMs: number;
     outcome: 'success' | 'failure';
     errorKind: 'none' | 'http' | 'dependency';
+    errorCode?: string;
+    stack?: string;
   }): void {
-    const kindPart = entry.outcome === 'failure' ? ` ${entry.errorKind}` : '';
-    const message = `${entry.transport.toUpperCase()} ${entry.route} ${entry.status} ${entry.durationMs}ms ${entry.outcome}${kindPart}`;
-    if (entry.outcome === 'success') {
-      this.logger.log(message);
+    if (isQuietHealthSuccess(entry.transport, entry.route, entry.outcome)) {
       return;
     }
-    this.logger.warn(message);
+
+    const actor = getActorContext();
+    const kindPart = entry.outcome === 'failure' ? ` ${entry.errorKind}` : '';
+    const described = splitRoute(entry.route);
+    const payload: MemoraLogEvent = {
+      message: `${entry.transport.toUpperCase()} ${entry.route} ${entry.status} ${entry.durationMs}ms ${entry.outcome}${kindPart}`,
+      event: entry.transport === 'http' ? 'http.request' : 'grpc.request',
+      method: described.method,
+      route: described.route,
+      statusCode: entry.status,
+      durationMs: entry.durationMs,
+      actorId: actor.actorId,
+      actorType: actor.actorType,
+      ...(actor.customerIdentityId === undefined
+        ? {}
+        : { customerIdentityId: actor.customerIdentityId }),
+      ...(entry.errorCode === undefined ? {} : { errorCode: entry.errorCode }),
+    };
+    if (entry.outcome === 'success') {
+      this.logger.log(payload);
+      return;
+    }
+    if (isServerFailure(entry.transport, entry.status)) {
+      this.logger.error(payload, entry.stack);
+      return;
+    }
+    this.logger.warn(payload);
   }
+}
+
+export function isQuietHealthSuccess(
+  transport: string,
+  route: string,
+  outcome: string,
+): boolean {
+  if (transport !== 'http' || outcome !== 'success') {
+    return false;
+  }
+  const path = route.replace(/^[A-Z]+\s+/, '').split('?')[0] ?? '';
+  return path === '/health/live' || path === '/health/ready';
+}
+
+function splitRoute(route: string): { method: string; route: string } {
+  const space = route.indexOf(' ');
+  if (space <= 0) {
+    return { method: route, route };
+  }
+  return { method: route.slice(0, space), route: route.slice(space + 1) };
 }
 
 function bindObservableToContext<T>(
@@ -151,6 +203,13 @@ const REDACTED_QUERY_KEYS = new Set([
   'access_token',
   'refresh_token',
   'token',
+  'otp',
+  'password',
+  'confirmationid',
+  'code_verifier',
+  'client_secret',
+  'credential',
+  'cookie',
 ]);
 
 export function sanitizeHttpUrl(url: string): string {
@@ -221,6 +280,58 @@ function resolveErrorKind(status: number): 'http' | 'dependency' {
   }
   return 'http';
 }
+
+const SERVER_GRPC_STATUSES = new Set<number>([
+  GrpcStatus.UNKNOWN,
+  GrpcStatus.INTERNAL,
+  GrpcStatus.UNAVAILABLE,
+  GrpcStatus.DATA_LOSS,
+  GrpcStatus.DEADLINE_EXCEEDED,
+]);
+
+function isServerFailure(transport: TransportName, status: number): boolean {
+  if (transport === 'http') {
+    return status >= 500;
+  }
+  return SERVER_GRPC_STATUSES.has(status);
+}
+
+function readErrorCode(
+  error: unknown,
+  status: number,
+  transport: TransportName,
+): string | undefined {
+  if (error instanceof HttpException) {
+    const payload: unknown = error.getResponse();
+    if (typeof payload === 'object' && payload !== null && 'code' in payload) {
+      const code = payload.code;
+      if (typeof code === 'string' && /^[A-Z0-9_]{1,64}$/.test(code)) {
+        return code;
+      }
+    }
+  }
+
+  if (transport === 'http') {
+    return HTTP_ERROR_CODES[status] ?? 'INTERNAL_ERROR';
+  }
+
+  const name = GrpcStatus[status];
+  return typeof name === 'string' ? name : 'UNKNOWN';
+}
+
+const HTTP_ERROR_CODES: Readonly<Record<number, string>> = {
+  400: 'BAD_REQUEST',
+  401: 'UNAUTHORIZED',
+  403: 'FORBIDDEN',
+  404: 'NOT_FOUND',
+  409: 'CONFLICT',
+  412: 'PRECONDITION_FAILED',
+  429: 'TOO_MANY_REQUESTS',
+  500: 'INTERNAL_ERROR',
+  502: 'BAD_GATEWAY',
+  503: 'SERVICE_UNAVAILABLE',
+  504: 'GATEWAY_TIMEOUT',
+};
 
 function hasNumericCode(value: unknown): value is { code: number } {
   return (
