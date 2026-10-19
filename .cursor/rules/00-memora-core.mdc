@@ -13,4 +13,5 @@ alwaysApply: true
 - Keep strict typing, security, existing HTTP/gRPC semantics and relevant tests intact. Never weaken tests, validation or security just to pass a check.
 - Read targeted files first; load long docs/Skills only when relevant. Do not dump entire folders or repeat long logs. Correctness takes priority over token savings.
 - Verify touched scope with available commands. Never claim builds, live E2E, database migrations or OAuth login ran unless they actually ran; clearly label blockers.
+- After the test command for the current task finishes, delete only the test files that task added. Leave test files that already existed in the repository.
 - Summarize in concise Vietnamese: changed files, important decisions, commands/results and unverified items.

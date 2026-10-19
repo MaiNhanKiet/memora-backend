@@ -1,6 +1,6 @@
 ---
 description: MEMORA Conventional Commit message format, scope naming, breaking changes, and safe Git commit behavior
-alwaysApply: true
+alwaysApply: false
 ---
 
 # MEMORA — Commit Message Rules

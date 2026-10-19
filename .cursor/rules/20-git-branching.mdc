@@ -1,6 +1,6 @@
 ---
 description: MEMORA Git branching, Conventional Commits, pull requests, and safe CI/CD workflow
-alwaysApply: true
+alwaysApply: false
 ---
 
 # MEMORA — Git Branching & Commit Rules

@@ -1,6 +1,6 @@
 ---
 description: Delete test files created for the current task after the test command finishes.
-alwaysApply: true
+alwaysApply: false
 ---
 # Delete task tests after the run
 
