@@ -72,6 +72,15 @@ export class ResendEmailSender implements EmailSender {
   private toPayload(
     message: OutboundEmail,
   ): Parameters<ResendEmailClient['send']>[0] {
+    if (message.template === 'guest-identity-verification') {
+      return {
+        from: this.from,
+        to: [message.to],
+        subject: 'MEMORA - Xác minh email khách',
+        text: `Mã xác minh MEMORA của bạn là ${message.code}. Mã hết hạn sau 5 phút.`,
+      };
+    }
+
     if (message.template === 'security-notice') {
       return {
         from: this.from,

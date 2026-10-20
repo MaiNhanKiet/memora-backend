@@ -12,6 +12,7 @@ import { PrismaModule } from './persistence/prisma/prisma.module';
 import { RedisModule } from './persistence/redis/redis.module';
 import { IamReadinessService } from './application/ops/iam-readiness.service';
 import { AccountGrpcController } from './presentation/grpc/account.grpc.controller';
+import { GuestIdentityGrpcController } from './presentation/grpc/guest-identity.grpc.controller';
 import { IamAdminGrpcController } from './presentation/grpc/iam-admin.grpc.controller';
 import { AuthenticationGrpcController } from './presentation/grpc/authentication.grpc.controller';
 import { AuthorizationGrpcController } from './presentation/grpc/authorization.grpc.controller';
@@ -32,6 +33,7 @@ import { InternalGrpcAuthGuard } from './presentation/grpc/internal-grpc-auth.gu
   controllers: [
     AuthenticationGrpcController,
     AccountGrpcController,
+    GuestIdentityGrpcController,
     IamAdminGrpcController,
     AuthorizationGrpcController,
     GrpcHealthController,

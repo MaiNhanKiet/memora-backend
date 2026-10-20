@@ -22,13 +22,23 @@ import type {
   ConfirmRegistrationRequest,
   ForgotPasswordResponse,
   GetCurrentUserRequest,
+  UpdateMyProfileRequest,
+  GetMyAuthorizationRequest,
+  GetUserAuthorizationResponse,
+  RequestGuestIdentityVerificationRequest,
+  RequestGuestIdentityVerificationResponse,
+  ConfirmGuestIdentityVerificationRequest,
+  ConfirmGuestIdentityVerificationResponse,
+  GetMyCustomerIdentityRequest,
+  GetMyCustomerIdentityResponse,
+  LinkGuestIdentityToMyAccountRequest,
+  LinkGuestIdentityToMyAccountResponse,
   AssignUserRoleRequest,
   AssignUserRoleResponse,
   GetUserAuthorizationRequest,
   GrantRolePermissionRequest,
   RevokeRolePermissionRequest,
   RolePermissionGrantResponse,
-  GetUserAuthorizationResponse,
   GetUserByIdRequest,
   ListPermissionsResponse,
   ListRolePermissionsRequest,
@@ -123,6 +133,30 @@ interface IamServiceClient {
     request: GetCurrentUserRequest,
     metadata?: Metadata,
   ): Observable<UserResponse>;
+  updateMyProfile(
+    request: UpdateMyProfileRequest,
+    metadata?: Metadata,
+  ): Observable<UserResponse>;
+  getMyAuthorization(
+    request: GetMyAuthorizationRequest,
+    metadata?: Metadata,
+  ): Observable<GetUserAuthorizationResponse>;
+  requestGuestIdentityVerification(
+    request: RequestGuestIdentityVerificationRequest,
+    metadata?: Metadata,
+  ): Observable<RequestGuestIdentityVerificationResponse>;
+  confirmGuestIdentityVerification(
+    request: ConfirmGuestIdentityVerificationRequest,
+    metadata?: Metadata,
+  ): Observable<ConfirmGuestIdentityVerificationResponse>;
+  getMyCustomerIdentity(
+    request: GetMyCustomerIdentityRequest,
+    metadata?: Metadata,
+  ): Observable<GetMyCustomerIdentityResponse>;
+  linkGuestIdentityToMyAccount(
+    request: LinkGuestIdentityToMyAccountRequest,
+    metadata?: Metadata,
+  ): Observable<LinkGuestIdentityToMyAccountResponse>;
   getUserById(
     request: GetUserByIdRequest,
     metadata?: Metadata,
@@ -334,6 +368,75 @@ export class IamGrpcClient implements OnModuleInit {
   getCurrentUser(accessCredential: string): Promise<UserResponse> {
     return this.unary((metadata) =>
       this.iamService.getCurrentUser({ accessCredential }, metadata),
+    );
+  }
+
+  updateMyProfile(
+    accessCredential: string,
+    patch: { fullName?: string; phone?: string; clearPhone: boolean },
+  ): Promise<UserResponse> {
+    return this.unary((metadata) =>
+      this.iamService.updateMyProfile(
+        {
+          accessCredential,
+          clearPhone: patch.clearPhone,
+          ...(patch.fullName === undefined ? {} : { fullName: patch.fullName }),
+          ...(patch.phone === undefined ? {} : { phone: patch.phone }),
+        },
+        metadata,
+      ),
+    );
+  }
+
+  getMyAuthorization(
+    accessCredential: string,
+  ): Promise<GetUserAuthorizationResponse> {
+    return this.unary((metadata) =>
+      this.iamService.getMyAuthorization({ accessCredential }, metadata),
+    );
+  }
+
+  requestGuestIdentityVerification(
+    contactEmail: string,
+    clientIp: string,
+  ): Promise<RequestGuestIdentityVerificationResponse> {
+    return this.unary((metadata) =>
+      this.iamService.requestGuestIdentityVerification(
+        { contactEmail, clientIp },
+        metadata,
+      ),
+    );
+  }
+
+  confirmGuestIdentityVerification(
+    challengeId: string,
+    otp: string,
+  ): Promise<ConfirmGuestIdentityVerificationResponse> {
+    return this.unary((metadata) =>
+      this.iamService.confirmGuestIdentityVerification(
+        { challengeId, otp },
+        metadata,
+      ),
+    );
+  }
+
+  getMyCustomerIdentity(
+    accessCredential: string,
+  ): Promise<GetMyCustomerIdentityResponse> {
+    return this.unary((metadata) =>
+      this.iamService.getMyCustomerIdentity({ accessCredential }, metadata),
+    );
+  }
+
+  linkGuestIdentityToMyAccount(
+    accessCredential: string,
+    guestProof: string,
+  ): Promise<LinkGuestIdentityToMyAccountResponse> {
+    return this.unary((metadata) =>
+      this.iamService.linkGuestIdentityToMyAccount(
+        { accessCredential, guestProof },
+        metadata,
+      ),
     );
   }
 

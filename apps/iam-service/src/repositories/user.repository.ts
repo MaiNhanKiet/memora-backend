@@ -29,8 +29,7 @@ export class UserRepository {
     skip: number;
     take: number;
   }): Promise<{ rows: User[]; total: number }> {
-    const where =
-      input.status === undefined ? {} : { status: input.status };
+    const where = input.status === undefined ? {} : { status: input.status };
     const [rows, total] = await Promise.all([
       this.prisma.user.findMany({
         where,

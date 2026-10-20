@@ -14,6 +14,8 @@ import {
 import type { CookieSameSite } from '@app/config';
 import { AuthCookieService } from './auth/cookies/auth-cookie.service';
 import { AuthController } from './auth/controllers/auth.controller';
+import { GuestIdentityController } from './guest-identity/controllers/guest-identity.controller';
+import { MeController } from './me/controllers/me.controller';
 import { GoogleOAuthController } from './auth/controllers/google-oauth.controller';
 import { GoogleOAuthRedirectFilter } from './auth/filters/google-oauth-redirect.filter';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -86,6 +88,8 @@ import { UserManagementController } from './user-management/controllers/user-man
   ],
   controllers: [
     AuthController,
+    MeController,
+    GuestIdentityController,
     GoogleOAuthController,
     UserManagementController,
     RoleManagementController,

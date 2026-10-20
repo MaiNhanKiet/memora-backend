@@ -112,6 +112,67 @@ export interface GetCurrentUserRequest {
   accessCredential: string;
 }
 
+export interface UpdateMyProfileRequest {
+  accessCredential: string;
+  fullName?: string;
+  phone?: string;
+  clearPhone: boolean;
+}
+
+export interface GetMyAuthorizationRequest {
+  accessCredential: string;
+}
+
+export interface RequestGuestIdentityVerificationRequest {
+  contactEmail: string;
+  clientIp: string;
+}
+
+export interface RequestGuestIdentityVerificationResponse {
+  challengeId: string;
+  expiresInSeconds: number;
+}
+
+export interface ConfirmGuestIdentityVerificationRequest {
+  challengeId: string;
+  otp: string;
+}
+
+export interface ConfirmGuestIdentityVerificationResponse {
+  customerIdentityId: string;
+  guestProof: string;
+  expiresInSeconds: number;
+}
+
+export interface CustomerIdentityProjectionMessage {
+  id: string;
+  displayName?: string;
+  contactEmail: string;
+  emailVerifiedAt?: string;
+  isPrimaryForUser: boolean;
+  accountLinkedAt?: string;
+}
+
+export interface GetMyCustomerIdentityRequest {
+  accessCredential: string;
+}
+
+export interface GetMyCustomerIdentityResponse {
+  primary?: CustomerIdentityProjectionMessage;
+}
+
+export interface LinkGuestIdentityToMyAccountRequest {
+  accessCredential: string;
+  guestProof: string;
+}
+
+export interface LinkGuestIdentityToMyAccountResponse {
+  customerIdentityId: string;
+  userId: string;
+  isPrimaryForUser: boolean;
+  accountLinkedAt: string;
+}
+
 export interface GetUserByIdRequest {
   userId: string;
 }
@@ -359,6 +420,10 @@ export interface IamServiceHandler {
     request: UnlinkGoogleAccountRequest,
   ): Promise<UserResponse>;
   getCurrentUser(request: GetCurrentUserRequest): Promise<UserResponse>;
+  updateMyProfile(request: UpdateMyProfileRequest): Promise<UserResponse>;
+  getMyAuthorization(
+    request: GetMyAuthorizationRequest,
+  ): Promise<GetUserAuthorizationResponse>;
   getUserById(request: GetUserByIdRequest): Promise<UserResponse>;
   listUsers(request: ListUsersRequest): Promise<ListUsersResponse>;
   updateUserStatus(
@@ -400,4 +465,16 @@ export interface IamServiceHandler {
   checkPermissions(
     request: CheckPermissionsRequest,
   ): Promise<AuthorizationDecisionResponse>;
+  requestGuestIdentityVerification(
+    request: RequestGuestIdentityVerificationRequest,
+  ): Promise<RequestGuestIdentityVerificationResponse>;
+  confirmGuestIdentityVerification(
+    request: ConfirmGuestIdentityVerificationRequest,
+  ): Promise<ConfirmGuestIdentityVerificationResponse>;
+  getMyCustomerIdentity(
+    request: GetMyCustomerIdentityRequest,
+  ): Promise<GetMyCustomerIdentityResponse>;
+  linkGuestIdentityToMyAccount(
+    request: LinkGuestIdentityToMyAccountRequest,
+  ): Promise<LinkGuestIdentityToMyAccountResponse>;
 }

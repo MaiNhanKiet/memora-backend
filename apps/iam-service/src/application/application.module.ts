@@ -14,6 +14,7 @@ import { SecurityAuditService } from './auth/security-audit.service';
 import { RefreshTokenService } from './auth/refresh-token.service';
 import { AuthorizationService } from './authorization/authorization.service';
 import { CustomerIdentitiesService } from './users/customer-identities.service';
+import { GuestIdentityService } from './users/guest-identity.service';
 import { UsersService } from './users/users.service';
 import { CatalogAdminService } from './admin/catalog-admin.service';
 import { SecurityAuditAdminService } from './admin/security-audit-admin.service';
@@ -26,6 +27,7 @@ import { UserRoleAdminService } from './admin/user-role-admin.service';
   providers: [
     UsersService,
     CustomerIdentitiesService,
+    GuestIdentityService,
     AuthorizationService,
     PasswordHasher,
     AccessTokenService,
@@ -49,6 +51,7 @@ import { UserRoleAdminService } from './admin/user-role-admin.service';
   exports: [
     UsersService,
     CustomerIdentitiesService,
+    GuestIdentityService,
     AuthorizationService,
     AuthenticationService,
     GoogleAuthService,

@@ -49,14 +49,6 @@ export function ApiCookieCsrfDocs(summary: string) {
   );
 }
 
-export function ApiMeDocs() {
-  return applyDecorators(
-    ApiBearerAuth('bearer'),
-    ApiOperation({ summary: 'Get the authenticated user' }),
-    ApiSuccessResponse({ type: PublicUserResponseDto }),
-  );
-}
-
 export function ApiAcceptedDocs(summary: string) {
   return applyDecorators(
     ApiOperation({ summary }),

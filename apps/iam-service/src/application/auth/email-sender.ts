@@ -21,6 +21,11 @@ export type OutboundEmail =
       template: 'security-notice';
       subject: string;
       text: string;
+    }
+  | {
+      to: string;
+      template: 'guest-identity-verification';
+      code: string;
     };
 
 export interface EmailSender {

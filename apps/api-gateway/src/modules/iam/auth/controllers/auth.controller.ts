@@ -35,7 +35,6 @@ import {
   ApiUnlinkGoogleDocs,
   ApiCookieCsrfDocs,
   ApiLogoutDocs,
-  ApiMeDocs,
   ApiRegisterChallengeDocs,
   ApiResendVerificationDocs,
 } from '../docs/auth.swagger';
@@ -192,18 +191,6 @@ export class AuthController {
     await this.iam.logoutAll(principal.accessCredential);
     this.cookies.clearSession(response);
     return null;
-  }
-
-  @Get('me')
-  @ApiMeDocs()
-  async me(
-    @CurrentUser() principal: GatewayAuthenticatedPrincipal | undefined,
-  ) {
-    if (principal === undefined) {
-      throw new UnauthorizedException();
-    }
-    const result = await this.iam.getCurrentUser(principal.accessCredential);
-    return toPublicUserResponse(result.user);
   }
 
   @Post('resend-verification')
