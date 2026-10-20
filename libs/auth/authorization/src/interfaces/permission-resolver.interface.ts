@@ -13,4 +13,8 @@ export interface PermissionResolver {
     principal: AuthenticatedPrincipal,
     permissionCodes: readonly string[],
   ): Promise<boolean>;
+  hasAnyPermission(
+    principal: AuthenticatedPrincipal,
+    permissionCodes: readonly string[],
+  ): Promise<boolean>;
 }

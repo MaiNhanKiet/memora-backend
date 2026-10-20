@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, type UserRole } from '../../generated/prisma/client';
 import { PrismaService } from '../persistence/prisma/prisma.service';
 
+const ACTIVE_USER_STATUS = 'ACTIVE';
+const ADMIN_ROLE_CODE = 'ADMIN';
+
 export type UserRoleWithRole = Prisma.UserRoleGetPayload<{
   include: { role: true };
 }>;
@@ -32,11 +35,52 @@ export class UserRoleRepository {
     });
   }
 
+  /** Open assignments, including a role that is no longer active. */
+  findOpenAssignmentsWithRoleByUserId(
+    userId: string,
+  ): Promise<UserRoleWithRole[]> {
+    return this.prisma.userRole.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      include: { role: true },
+      orderBy: { assignedAt: 'asc' },
+    });
+  }
+
   findHistoryByUserId(userId: string): Promise<UserRole[]> {
     return this.prisma.userRole.findMany({
       where: { userId },
       orderBy: { assignedAt: 'desc' },
     });
+  }
+
+  countActiveAdminUsers(): Promise<number> {
+    return this.prisma.user.count({
+      where: {
+        status: ACTIVE_USER_STATUS,
+        userRoles: {
+          some: {
+            revokedAt: null,
+            role: { code: ADMIN_ROLE_CODE, isActive: true },
+          },
+        },
+      },
+    });
+  }
+
+  userHasActiveAdminRole(userId: string): Promise<boolean> {
+    return this.prisma.userRole
+      .findFirst({
+        where: {
+          userId,
+          revokedAt: null,
+          role: { code: ADMIN_ROLE_CODE, isActive: true },
+        },
+        select: { id: true },
+      })
+      .then((row) => row !== null);
   }
 
   findActiveByUserAndRole(

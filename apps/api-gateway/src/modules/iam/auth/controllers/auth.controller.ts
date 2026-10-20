@@ -215,7 +215,7 @@ export class AuthController {
     return this.iam.resendVerificationEmail(body.email);
   }
 
-  @Post('change-password')
+  @Post('password/change')
   @AuthRateLimit(10, 15)
   @HttpCode(200)
   @SuccessMessage('Password updated')
@@ -302,7 +302,7 @@ export class AuthController {
     return toPublicUserResponse(result.user);
   }
 
-  @Post('forgot-password')
+  @Post('password/forgot')
   @Public()
   @AuthRateLimit(5, 15)
   @HttpCode(200)
@@ -311,7 +311,7 @@ export class AuthController {
     return this.iam.forgotPassword(body.email);
   }
 
-  @Post('reset-password')
+  @Post('password/reset')
   @Public()
   @AuthRateLimit(10, 15)
   @HttpCode(200)

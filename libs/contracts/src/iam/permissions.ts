@@ -12,8 +12,8 @@ export const RBAC_V1_APPROVAL_STATUS = 'APPROVED';
 export const RBAC_V1_SCHEMA_VERSION = '1.0.0';
 export const RBAC_V1_EXPECTED = {
   roles: 6,
-  permissions: 45,
-  rolePermissionMappings: 48,
+  permissions: 46,
+  rolePermissionMappings: 49,
 } as const;
 
 export const PERMISSION_DEFINITIONS = [
@@ -53,6 +53,13 @@ export const PERMISSION_DEFINITIONS = [
     description: 'Manage grants using controlled, audited operations.',
     domain: 'IAM',
     businessSource: 'IAM admin extension; user-approved RBAC v1',
+  },
+  {
+    code: 'IAM_SECURITY_AUDIT_READ',
+    name: 'Read security audit events',
+    description: 'Read security audit events for one user.',
+    domain: 'IAM',
+    businessSource: 'IAM admin extension; user-approved 2026-10-20',
   },
   {
     code: 'CATALOG_TEMPLATE_MANAGE',
@@ -426,6 +433,7 @@ export const RBAC_V1_ROLE_PERMISSIONS = {
     'IAM_USER_STATUS_MANAGE',
     'IAM_USER_ROLE_ASSIGN',
     'IAM_RBAC_MANAGE',
+    'IAM_SECURITY_AUDIT_READ',
     'DATA_RIGHTS_PROCESS',
   ],
 } as const satisfies Record<RbacV1RoleCode, readonly PermissionCode[]>;

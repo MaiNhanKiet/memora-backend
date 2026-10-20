@@ -20,6 +20,7 @@ import { UserRepository } from './user.repository';
     SecurityAuditRepository,
   ],
   exports: [
+    PrismaModule,
     UserRepository,
     CustomerIdentityRepository,
     RoleRepository,

@@ -24,8 +24,66 @@ export class UserRepository {
     });
   }
 
+  async findManyPaginated(input: {
+    status?: string;
+    skip: number;
+    take: number;
+  }): Promise<{ rows: User[]; total: number }> {
+    const where =
+      input.status === undefined ? {} : { status: input.status };
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip: input.skip,
+        take: input.take,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { rows, total };
+  }
+
   create(data: Prisma.UserUncheckedCreateInput): Promise<User> {
     return this.prisma.user.create({ data });
+  }
+
+  provisionLocalUserWithRole(input: {
+    email: string;
+    fullName: string;
+    passwordHash: string;
+    createdByUserId: string;
+    roleId: string;
+  }): Promise<User> {
+    return this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const user = await tx.user.create({
+        data: {
+          email: input.email,
+          fullName: input.fullName,
+          passwordHash: input.passwordHash,
+          authProvider: 'LOCAL',
+          status: 'ACTIVE',
+          emailVerifiedAt: now,
+          createdByUserId: input.createdByUserId,
+        },
+      });
+      await tx.userRole.create({
+        data: {
+          userId: user.id,
+          roleId: input.roleId,
+          assignedByUserId: input.createdByUserId,
+        },
+      });
+      await tx.securityAuditEvent.create({
+        data: {
+          userId: user.id,
+          action: 'role_assigned',
+          outcome: 'success',
+          metadata: { roleId: input.roleId },
+        },
+      });
+      return user;
+    });
   }
 
   createWithRoleAssignment(

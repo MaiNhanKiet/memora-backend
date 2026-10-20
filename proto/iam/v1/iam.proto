@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package memora.iam.v1;
 
+import "common/v1/pagination.proto";
+
 service IamService {
   rpc Register (RegisterRequest) returns (RegisterChallengeResponse);
   rpc ConfirmRegistration (ConfirmRegistrationRequest) returns (AuthSessionResponse);
@@ -22,6 +24,19 @@ service IamService {
 
   rpc GetCurrentUser (GetCurrentUserRequest) returns (UserResponse);
   rpc GetUserById (GetUserByIdRequest) returns (UserResponse);
+  rpc ListUsers (ListUsersRequest) returns (ListUsersResponse);
+  rpc UpdateUserStatus (UpdateUserStatusRequest) returns (UpdateUserStatusResponse);
+  rpc ProvisionUser (ProvisionUserRequest) returns (ProvisionUserResponse);
+  rpc ListRoles (ListRolesRequest) returns (ListRolesResponse);
+  rpc ListPermissions (ListPermissionsRequest) returns (ListPermissionsResponse);
+  rpc ListUserRoles (ListUserRolesRequest) returns (ListUserRolesResponse);
+  rpc AssignUserRole (AssignUserRoleRequest) returns (AssignUserRoleResponse);
+  rpc RevokeUserRole (RevokeUserRoleRequest) returns (RevokeUserRoleResponse);
+  rpc GetUserAuthorization (GetUserAuthorizationRequest) returns (GetUserAuthorizationResponse);
+  rpc ListRolePermissions (ListRolePermissionsRequest) returns (ListRolePermissionsResponse);
+  rpc GrantRolePermission (GrantRolePermissionRequest) returns (RolePermissionGrantResponse);
+  rpc RevokeRolePermission (RevokeRolePermissionRequest) returns (RolePermissionGrantResponse);
+  rpc ListUserSecurityAuditEvents (ListUserSecurityAuditEventsRequest) returns (ListUserSecurityAuditEventsResponse);
 
   rpc ValidateAccessToken (ValidateAccessTokenRequest) returns (AccessPrincipalResponse);
   rpc CheckRoles (CheckRolesRequest) returns (AuthorizationDecisionResponse);
@@ -188,4 +203,160 @@ message PublicUser {
   optional string last_login_at = 8;
   string created_at = 9;
   string updated_at = 10;
+}
+
+message ListUsersRequest {
+  memora.common.v1.PaginationRequest pagination = 1;
+  optional string status = 2;
+}
+
+message ListUsersResponse {
+  repeated PublicUser users = 1;
+  memora.common.v1.PaginationMeta pagination = 2;
+}
+
+message UpdateUserStatusRequest {
+  string user_id = 1;
+  string status = 2;
+  string actor_user_id = 3;
+}
+
+message UpdateUserStatusResponse {
+  string user_id = 1;
+  string status = 2;
+}
+
+message ProvisionUserRequest {
+  string email = 1;
+  string full_name = 2;
+  string role_code = 3;
+  string created_by_user_id = 4;
+}
+
+message ProvisionUserResponse {
+  string user_id = 1;
+  string email = 2;
+  string status = 3;
+  string role_code = 4;
+  string initial_password = 5;
+}
+
+message RoleCatalogItem {
+  string code = 1;
+  string name = 2;
+  optional string description = 3;
+  bool is_active = 4;
+}
+
+message ListRolesRequest {}
+
+message ListRolesResponse {
+  repeated RoleCatalogItem roles = 1;
+}
+
+message PermissionCatalogItem {
+  string code = 1;
+  string name = 2;
+  optional string description = 3;
+  bool is_active = 4;
+}
+
+message ListPermissionsRequest {}
+
+message ListPermissionsResponse {
+  repeated PermissionCatalogItem permissions = 1;
+}
+
+message UserRoleAssignmentItem {
+  string assignment_id = 1;
+  string role_code = 2;
+  string role_name = 3;
+  string assigned_at = 4;
+}
+
+message ListUserRolesRequest {
+  string user_id = 1;
+}
+
+message ListUserRolesResponse {
+  repeated UserRoleAssignmentItem assignments = 1;
+}
+
+message AssignUserRoleRequest {
+  string user_id = 1;
+  string role_code = 2;
+  string assigned_by_user_id = 3;
+}
+
+message AssignUserRoleResponse {
+  string assignment_id = 1;
+  string role_code = 2;
+  string assigned_at = 3;
+}
+
+message RevokeUserRoleRequest {
+  string user_id = 1;
+  string role_code = 2;
+  optional string reason = 3;
+  string actor_user_id = 4;
+}
+
+message RevokeUserRoleResponse {
+  string assignment_id = 1;
+  string role_code = 2;
+  string revoked_at = 3;
+}
+
+message GetUserAuthorizationRequest {
+  string user_id = 1;
+}
+
+message GetUserAuthorizationResponse {
+  string user_id = 1;
+  string status = 2;
+  repeated string role_codes = 3;
+  repeated string permission_codes = 4;
+}
+
+message ListRolePermissionsRequest {
+  string role_code = 1;
+}
+
+message ListRolePermissionsResponse {
+  string role_code = 1;
+  repeated string permission_codes = 2;
+}
+
+message GrantRolePermissionRequest {
+  string role_code = 1;
+  string permission_code = 2;
+  string granted_by_user_id = 3;
+}
+
+message RevokeRolePermissionRequest {
+  string role_code = 1;
+  string permission_code = 2;
+}
+
+message RolePermissionGrantResponse {
+  string role_code = 1;
+  string permission_code = 2;
+}
+
+message SecurityAuditEventItem {
+  string id = 1;
+  string action = 2;
+  string outcome = 3;
+  string created_at = 4;
+  string metadata_json = 5;
+}
+
+message ListUserSecurityAuditEventsRequest {
+  string user_id = 1;
+  memora.common.v1.PaginationRequest pagination = 2;
+}
+
+message ListUserSecurityAuditEventsResponse {
+  repeated SecurityAuditEventItem events = 1;
+  memora.common.v1.PaginationMeta pagination = 2;
 }

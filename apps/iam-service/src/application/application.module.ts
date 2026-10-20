@@ -15,6 +15,11 @@ import { RefreshTokenService } from './auth/refresh-token.service';
 import { AuthorizationService } from './authorization/authorization.service';
 import { CustomerIdentitiesService } from './users/customer-identities.service';
 import { UsersService } from './users/users.service';
+import { CatalogAdminService } from './admin/catalog-admin.service';
+import { SecurityAuditAdminService } from './admin/security-audit-admin.service';
+import { IamAdminPolicyService } from './admin/iam-admin-policy.service';
+import { UserAdminService } from './admin/user-admin.service';
+import { UserRoleAdminService } from './admin/user-role-admin.service';
 
 @Module({
   imports: [RepositoriesModule, RedisModule],
@@ -35,6 +40,11 @@ import { UsersService } from './users/users.service';
     EmailVerificationService,
     PasswordRecoveryService,
     SecurityAuditService,
+    IamAdminPolicyService,
+    UserAdminService,
+    UserRoleAdminService,
+    CatalogAdminService,
+    SecurityAuditAdminService,
   ],
   exports: [
     UsersService,
@@ -42,8 +52,13 @@ import { UsersService } from './users/users.service';
     AuthorizationService,
     AuthenticationService,
     GoogleAuthService,
+    PasswordHasher,
     EmailVerificationService,
     PasswordRecoveryService,
+    UserAdminService,
+    UserRoleAdminService,
+    CatalogAdminService,
+    SecurityAuditAdminService,
   ],
 })
 export class ApplicationModule {}

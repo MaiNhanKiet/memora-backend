@@ -5,8 +5,10 @@ export {
   PERMISSION_RESOLVER,
   PRINCIPAL_RESOLVER,
 } from './constants/authorization.constants';
+export { RequireAnyPermissions } from './decorators/any-permissions.decorator';
 export { RequirePermissions } from './decorators/permissions.decorator';
 export { Roles } from './decorators/roles.decorator';
+export { AnyPermissionsGuard } from './guards/any-permissions.guard';
 export { PermissionsGuard } from './guards/permissions.guard';
 export { RolesGuard } from './guards/roles.guard';
 export type { AuthenticatedPrincipal } from './interfaces/authenticated-principal.interface';

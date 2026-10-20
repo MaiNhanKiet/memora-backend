@@ -10,6 +10,7 @@
 export const AUTHORIZATION_METADATA = {
   ROLES: 'auth:roles',
   PERMISSIONS: 'auth:permissions',
+  PERMISSIONS_ANY: 'auth:permissions_any',
 } as const;
 
 export const PRINCIPAL_RESOLVER = Symbol('AUTHORIZATION_PRINCIPAL_RESOLVER');

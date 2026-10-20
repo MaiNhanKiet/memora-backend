@@ -65,6 +65,14 @@ export function requireUserId(value: string | undefined): string {
   return userId;
 }
 
+export function requireRoleCode(value: string | undefined): string {
+  return requireText(value, 'Role code', MAX_CODE_LENGTH);
+}
+
+export function requirePermissionCode(value: string | undefined): string {
+  return requireText(value, 'Permission code', MAX_CODE_LENGTH);
+}
+
 export function requireCodes(values: string[] | undefined): string[] {
   if (values === undefined || values.length === 0) {
     throw new BadRequestException('At least one code is required');

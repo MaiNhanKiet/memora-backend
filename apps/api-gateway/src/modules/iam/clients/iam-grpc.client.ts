@@ -22,7 +22,31 @@ import type {
   ConfirmRegistrationRequest,
   ForgotPasswordResponse,
   GetCurrentUserRequest,
+  AssignUserRoleRequest,
+  AssignUserRoleResponse,
+  GetUserAuthorizationRequest,
+  GrantRolePermissionRequest,
+  RevokeRolePermissionRequest,
+  RolePermissionGrantResponse,
+  GetUserAuthorizationResponse,
+  GetUserByIdRequest,
+  ListPermissionsResponse,
+  ListRolePermissionsRequest,
+  ListRolePermissionsResponse,
+  ListRolesResponse,
+  ListUserRolesRequest,
+  ListUserRolesResponse,
+  ListUserSecurityAuditEventsRequest,
+  ListUserSecurityAuditEventsResponse,
+  ListUsersRequest,
+  ListUsersResponse,
   LoginRequest,
+  ProvisionUserRequest,
+  ProvisionUserResponse,
+  RevokeUserRoleRequest,
+  RevokeUserRoleResponse,
+  UpdateUserStatusRequest,
+  UpdateUserStatusResponse,
   LogoutAllRequest,
   LogoutRequest,
   RefreshTokenRequest,
@@ -99,6 +123,62 @@ interface IamServiceClient {
     request: GetCurrentUserRequest,
     metadata?: Metadata,
   ): Observable<UserResponse>;
+  getUserById(
+    request: GetUserByIdRequest,
+    metadata?: Metadata,
+  ): Observable<UserResponse>;
+  listUsers(
+    request: ListUsersRequest,
+    metadata?: Metadata,
+  ): Observable<ListUsersResponse>;
+  updateUserStatus(
+    request: UpdateUserStatusRequest,
+    metadata?: Metadata,
+  ): Observable<UpdateUserStatusResponse>;
+  provisionUser(
+    request: ProvisionUserRequest,
+    metadata?: Metadata,
+  ): Observable<ProvisionUserResponse>;
+  listRoles(
+    request: Record<string, never>,
+    metadata?: Metadata,
+  ): Observable<ListRolesResponse>;
+  listPermissions(
+    request: Record<string, never>,
+    metadata?: Metadata,
+  ): Observable<ListPermissionsResponse>;
+  listUserRoles(
+    request: ListUserRolesRequest,
+    metadata?: Metadata,
+  ): Observable<ListUserRolesResponse>;
+  assignUserRole(
+    request: AssignUserRoleRequest,
+    metadata?: Metadata,
+  ): Observable<AssignUserRoleResponse>;
+  revokeUserRole(
+    request: RevokeUserRoleRequest,
+    metadata?: Metadata,
+  ): Observable<RevokeUserRoleResponse>;
+  getUserAuthorization(
+    request: GetUserAuthorizationRequest,
+    metadata?: Metadata,
+  ): Observable<GetUserAuthorizationResponse>;
+  listRolePermissions(
+    request: ListRolePermissionsRequest,
+    metadata?: Metadata,
+  ): Observable<ListRolePermissionsResponse>;
+  grantRolePermission(
+    request: GrantRolePermissionRequest,
+    metadata?: Metadata,
+  ): Observable<RolePermissionGrantResponse>;
+  revokeRolePermission(
+    request: RevokeRolePermissionRequest,
+    metadata?: Metadata,
+  ): Observable<RolePermissionGrantResponse>;
+  listUserSecurityAuditEvents(
+    request: ListUserSecurityAuditEventsRequest,
+    metadata?: Metadata,
+  ): Observable<ListUserSecurityAuditEventsResponse>;
   validateAccessToken(
     request: { accessCredential: string },
     metadata?: Metadata,
@@ -254,6 +334,100 @@ export class IamGrpcClient implements OnModuleInit {
   getCurrentUser(accessCredential: string): Promise<UserResponse> {
     return this.unary((metadata) =>
       this.iamService.getCurrentUser({ accessCredential }, metadata),
+    );
+  }
+
+  getUserById(userId: string): Promise<UserResponse> {
+    return this.unary((metadata) =>
+      this.iamService.getUserById({ userId }, metadata),
+    );
+  }
+
+  listUsers(request: ListUsersRequest): Promise<ListUsersResponse> {
+    return this.unary((metadata) =>
+      this.iamService.listUsers(request, metadata),
+    );
+  }
+
+  updateUserStatus(
+    request: UpdateUserStatusRequest,
+  ): Promise<UpdateUserStatusResponse> {
+    return this.unary((metadata) =>
+      this.iamService.updateUserStatus(request, metadata),
+    );
+  }
+
+  provisionUser(request: ProvisionUserRequest): Promise<ProvisionUserResponse> {
+    return this.unary((metadata) =>
+      this.iamService.provisionUser(request, metadata),
+    );
+  }
+
+  listRoles(): Promise<ListRolesResponse> {
+    return this.unary((metadata) => this.iamService.listRoles({}, metadata));
+  }
+
+  listPermissions(): Promise<ListPermissionsResponse> {
+    return this.unary((metadata) =>
+      this.iamService.listPermissions({}, metadata),
+    );
+  }
+
+  listUserRoles(userId: string): Promise<ListUserRolesResponse> {
+    return this.unary((metadata) =>
+      this.iamService.listUserRoles({ userId }, metadata),
+    );
+  }
+
+  assignUserRole(
+    request: AssignUserRoleRequest,
+  ): Promise<AssignUserRoleResponse> {
+    return this.unary((metadata) =>
+      this.iamService.assignUserRole(request, metadata),
+    );
+  }
+
+  revokeUserRole(
+    request: RevokeUserRoleRequest,
+  ): Promise<RevokeUserRoleResponse> {
+    return this.unary((metadata) =>
+      this.iamService.revokeUserRole(request, metadata),
+    );
+  }
+
+  getUserAuthorization(userId: string): Promise<GetUserAuthorizationResponse> {
+    return this.unary((metadata) =>
+      this.iamService.getUserAuthorization({ userId }, metadata),
+    );
+  }
+
+  listRolePermissions(roleCode: string): Promise<ListRolePermissionsResponse> {
+    return this.unary((metadata) =>
+      this.iamService.listRolePermissions({ roleCode }, metadata),
+    );
+  }
+
+  grantRolePermission(
+    request: GrantRolePermissionRequest,
+  ): Promise<RolePermissionGrantResponse> {
+    return this.unary((metadata) =>
+      this.iamService.grantRolePermission(request, metadata),
+    );
+  }
+
+  revokeRolePermission(
+    request: RevokeRolePermissionRequest,
+  ): Promise<RolePermissionGrantResponse> {
+    return this.unary((metadata) =>
+      this.iamService.revokeRolePermission(request, metadata),
+    );
+  }
+
+  listUserSecurityAuditEvents(
+    request: ListUserSecurityAuditEventsRequest,
+  ): Promise<ListUserSecurityAuditEventsResponse> {
+    return this.unary((metadata) =>
+      this.iamService.listUserSecurityAuditEvents(request, metadata),
     );
   }
 

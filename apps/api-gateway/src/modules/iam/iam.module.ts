@@ -1,7 +1,12 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AuthorizationModule, PermissionsGuard, RolesGuard } from '@app/auth';
+import {
+  AnyPermissionsGuard,
+  AuthorizationModule,
+  PermissionsGuard,
+  RolesGuard,
+} from '@app/auth';
 import {
   GoogleOAuthModule,
   SignedCookieOAuthStateStore,
@@ -15,6 +20,9 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { HttpPrincipalResolver } from './authorization/http-principal.resolver';
 import { IamGrpcPermissionResolver } from './authorization/iam-grpc-permission.resolver';
 import { IamClientsModule } from './clients/iam-clients.module';
+import { PermissionManagementController } from './permission-management/controllers/permission-management.controller';
+import { RoleManagementController } from './role-management/controllers/role-management.controller';
+import { UserManagementController } from './user-management/controllers/user-management.controller';
 
 @Module({
   imports: [
@@ -76,7 +84,13 @@ import { IamClientsModule } from './clients/iam-clients.module';
       },
     }),
   ],
-  controllers: [AuthController, GoogleOAuthController],
+  controllers: [
+    AuthController,
+    GoogleOAuthController,
+    UserManagementController,
+    RoleManagementController,
+    PermissionManagementController,
+  ],
   providers: [
     AuthCookieService,
     GoogleOAuthRedirectFilter,
@@ -92,6 +106,10 @@ import { IamClientsModule } from './clients/iam-clients.module';
     {
       provide: APP_GUARD,
       useClass: PermissionsGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: AnyPermissionsGuard,
     },
   ],
 })

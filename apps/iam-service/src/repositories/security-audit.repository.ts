@@ -13,4 +13,20 @@ export class SecurityAuditRepository {
     const db = tx ?? this.prisma;
     return db.securityAuditEvent.create({ data });
   }
+
+  findPageByUserId(
+    userId: string,
+    skip: number,
+    take: number,
+  ): Promise<[SecurityAuditEvent[], number]> {
+    return this.prisma.$transaction([
+      this.prisma.securityAuditEvent.findMany({
+        where: { userId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip,
+        take,
+      }),
+      this.prisma.securityAuditEvent.count({ where: { userId } }),
+    ]);
+  }
 }

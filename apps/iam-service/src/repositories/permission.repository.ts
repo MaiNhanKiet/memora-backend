@@ -18,6 +18,12 @@ export class PermissionRepository {
     });
   }
 
+  findAllOrdered(): Promise<Permission[]> {
+    return this.prisma.permission.findMany({
+      orderBy: { code: 'asc' },
+    });
+  }
+
   findActiveByIds(ids: string[]): Promise<Permission[]> {
     if (ids.length === 0) {
       return Promise.resolve([]);
