@@ -18,6 +18,12 @@ export class RoleRepository {
     });
   }
 
+  findAllOrdered(): Promise<Role[]> {
+    return this.prisma.role.findMany({
+      orderBy: { code: 'asc' },
+    });
+  }
+
   findActiveByIds(ids: string[]): Promise<Role[]> {
     if (ids.length === 0) {
       return Promise.resolve([]);

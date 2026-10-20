@@ -3,6 +3,7 @@ import {
   PERMISSION_RESOLVER,
   PRINCIPAL_RESOLVER,
 } from './constants/authorization.constants';
+import { AnyPermissionsGuard } from './guards/any-permissions.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { RolesGuard } from './guards/roles.guard';
 import type { PermissionResolver } from './interfaces/permission-resolver.interface';
@@ -31,12 +32,14 @@ export class AuthorizationModule {
         },
         RolesGuard,
         PermissionsGuard,
+        AnyPermissionsGuard,
       ],
       exports: [
         PRINCIPAL_RESOLVER,
         PERMISSION_RESOLVER,
         RolesGuard,
         PermissionsGuard,
+        AnyPermissionsGuard,
       ],
     };
   }

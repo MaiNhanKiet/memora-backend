@@ -12,7 +12,7 @@ Sensitive mappings approved in v1:
 - `JEWELER` → `LASER_OPERATE`
 - `MANAGER` → `CLAIM_SERVICE_QUOTE_MANAGE`
 
-There is **no ADMIN wildcard**. ADMIN has six explicit IAM/privacy grants only.
+There is **no ADMIN wildcard**. ADMIN has seven explicit grants. `IAM_SECURITY_AUDIT_READ` was added on 2026-10-20.
 
 ## Roles (6)
 
@@ -49,13 +49,13 @@ Existing role UUIDs must not be recreated. Seed inserts missing roles/permission
 
 `DELIVERY_ACCEPT`, `DELIVERY_UPDATE`, `RECIPIENT_VERIFY`, `HANDOVER_RECORD`
 
-### ADMIN (6)
+### ADMIN (7)
 
-`IAM_USER_READ`, `IAM_USER_PROVISION`, `IAM_USER_STATUS_MANAGE`, `IAM_USER_ROLE_ASSIGN`, `IAM_RBAC_MANAGE`, `DATA_RIGHTS_PROCESS`
+`IAM_USER_READ`, `IAM_USER_PROVISION`, `IAM_USER_STATUS_MANAGE`, `IAM_USER_ROLE_ASSIGN`, `IAM_RBAC_MANAGE`, `IAM_SECURITY_AUDIT_READ`, `DATA_RIGHTS_PROCESS`
 
-`ORDER_READ_OPERATIONS`, `RECIPIENT_VERIFY`, and `HANDOVER_RECORD` are granted to more than one role (48 mappings of 45 distinct codes).
+`ORDER_READ_OPERATIONS`, `RECIPIENT_VERIFY`, and `HANDOVER_RECORD` are granted to more than one role (49 mappings of 46 distinct codes).
 
-## Permission catalog (45)
+## Permission catalog (46)
 
 | Domain | Code | Name | Business source |
 |---|---|---|---|
@@ -64,6 +64,7 @@ Existing role UUIDs must not be recreated. Seed inserts missing roles/permission
 | IAM | `IAM_USER_STATUS_MANAGE` | Manage user status | IAM admin extension; user-approved RBAC v1 |
 | IAM | `IAM_USER_ROLE_ASSIGN` | Assign user roles | IAM admin extension; user-approved RBAC v1 |
 | IAM | `IAM_RBAC_MANAGE` | Manage RBAC mappings | IAM admin extension; user-approved RBAC v1 |
+| IAM | `IAM_SECURITY_AUDIT_READ` | Read security audit events | IAM admin extension; user-approved 2026-10-20 |
 | CATALOG_INVENTORY | `CATALOG_TEMPLATE_MANAGE` | Manage ring templates | MF01-07; user-approved RBAC v1 |
 | CATALOG_INVENTORY | `CATALOG_VARIANT_MANAGE` | Manage template variants | MF01-08; MF04-19; user-approved RBAC v1 |
 | CATALOG_INVENTORY | `CATALOG_OPTION_MANAGE` | Manage catalog options | MF01-07; user-approved RBAC v1 |

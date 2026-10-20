@@ -12,7 +12,7 @@ Ask first if the change would add a Nest app, a new Postgres/Redis instance, a n
 
 - One Nest application per bounded context (`apps/<name>-service`), not per transport. Mirror `iam-service`: `main.ts`, feature modules, gRPC presentation, repositories, Prisma only if this context owns data.
 - Gateway stays HTTP/DTO/Swagger/orchestration. New public REST goes in Gateway; domain writes stay in the owning service. No Prisma in Gateway.
-- Add `nest-cli.json` project, `tsconfig.app.json`, webpack if IAM-style, handwritten contracts in `libs/contracts` plus `proto/` if gRPC. Use `create-grpc-rpc` / `implement-http-api` skills when those files change.
+- Add `nest-cli.json` project, `tsconfig.app.json`, webpack if IAM-style, handwritten contracts in `libs/contracts` plus `proto/` if gRPC. Use `create-grpc-rpc` / `implement-api` skills when those files change.
 - Internal gRPC: verify caller secret from config; never trust client actor IDs. Reuse `IAM_INTERNAL_GRPC_SECRET` pattern or a dedicated shared secret in **both** Gateway and the new service env.
 
 ## Database

@@ -27,6 +27,23 @@ export class IamGrpcPermissionResolver implements PermissionResolver {
     );
     return result.allowed;
   }
+
+  async hasAnyPermission(
+    principal: AuthenticatedPrincipal,
+    permissionCodes: readonly string[],
+  ): Promise<boolean> {
+    if (permissionCodes.length === 0) {
+      return false;
+    }
+    const credential = accessCredentialOf(principal);
+    for (const code of permissionCodes) {
+      const result = await this.iam.checkPermissions(credential, [code]);
+      if (result.allowed) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 function accessCredentialOf(principal: AuthenticatedPrincipal): string {

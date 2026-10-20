@@ -6,6 +6,8 @@ export const SECURITY_AUDIT_ACTION = {
   PASSWORD_CHANGED: 'password_changed',
   ROLE_ASSIGNED: 'role_assigned',
   ROLE_REVOKED: 'role_revoked',
+  USER_STATUS_CHANGED: 'user_status_changed',
+  GUEST_IDENTITY_LINKED: 'guest_identity_linked',
 } as const;
 
 export type SecurityAuditAction =

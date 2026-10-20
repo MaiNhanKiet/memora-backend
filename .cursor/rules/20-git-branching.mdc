@@ -1,5 +1,5 @@
 ---
-description: MEMORA Git branching, Conventional Commits, pull requests, and safe CI/CD workflow
+description: MEMORA Git branching from dev, Conventional Commits, pull requests, and safe CI/CD workflow
 alwaysApply: false
 ---
 
@@ -26,6 +26,7 @@ alwaysApply: false
 - For cross-service features, use the primary owning domain. A single cohesive feature may change multiple apps, libraries, contracts, and migrations in one branch.
 - Do **not** use permanent branches per service or automatically create `develop` / `release` branches.
 - Do not directly develop on `main`.
+- Create every new branch from the latest `dev`. Do not use `main` or another task branch as the source unless the user explicitly names a different base.
 
 ### Examples
 - `feat/iam-customer-identity`
@@ -75,7 +76,7 @@ Before proposing code changes:
 2. Inspect existing remote (`git remote -v`) before assuming it is configured.
 3. Propose an appropriate branch name using the rules above.
 4. Only switch branches, create a branch, commit, push, merge, or rebase **when the user explicitly authorizes it**.
-5. Start new task branches from an up-to-date `main` if it can be updated without losing local work.
+5. Create every new branch from an up-to-date `dev`: `git fetch origin` and `git switch -c <branch> origin/dev`. Do not branch from `main` unless the user explicitly names another base.
 6. Preserve uncommitted changes. Never reset, discard, force-push, or overwrite local commits without explicit authorization.
 7. Never run `git init` or replace `.git` without explicit authorization. A missing `.git` in the current folder is not proof that the GitHub repository does not exist.
 

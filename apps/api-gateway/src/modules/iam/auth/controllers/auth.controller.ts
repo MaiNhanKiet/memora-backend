@@ -35,7 +35,6 @@ import {
   ApiUnlinkGoogleDocs,
   ApiCookieCsrfDocs,
   ApiLogoutDocs,
-  ApiMeDocs,
   ApiRegisterChallengeDocs,
   ApiResendVerificationDocs,
 } from '../docs/auth.swagger';
@@ -194,18 +193,6 @@ export class AuthController {
     return null;
   }
 
-  @Get('me')
-  @ApiMeDocs()
-  async me(
-    @CurrentUser() principal: GatewayAuthenticatedPrincipal | undefined,
-  ) {
-    if (principal === undefined) {
-      throw new UnauthorizedException();
-    }
-    const result = await this.iam.getCurrentUser(principal.accessCredential);
-    return toPublicUserResponse(result.user);
-  }
-
   @Post('resend-verification')
   @Public()
   @AuthRateLimit(5, 15)
@@ -215,7 +202,7 @@ export class AuthController {
     return this.iam.resendVerificationEmail(body.email);
   }
 
-  @Post('change-password')
+  @Post('password/change')
   @AuthRateLimit(10, 15)
   @HttpCode(200)
   @SuccessMessage('Password updated')
@@ -302,7 +289,7 @@ export class AuthController {
     return toPublicUserResponse(result.user);
   }
 
-  @Post('forgot-password')
+  @Post('password/forgot')
   @Public()
   @AuthRateLimit(5, 15)
   @HttpCode(200)
@@ -311,7 +298,7 @@ export class AuthController {
     return this.iam.forgotPassword(body.email);
   }
 
-  @Post('reset-password')
+  @Post('password/reset')
   @Public()
   @AuthRateLimit(10, 15)
   @HttpCode(200)

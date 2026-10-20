@@ -39,4 +39,17 @@ export class RolePermissionRepository {
   ): Promise<RolePermission> {
     return this.prisma.rolePermission.create({ data });
   }
+
+  findByRoleAndPermission(
+    roleId: string,
+    permissionId: string,
+  ): Promise<RolePermission | null> {
+    return this.prisma.rolePermission.findFirst({
+      where: { roleId, permissionId },
+    });
+  }
+
+  deleteById(id: string): Promise<RolePermission> {
+    return this.prisma.rolePermission.delete({ where: { id } });
+  }
 }

@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import type { CustomerIdentity } from '../../../generated/prisma/client';
-import { CustomerIdentityRepository } from '../../repositories/customer-identity.repository';
+import {
+  Prisma,
+  type CustomerIdentity,
+} from '../../../generated/prisma/client';
+import {
+  CustomerIdentityRepository,
+  type LinkGuestIdentityResult,
+} from '../../repositories/customer-identity.repository';
 
 @Injectable()
 export class CustomerIdentitiesService {
@@ -16,5 +22,31 @@ export class CustomerIdentitiesService {
 
   findPrimaryByUserId(userId: string): Promise<CustomerIdentity | null> {
     return this.identities.findPrimaryByUserId(userId);
+  }
+
+  createVerifiedGuest(input: {
+    id: string;
+    contactEmail: string;
+  }): Promise<CustomerIdentity> {
+    return this.identities.create({
+      id: input.id,
+      contactEmail: input.contactEmail,
+      userId: null,
+      isPrimaryForUser: false,
+      emailVerifiedAt: new Date(),
+      status: 'ACTIVE',
+    });
+  }
+
+  linkVerifiedGuestAsPrimary(
+    identityId: string,
+    userId: string,
+    audit: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<LinkGuestIdentityResult> {
+    return this.identities.linkVerifiedGuestAsPrimary(
+      identityId,
+      userId,
+      audit,
+    );
   }
 }
