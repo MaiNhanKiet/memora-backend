@@ -3,6 +3,7 @@
 /node_modules
 /build
 /apps/iam-service/generated
+/apps/commerce-service/generated
 
 # Logs
 logs

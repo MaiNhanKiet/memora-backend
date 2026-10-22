@@ -16,6 +16,7 @@ logs
 **/*.md
 docs
 apps/iam-service/generated
+apps/commerce-service/generated
 **/*.spec.ts
 **/*.tsbuildinfo
 npm-debug.log*

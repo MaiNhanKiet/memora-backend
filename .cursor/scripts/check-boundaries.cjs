@@ -30,6 +30,12 @@ const checks = [
     forbidden: /^(?:@app\/api-gateway(?:\/.*)?|.*(?:^|\/)apps\/api-gateway(?:\/.*)?)$/,
     message: 'IAM must not import API Gateway application code.',
   },
+  {
+    name: 'commerce-must-not-import-other-owners',
+    owner: /^apps\/commerce-service\//,
+    forbidden: /^(?:@app\/api-gateway(?:\/.*)?|@app\/iam-service(?:\/.*)?|.*(?:^|\/)apps\/(?:api-gateway|iam-service)(?:\/.*)?)$/,
+    message: 'Commerce must not import Gateway or IAM application code.',
+  },
 ];
 
 function norm(v) { return v.split(path.sep).join('/'); }
@@ -81,7 +87,7 @@ function run(argv) {
     files=[argv[fArg+1]];
   }
   else if(argv.includes('--all')) {
-    files=['apps/api-gateway/src','apps/iam-service/src','libs/auth','libs/contracts'].flatMap(p=>walk(path.join(ROOT,p)));
+    files=['apps/api-gateway/src','apps/iam-service/src','apps/commerce-service/src','libs/auth','libs/contracts'].flatMap(p=>walk(path.join(ROOT,p)));
     if(files.length===0) throw Error('No MEMORA application/library sources found. Install kit at repository root before --all.');
   }
   else {process.stdout.write('Use --all or --file <path>\n');return 2;}

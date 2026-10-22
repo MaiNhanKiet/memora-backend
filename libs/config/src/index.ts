@@ -6,6 +6,18 @@ export {
 } from './env/api-gateway.env';
 export { iamConfig, loadIamRuntimeConfig, validateIamEnv } from './env/iam.env';
 export {
+  COMMERCE_DATABASE_NAME,
+  COMMERCE_FORBIDDEN_SCHEMAS,
+  COMMERCE_OWNED_SCHEMAS,
+  assertCommerceDatabaseUrl,
+  commerceConfig,
+  loadCommerceRuntimeConfig,
+  toCommercePoolConnectionString,
+  validateCommerceEnv,
+  type CommerceEnv,
+  type CommerceOwnedSchema,
+} from './env/commerce.env';
+export {
   cacheRedisConfig,
   validateCacheRedisEnv,
   type CacheRedisEnv,

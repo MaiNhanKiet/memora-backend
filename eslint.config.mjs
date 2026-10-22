@@ -6,7 +6,11 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs', 'apps/iam-service/generated/**'],
+    ignores: [
+      'eslint.config.mjs',
+      'apps/iam-service/generated/**',
+      'apps/commerce-service/generated/**',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

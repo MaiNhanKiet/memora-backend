@@ -1,0 +1,633 @@
+// Introspected from database memora. Commerce owns these five schemas only.
+// Logical IDs such as user_id and customer_identity_id are not foreign keys to IAM.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["catalog", "design", "inventory", "ordering", "pricing"]
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model gemstone_groups {
+  id                       String                     @id(map: "pk_catalog_gemstone_groups") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ring_template_id         String                     @db.Uuid
+  code                     String                     @db.VarChar(60)
+  name                     String?                    @db.VarChar(120)
+  selection_mode           String                     @default("INDEPENDENT") @db.VarChar(20)
+  is_required              Boolean                    @default(false)
+  sequence_no              Int                        @default(1) @db.SmallInt
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  ring_templates           ring_templates             @relation(fields: [ring_template_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_catalog_gemstone_groups_ring_template_id")
+  gemstone_slots           gemstone_slots[]
+  template_compatibilities template_compatibilities[]
+
+  @@unique([ring_template_id, code], map: "uidx_catalog_gemstone_groups_ring_template_id_code")
+  @@schema("catalog")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model gemstone_options {
+  id                          String                        @id(map: "pk_catalog_gemstone_options") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                        String                        @unique(map: "uidx_catalog_gemstone_options_code") @db.VarChar(60)
+  name                        String                        @db.VarChar(150)
+  stone_type                  String                        @db.VarChar(80)
+  shape                       String                        @db.VarChar(60)
+  length_mm                   Decimal                       @db.Decimal(8, 3)
+  width_mm                    Decimal                       @db.Decimal(8, 3)
+  color_grade                 String?                       @db.VarChar(50)
+  clarity_grade               String?                       @db.VarChar(50)
+  certified_required          Boolean                       @default(false)
+  status                      String                        @default("ACTIVE") @db.VarChar(20)
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  template_compatibilities    template_compatibilities[]
+  certified_gemstones         certified_gemstones[]
+  gemstone_batches            gemstone_batches[]
+  ring_item_version_gemstones ring_item_version_gemstones[]
+  price_items                 price_items[]
+
+  @@schema("catalog")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model gemstone_slots {
+  id                          String                        @id(map: "pk_catalog_gemstone_slots") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  gemstone_group_id           String                        @db.Uuid
+  code                        String                        @db.VarChar(60)
+  slot_index                  Int                           @db.SmallInt
+  glb_node_name               String                        @db.VarChar(120)
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  gemstone_groups             gemstone_groups               @relation(fields: [gemstone_group_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_catalog_gemstone_slots_gemstone_group_id")
+  ring_item_version_gemstones ring_item_version_gemstones[]
+
+  @@unique([gemstone_group_id, code], map: "uidx_catalog_gemstone_slots_gemstone_group_id_code")
+  @@unique([gemstone_group_id, slot_index], map: "uidx_catalog_gemstone_slots_gemstone_group_id_slot_index")
+  @@schema("catalog")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model materials {
+  id                String              @id(map: "pk_catalog_materials") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code              String              @unique(map: "uidx_catalog_materials_code") @db.VarChar(50)
+  name              String              @db.VarChar(120)
+  material_family   String?             @db.VarChar(50)
+  purity_percent    Decimal?            @db.Decimal(5, 2)
+  color             String?             @db.VarChar(50)
+  status            String              @default("ACTIVE") @db.VarChar(20)
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  resize_policies   resize_policies[]
+  template_variants template_variants[]
+
+  @@schema("catalog")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model resize_policies {
+  id                  String          @id(map: "pk_catalog_resize_policies") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ring_template_id    String          @db.Uuid
+  material_id         String          @db.Uuid
+  max_up_delta        Decimal?        @db.Decimal(6, 2)
+  max_down_delta      Decimal?        @db.Decimal(6, 2)
+  resize_method       String          @db.VarChar(80)
+  added_metal_allowed Boolean         @default(false)
+  status              String          @default("ACTIVE") @db.VarChar(20)
+  created_at          DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime        @default(now()) @db.Timestamptz(6)
+  materials           materials       @relation(fields: [material_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_catalog_resize_policies_material_id")
+  ring_templates      ring_templates  @relation(fields: [ring_template_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_catalog_resize_policies_ring_template_id")
+  pricing_rules       pricing_rules[]
+
+  @@unique([ring_template_id, material_id], map: "uidx_catalog_resize_policies_ring_template_id_material_id")
+  @@schema("catalog")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ring_templates {
+  id                                        String              @id(map: "pk_catalog_ring_templates") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                                      String              @unique(map: "uidx_catalog_ring_templates_code") @db.VarChar(60)
+  name                                      String              @db.VarChar(150)
+  description                               String?
+  glb_asset_key                             String
+  stone_layout                              String              @default("NONE") @db.VarChar(20)
+  design_supported_personalization_packages String[]            @default(["NONE"])
+  theta_min_deg                             Decimal?            @db.Decimal(8, 3)
+  theta_max_deg                             Decimal?            @db.Decimal(8, 3)
+  v_min_mm                                  Decimal?            @db.Decimal(8, 3)
+  v_max_mm                                  Decimal?            @db.Decimal(8, 3)
+  boundary_json                             Json?
+  forbidden_zones_json                      Json?               @default("[]")
+  placement_tolerance_mm                    Decimal?            @db.Decimal(8, 3)
+  status                                    String              @default("DRAFT") @db.VarChar(20)
+  created_by_user_id                        String?             @db.Uuid
+  created_at                                DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at                                DateTime            @default(now()) @db.Timestamptz(6)
+  gemstone_groups                           gemstone_groups[]
+  resize_policies                           resize_policies[]
+  template_variants                         template_variants[]
+
+  @@schema("catalog")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model template_compatibilities {
+  id                  String            @id(map: "pk_catalog_template_compatibilities") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_variant_id String            @db.Uuid
+  gemstone_group_id   String            @db.Uuid
+  gemstone_option_id  String            @db.Uuid
+  created_at          DateTime          @default(now()) @db.Timestamptz(6)
+  gemstone_groups     gemstone_groups   @relation(fields: [gemstone_group_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_catalog_template_compatibilities_gemstone_group_id")
+  gemstone_options    gemstone_options  @relation(fields: [gemstone_option_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_catalog_template_compatibilities_gemstone_option_id")
+  template_variants   template_variants @relation(fields: [template_variant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_catalog_template_compatibilities_template_variant_id")
+
+  @@unique([template_variant_id, gemstone_group_id, gemstone_option_id], map: "uidx_catalog_template_compatibilities_template_var_87cce70fe1")
+  @@schema("catalog")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model template_variants {
+  id                              String                     @id(map: "pk_catalog_template_variants") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ring_template_id                String                     @db.Uuid
+  material_id                     String                     @db.Uuid
+  standard_size                   Decimal                    @db.Decimal(6, 2)
+  local_wall_thickness_mm         Decimal                    @db.Decimal(8, 3)
+  min_remaining_wall_thickness_mm Decimal                    @db.Decimal(8, 3)
+  max_safe_engraving_depth_mm     Decimal                    @db.Decimal(8, 3)
+  status                          String                     @default("DRAFT") @db.VarChar(20)
+  created_by_user_id              String?                    @db.Uuid
+  created_at                      DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime                   @default(now()) @db.Timestamptz(6)
+  template_compatibilities        template_compatibilities[]
+  materials                       materials                  @relation(fields: [material_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_catalog_template_variants_material_id")
+  ring_templates                  ring_templates             @relation(fields: [ring_template_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_catalog_template_variants_ring_template_id")
+  ring_design_drafts              ring_design_drafts[]
+  ring_blank_stocks               ring_blank_stocks[]
+  ring_item_versions              ring_item_versions[]
+  price_items                     price_items[]
+
+  @@unique([ring_template_id, material_id, standard_size], map: "uidx_catalog_template_variants_ring_template_id_ma_ba5e77dfff")
+  @@schema("catalog")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model carts {
+  id                 String               @id(map: "pk_design_carts") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id            String?              @db.Uuid
+  guest_session_id   String?              @db.VarChar(120)
+  status             String               @default("ACTIVE") @db.VarChar(20)
+  expires_at         DateTime?            @db.Timestamptz(6)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  ring_design_drafts ring_design_drafts[]
+  orders             orders[]
+
+  @@schema("design")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ring_design_drafts {
+  id                      String            @id(map: "pk_design_ring_design_drafts") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cart_id                 String?           @db.Uuid
+  owner_user_id           String?           @db.Uuid
+  guest_session_id        String?           @db.VarChar(120)
+  template_variant_id     String            @db.Uuid
+  target_size             Decimal           @db.Decimal(6, 2)
+  gemstone_config_json    Json              @default("{}")
+  personalization_package String            @default("NONE") @db.VarChar(20)
+  memory_enabled          Boolean           @default(false)
+  estimated_price         Decimal?          @db.Decimal(18, 2)
+  currency                String            @default("VND") @db.Char(3)
+  estimated_price_at      DateTime?         @db.Timestamptz(6)
+  status                  String            @default("IN_CART") @db.VarChar(20)
+  created_at              DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime          @default(now()) @db.Timestamptz(6)
+  carts                   carts?            @relation(fields: [cart_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_design_ring_design_drafts_cart_id")
+  template_variants       template_variants @relation(fields: [template_variant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_design_ring_design_drafts_template_variant_id")
+  ring_items              ring_items[]
+
+  @@schema("design")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model allocations {
+  id                    String                @id(map: "pk_inventory_allocations") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ring_item_id          String                @db.Uuid
+  production_attempt_id String?               @db.Uuid
+  ring_blank_stock_id   String?               @db.Uuid
+  gemstone_batch_id     String?               @db.Uuid
+  certified_gemstone_id String?               @db.Uuid
+  quantity              Decimal               @default(1) @db.Decimal(12, 3)
+  status                String                @default("HOLD") @db.VarChar(20)
+  expires_at            DateTime?             @db.Timestamptz(6)
+  allocated_by_user_id  String?               @db.Uuid
+  created_at            DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime              @default(now()) @db.Timestamptz(6)
+  certified_gemstones   certified_gemstones?  @relation(fields: [certified_gemstone_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_allocations_certified_gemstone_id")
+  gemstone_batches      gemstone_batches?     @relation(fields: [gemstone_batch_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_allocations_gemstone_batch_id")
+  ring_blank_stocks     ring_blank_stocks?    @relation(fields: [ring_blank_stock_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_allocations_ring_blank_stock_id")
+  ring_items            ring_items            @relation(fields: [ring_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_allocations_ring_item_id")
+  inventory_movements   inventory_movements[]
+
+  @@schema("inventory")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model certified_gemstones {
+  id                        String                @id(map: "pk_inventory_certified_gemstones") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  internal_code             String                @unique(map: "uidx_inventory_certified_gemstones_internal_code") @db.VarChar(80)
+  gemstone_option_id        String                @db.Uuid
+  certificate_provider      String?               @db.VarChar(100)
+  certificate_number        String?               @db.VarChar(150)
+  certificate_url           String?
+  certificate_metadata_json Json?                 @default("{}")
+  purchase_cost             Decimal?              @db.Decimal(18, 2)
+  status                    String                @default("AVAILABLE") @db.VarChar(20)
+  location_code             String?               @db.VarChar(80)
+  received_at               DateTime?             @db.Timestamptz(6)
+  updated_at                DateTime              @default(now()) @db.Timestamptz(6)
+  allocations               allocations[]
+  gemstone_options          gemstone_options      @relation(fields: [gemstone_option_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_certified_gemstones_gemstone_option_id")
+  inventory_movements       inventory_movements[]
+  price_items               price_items[]
+
+  @@unique([certificate_provider, certificate_number], map: "uidx_inventory_certified_gemstones_certificate_pro_9ed1f795bb")
+  @@schema("inventory")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model gemstone_batches {
+  id                  String                @id(map: "pk_inventory_gemstone_batches") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batch_code          String                @unique(map: "uidx_inventory_gemstone_batches_batch_code") @db.VarChar(60)
+  gemstone_option_id  String                @db.Uuid
+  lot_code            String?               @db.VarChar(80)
+  supplier_ref        String?               @db.VarChar(120)
+  quantity_on_hand    Int                   @default(0)
+  quantity_reserved   Int                   @default(0)
+  unit_cost           Decimal?              @db.Decimal(18, 2)
+  location_code       String?               @db.VarChar(80)
+  status              String                @default("ACTIVE") @db.VarChar(20)
+  received_at         DateTime?             @db.Timestamptz(6)
+  updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  allocations         allocations[]
+  gemstone_options    gemstone_options      @relation(fields: [gemstone_option_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_gemstone_batches_gemstone_option_id")
+  inventory_movements inventory_movements[]
+
+  @@schema("inventory")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model inventory_movements {
+  id                    String               @id(map: "pk_inventory_inventory_movements") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  movement_type         String               @db.VarChar(25)
+  ring_blank_stock_id   String?              @db.Uuid
+  gemstone_batch_id     String?              @db.Uuid
+  certified_gemstone_id String?              @db.Uuid
+  allocation_id         String?              @db.Uuid
+  ring_item_id          String?              @db.Uuid
+  production_attempt_id String?              @db.Uuid
+  quantity              Decimal              @db.Decimal(12, 3)
+  unit_cost_snapshot    Decimal?             @db.Decimal(18, 2)
+  reason                String?
+  performed_by_user_id  String?              @db.Uuid
+  occurred_at           DateTime             @default(now()) @db.Timestamptz(6)
+  metadata_json         Json?                @default("{}")
+  allocations           allocations?         @relation(fields: [allocation_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_inventory_movements_allocation_id")
+  certified_gemstones   certified_gemstones? @relation(fields: [certified_gemstone_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_inventory_movements_certified_gemstone_id")
+  gemstone_batches      gemstone_batches?    @relation(fields: [gemstone_batch_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_inventory_movements_gemstone_batch_id")
+  ring_blank_stocks     ring_blank_stocks?   @relation(fields: [ring_blank_stock_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_inventory_movements_ring_blank_stock_id")
+  ring_items            ring_items?          @relation(fields: [ring_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_inventory_movements_ring_item_id")
+
+  @@schema("inventory")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ring_blank_stocks {
+  id                  String                @id(map: "pk_inventory_ring_blank_stocks") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stock_code          String                @unique(map: "uidx_inventory_ring_blank_stocks_stock_code") @db.VarChar(60)
+  template_variant_id String                @db.Uuid
+  lot_code            String?               @db.VarChar(80)
+  quantity_on_hand    Int                   @default(0)
+  quantity_reserved   Int                   @default(0)
+  unit_cost           Decimal?              @db.Decimal(18, 2)
+  location_code       String?               @db.VarChar(80)
+  status              String                @default("ACTIVE") @db.VarChar(20)
+  received_at         DateTime?             @db.Timestamptz(6)
+  updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  allocations         allocations[]
+  inventory_movements inventory_movements[]
+  template_variants   template_variants     @relation(fields: [template_variant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_ring_blank_stocks_template_variant_id")
+
+  @@schema("inventory")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model final_confirmation_items {
+  id                    String              @id(map: "pk_ordering_final_confirmation_items") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  final_confirmation_id String              @db.Uuid
+  ring_item_id          String              @db.Uuid
+  ring_item_version_id  String              @db.Uuid
+  created_at            DateTime            @default(now()) @db.Timestamptz(6)
+  final_confirmations   final_confirmations @relation(fields: [final_confirmation_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_final_confirmation_items_final_confirmation_id")
+  ring_items            ring_items          @relation(fields: [ring_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_final_confirmation_items_ring_item_id")
+  ring_item_versions    ring_item_versions  @relation(fields: [ring_item_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_final_confirmation_items_ring_item_version_id")
+
+  @@unique([final_confirmation_id, ring_item_id], map: "uidx_ordering_final_confirmation_items_final_confi_acc4625022")
+  @@schema("ordering")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model final_confirmations {
+  id                                String                     @id(map: "pk_ordering_final_confirmations") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id                          String                     @db.Uuid
+  quote_id                          String                     @db.Uuid
+  confirmed_by_customer_identity_id String                     @db.Uuid
+  status                            String                     @default("ACTIVE") @db.VarChar(20)
+  confirmed_at                      DateTime                   @default(now()) @db.Timestamptz(6)
+  invalidated_at                    DateTime?                  @db.Timestamptz(6)
+  invalidation_reason               String?
+  final_confirmation_items          final_confirmation_items[]
+  orders                            orders                     @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_final_confirmations_order_id")
+  quotes                            quotes                     @relation(fields: [quote_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_final_confirmations_quote_id")
+
+  @@schema("ordering")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model orders {
+  id                                     String                 @id(map: "pk_ordering_orders") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_no                               String                 @unique(map: "uidx_ordering_orders_order_no") @db.VarChar(40)
+  owner_customer_identity_id             String                 @db.Uuid
+  guest_email                            String?                @db.Citext
+  guest_phone                            String?                @db.VarChar(30)
+  guest_email_verified_at                DateTime?              @db.Timestamptz(6)
+  created_from_cart_id                   String?                @db.Uuid
+  status                                 String                 @default("AWAITING_P1") @db.VarChar(30)
+  source_plan_mode                       String                 @default("N/A") @db.VarChar(15)
+  fulfillment_mode                       String?                @db.VarChar(20)
+  recipient_name                         String?                @db.VarChar(150)
+  recipient_email                        String?                @db.Citext
+  recipient_phone                        String?                @db.VarChar(30)
+  delivery_address_json                  Json?
+  current_quote_id                       String?                @db.Uuid
+  invoice_no                             String?                @unique(map: "uidx_ordering_orders_invoice_no") @db.VarChar(60)
+  invoice_asset_key                      String?
+  invoice_issued_at                      DateTime?              @db.Timestamptz(6)
+  cancelled_at                           DateTime?              @db.Timestamptz(6)
+  cancellation_reason                    String?
+  created_at                             DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at                             DateTime               @default(now()) @db.Timestamptz(6)
+  final_confirmations                    final_confirmations[]
+  carts                                  carts?                 @relation(fields: [created_from_cart_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_orders_created_from_cart_id")
+  quotes_orders_current_quote_idToquotes quotes?                @relation("orders_current_quote_idToquotes", fields: [current_quote_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_orders_current_quote_id")
+  payment_transactions                   payment_transactions[]
+  quotes_quotes_order_idToorders         quotes[]               @relation("quotes_order_idToorders")
+  ring_items                             ring_items[]
+
+  @@schema("ordering")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model payment_transactions {
+  id                         String                 @id(map: "pk_ordering_payment_transactions") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id                   String?                @db.Uuid
+  claim_id                   String?                @db.Uuid
+  quote_id                   String?                @db.Uuid
+  payment_stage              String                 @db.VarChar(25)
+  transaction_type           String                 @default("PAYMENT") @db.VarChar(20)
+  provider                   String?                @db.VarChar(30)
+  provider_order_code        BigInt?
+  provider_transaction_id    String?                @db.VarChar(150)
+  provider_reference         String?                @db.VarChar(150)
+  related_transaction_id     String?                @db.Uuid
+  amount                     Decimal                @db.Decimal(18, 2)
+  currency                   String                 @default("VND") @db.Char(3)
+  status                     String                 @default("PENDING") @db.VarChar(20)
+  requested_at               DateTime               @default(now()) @db.Timestamptz(6)
+  expires_at                 DateTime?              @db.Timestamptz(6)
+  completed_at               DateTime?              @db.Timestamptz(6)
+  failed_at                  DateTime?              @db.Timestamptz(6)
+  failure_reason             String?
+  receipt_no                 String?                @unique(map: "uidx_ordering_payment_transactions_receipt_no") @db.VarChar(60)
+  receipt_asset_key          String?
+  receipt_issued_at          DateTime?              @db.Timestamptz(6)
+  metadata_json              Json?                  @default("{}")
+  orders                     orders?                @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_payment_transactions_order_id")
+  quotes                     quotes?                @relation(fields: [quote_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_payment_transactions_quote_id")
+  payment_transactions       payment_transactions?  @relation("payment_transactionsTopayment_transactions", fields: [related_transaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_payment_transactions_related_transaction_id")
+  other_payment_transactions payment_transactions[] @relation("payment_transactionsTopayment_transactions")
+
+  @@schema("ordering")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model quote_items {
+  id                String          @id(map: "pk_ordering_quote_items") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quote_id          String          @db.Uuid
+  ring_item_id      String?         @db.Uuid
+  component_type    String          @db.VarChar(30)
+  description       String?
+  quantity          Decimal         @default(1) @db.Decimal(12, 3)
+  unit_amount       Decimal         @db.Decimal(18, 2)
+  line_amount       Decimal         @db.Decimal(18, 2)
+  price_source_type String          @db.VarChar(30)
+  price_version_id  String?         @db.Uuid
+  pricing_rule_id   String?         @db.Uuid
+  metadata_json     Json?           @default("{}")
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+  price_versions    price_versions? @relation(fields: [price_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_quote_items_price_version_id")
+  pricing_rules     pricing_rules?  @relation(fields: [pricing_rule_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_quote_items_pricing_rule_id")
+  quotes            quotes          @relation(fields: [quote_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_quote_items_quote_id")
+  ring_items        ring_items?     @relation(fields: [ring_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_quote_items_ring_item_id")
+
+  @@schema("ordering")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model quotes {
+  id                                     String                 @id(map: "pk_ordering_quotes") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quote_no                               String                 @unique(map: "uidx_ordering_quotes_quote_no") @db.VarChar(50)
+  order_id                               String?                @db.Uuid
+  claim_id                               String?                @db.Uuid
+  quote_type                             String                 @db.VarChar(20)
+  version_no                             Int                    @default(1)
+  supersedes_quote_id                    String?                @db.Uuid
+  status                                 String                 @default("DRAFT") @db.VarChar(20)
+  subtotal_amount                        Decimal                @default(0) @db.Decimal(18, 2)
+  delivery_amount                        Decimal                @default(0) @db.Decimal(18, 2)
+  adjustment_amount                      Decimal                @default(0) @db.Decimal(18, 2)
+  total_amount                           Decimal                @db.Decimal(18, 2)
+  currency                               String                 @default("VND") @db.Char(3)
+  valid_until                            DateTime?              @db.Timestamptz(6)
+  created_by_user_id                     String?                @db.Uuid
+  issued_at                              DateTime?              @db.Timestamptz(6)
+  accepted_by_customer_identity_id       String?                @db.Uuid
+  accepted_at                            DateTime?              @db.Timestamptz(6)
+  created_at                             DateTime               @default(now()) @db.Timestamptz(6)
+  final_confirmations                    final_confirmations[]
+  orders_orders_current_quote_idToquotes orders[]               @relation("orders_current_quote_idToquotes")
+  payment_transactions                   payment_transactions[]
+  quote_items                            quote_items[]
+  orders_quotes_order_idToorders         orders?                @relation("quotes_order_idToorders", fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_quotes_order_id")
+  quotes                                 quotes?                @relation("quotesToquotes", fields: [supersedes_quote_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_quotes_supersedes_quote_id")
+  other_quotes                           quotes[]               @relation("quotesToquotes")
+
+  @@schema("ordering")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ring_item_version_gemstones {
+  id                   String             @id(map: "pk_ordering_ring_item_version_gemstones") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ring_item_version_id String             @db.Uuid
+  gemstone_slot_id     String             @db.Uuid
+  gemstone_option_id   String             @db.Uuid
+  created_at           DateTime           @default(now()) @db.Timestamptz(6)
+  gemstone_options     gemstone_options   @relation(fields: [gemstone_option_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_ring_item_version_gemstones_gemstone_option_id")
+  gemstone_slots       gemstone_slots     @relation(fields: [gemstone_slot_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_ring_item_version_gemstones_gemstone_slot_id")
+  ring_item_versions   ring_item_versions @relation(fields: [ring_item_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_ring_item_version_gemstones_ring_item_version_id")
+
+  @@schema("ordering")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ring_item_versions {
+  id                                                           String                        @id(map: "pk_ordering_ring_item_versions") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ring_item_id                                                 String                        @db.Uuid
+  version_no                                                   Int
+  parent_version_id                                            String?                       @db.Uuid
+  template_variant_id                                          String                        @db.Uuid
+  target_size                                                  Decimal                       @db.Decimal(6, 2)
+  personalization_package                                      String                        @default("NONE") @db.VarChar(20)
+  memory_enabled                                               Boolean                       @default(false)
+  preview_snapshot_json                                        Json?
+  status                                                       String                        @default("DRAFT") @db.VarChar(25)
+  change_reason                                                String?
+  created_by_user_id                                           String?                       @db.Uuid
+  created_at                                                   DateTime                      @default(now()) @db.Timestamptz(6)
+  created_by_customer_identity_id                              String?                       @db.Uuid
+  final_confirmation_items                                     final_confirmation_items[]
+  ring_item_version_gemstones                                  ring_item_version_gemstones[]
+  ring_item_versions                                           ring_item_versions?           @relation("ring_item_versionsToring_item_versions", fields: [parent_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_ring_item_versions_parent_version_id")
+  other_ring_item_versions                                     ring_item_versions[]          @relation("ring_item_versionsToring_item_versions")
+  ring_items_ring_item_versions_ring_item_idToring_items       ring_items                    @relation("ring_item_versions_ring_item_idToring_items", fields: [ring_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_ring_item_versions_ring_item_id")
+  template_variants                                            template_variants             @relation(fields: [template_variant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_ring_item_versions_template_variant_id")
+  ring_items_ring_items_current_version_idToring_item_versions ring_items[]                  @relation("ring_items_current_version_idToring_item_versions")
+
+  @@unique([ring_item_id, version_no], map: "uidx_ordering_ring_item_versions_ring_item_id_version_no")
+  @@schema("ordering")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ring_items {
+  id                                                                   String                     @id(map: "pk_ordering_ring_items") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id                                                             String                     @db.Uuid
+  item_no                                                              Int                        @db.SmallInt
+  source_ring_design_draft_id                                          String                     @db.Uuid
+  current_version_id                                                   String?                    @db.Uuid
+  warranty_started_at                                                  DateTime?                  @db.Timestamptz(6)
+  warranty_expires_at                                                  DateTime?                  @db.Timestamptz(6)
+  warranty_policy_version                                              String?                    @db.VarChar(50)
+  created_at                                                           DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                                                           DateTime                   @default(now()) @db.Timestamptz(6)
+  allocations                                                          allocations[]
+  inventory_movements                                                  inventory_movements[]
+  final_confirmation_items                                             final_confirmation_items[]
+  quote_items                                                          quote_items[]
+  ring_item_versions_ring_item_versions_ring_item_idToring_items       ring_item_versions[]       @relation("ring_item_versions_ring_item_idToring_items")
+  ring_item_versions_ring_items_current_version_idToring_item_versions ring_item_versions?        @relation("ring_items_current_version_idToring_item_versions", fields: [current_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_ring_items_current_version_id")
+  orders                                                               orders                     @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_ring_items_order_id")
+  ring_design_drafts                                                   ring_design_drafts         @relation(fields: [source_ring_design_draft_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ordering_ring_items_source_ring_design_draft_id")
+
+  @@unique([order_id, item_no], map: "uidx_ordering_ring_items_order_id_item_no")
+  @@schema("ordering")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model price_items {
+  id                                                                      String               @id(map: "pk_pricing_price_items") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  price_type                                                              String               @db.VarChar(30)
+  template_variant_id                                                     String?              @db.Uuid
+  gemstone_option_id                                                      String?              @db.Uuid
+  certified_gemstone_id                                                   String?              @db.Uuid
+  personalization_package                                                 String?              @db.VarChar(20)
+  code                                                                    String               @unique(map: "uidx_pricing_price_items_code") @db.VarChar(80)
+  status                                                                  String               @default("ACTIVE") @db.VarChar(20)
+  created_at                                                              DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at                                                              DateTime             @default(now()) @db.Timestamptz(6)
+  certified_gemstones                                                     certified_gemstones? @relation(fields: [certified_gemstone_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pricing_price_items_certified_gemstone_id")
+  gemstone_options                                                        gemstone_options?    @relation(fields: [gemstone_option_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pricing_price_items_gemstone_option_id")
+  template_variants                                                       template_variants?   @relation(fields: [template_variant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pricing_price_items_template_variant_id")
+  price_versions                                                          price_versions[]
+  pricing_rules_pricing_rules_maintenance_plan_price_item_idToprice_items pricing_rules[]      @relation("pricing_rules_maintenance_plan_price_item_idToprice_items")
+  pricing_rules_pricing_rules_target_price_item_idToprice_items           pricing_rules[]      @relation("pricing_rules_target_price_item_idToprice_items")
+
+  @@schema("pricing")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model price_versions {
+  id                        String        @id(map: "pk_pricing_price_versions") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  price_item_id             String        @db.Uuid
+  amount                    Decimal       @db.Decimal(18, 2)
+  currency                  String        @default("VND") @db.Char(3)
+  version_no                Int           @default(1)
+  status                    String        @default("DRAFT") @db.VarChar(25)
+  effective_from            DateTime?     @db.Timestamptz(6)
+  effective_to              DateTime?     @db.Timestamptz(6)
+  source_type               String        @default("MANUAL") @db.VarChar(30)
+  market_reference_value    Decimal?      @db.Decimal(18, 4)
+  market_reference_currency String?       @db.Char(3)
+  market_reference_unit     String?       @db.VarChar(30)
+  market_reference_source   String?       @db.VarChar(120)
+  market_reference_at       DateTime?     @db.Timestamptz(6)
+  review_note               String?
+  created_by_user_id        String?       @db.Uuid
+  reviewed_by_user_id       String?       @db.Uuid
+  reviewed_at               DateTime?     @db.Timestamptz(6)
+  created_at                DateTime      @default(now()) @db.Timestamptz(6)
+  quote_items               quote_items[]
+  price_items               price_items   @relation(fields: [price_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pricing_price_versions_price_item_id")
+
+  @@unique([price_item_id, version_no], map: "uidx_pricing_price_versions_price_item_id_version_no")
+  @@schema("pricing")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model pricing_rules {
+  id                                                                    String           @id(map: "pk_pricing_pricing_rules") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rule_type                                                             String           @db.VarChar(30)
+  code                                                                  String           @db.VarChar(80)
+  name                                                                  String           @db.VarChar(150)
+  resize_policy_id                                                      String?          @db.Uuid
+  resize_direction                                                      String?          @db.VarChar(10)
+  delivery_zone_code                                                    String?          @db.VarChar(50)
+  personalization_package                                               String?          @db.VarChar(20)
+  target_price_item_id                                                  String?          @db.Uuid
+  cancellation_stage                                                    String?          @db.VarChar(40)
+  redelivery_reason                                                     String?          @db.VarChar(50)
+  maintenance_plan_price_item_id                                        String?          @db.Uuid
+  config_json                                                           Json             @default("{}")
+  version_no                                                            Int              @default(1)
+  status                                                                String           @default("DRAFT") @db.VarChar(20)
+  effective_from                                                        DateTime?        @db.Timestamptz(6)
+  effective_to                                                          DateTime?        @db.Timestamptz(6)
+  created_by_user_id                                                    String?          @db.Uuid
+  approved_by_user_id                                                   String?          @db.Uuid
+  approved_at                                                           DateTime?        @db.Timestamptz(6)
+  created_at                                                            DateTime         @default(now()) @db.Timestamptz(6)
+  quote_items                                                           quote_items[]
+  price_items_pricing_rules_maintenance_plan_price_item_idToprice_items price_items?     @relation("pricing_rules_maintenance_plan_price_item_idToprice_items", fields: [maintenance_plan_price_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pricing_pricing_rules_maintenance_plan_price_item_id")
+  resize_policies                                                       resize_policies? @relation(fields: [resize_policy_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pricing_pricing_rules_resize_policy_id")
+  price_items_pricing_rules_target_price_item_idToprice_items           price_items?     @relation("pricing_rules_target_price_item_idToprice_items", fields: [target_price_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pricing_pricing_rules_target_price_item_id")
+
+  @@unique([rule_type, code, version_no], map: "uidx_pricing_pricing_rules_rule_type_code_version_no")
+  @@schema("pricing")
+}
+
+
