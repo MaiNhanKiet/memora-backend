@@ -17,6 +17,7 @@ const files = [
   'proto/iam/v1/iam.proto',
   'proto/grpc/health/v1/health.proto',
   'proto/common/v1/pagination.proto',
+  'proto/catalog/v1/catalog.proto',
 ];
 
 for (const relative of files) {

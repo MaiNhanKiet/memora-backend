@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package memora.catalog.v1;
+
+service CatalogService {
+  rpc ListRingTemplates (ListRingTemplatesRequest) returns (ListRingTemplatesResponse);
+}
+
+message ListRingTemplatesRequest {
+  optional string stone_layout = 1;
+  optional string package = 2;
+  optional int32 limit = 3;
+  optional int32 offset = 4;
+}
+
+message RingTemplateSummaryMessage {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  optional string description = 4;
+  string glb_asset_key = 5;
+  string stone_layout = 6;
+  repeated string design_supported_personalization_packages = 7;
+  string status = 8;
+}
+
+message ListRingTemplatesResponse {
+  repeated RingTemplateSummaryMessage items = 1;
+  int32 total = 2;
+}

@@ -24,8 +24,11 @@ async function bootstrap() {
       transport: Transport.GRPC,
       options: {
         url: grpcUrl,
-        package: ['grpc.health.v1'],
-        protoPath: [join(process.cwd(), 'proto/grpc/health/v1/health.proto')],
+        package: ['grpc.health.v1', 'memora.catalog.v1'],
+        protoPath: [
+          join(process.cwd(), 'proto/grpc/health/v1/health.proto'),
+          join(process.cwd(), 'proto/catalog/v1/catalog.proto'),
+        ],
         loader: {
           includeDirs: [join(process.cwd(), 'proto')],
           longs: String,
