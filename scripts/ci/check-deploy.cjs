@@ -19,6 +19,15 @@ const required = [
   'deploy/host/install-deploy-helper.sh',
   'deploy/host/sudoers.memora-deploy.example',
   'docker/iam-migrate.Dockerfile',
+  'docker/commerce-service.Dockerfile',
+  'docker/operations-service.Dockerfile',
+  'docker/experience-service.Dockerfile',
+  'deploy/secrets/commerce.env.example',
+  'deploy/secrets/operations.env.example',
+  'deploy/secrets/experience.env.example',
+  'deploy/postgres/proposals/service-roles.sql',
+  'deploy/postgres/proposals/service-roles-review.sql',
+  'scripts/ci/check-release-state.sh',
   '.github/workflows/ci.yml',
   '.github/workflows/bootstrap.yml',
   'docs/deployment/how-it-works.md',
@@ -104,5 +113,89 @@ if (existsSync(join(root, '.github/workflows/deploy.yml'))) {
   );
   process.exit(1);
 }
+
+const compose = readFileSync(join(root, 'deploy/backend/compose.yaml'), 'utf8');
+const releaseExample = readFileSync(
+  join(root, 'deploy/backend/.env.example'),
+  'utf8',
+);
+for (const token of [
+  'profiles: [\'domain-services\']',
+  'memora-commerce-service',
+  'memora-operations-service',
+  'memora-experience-service',
+  'COMMERCE_IMAGE',
+  'OPERATIONS_IMAGE',
+  'EXPERIENCE_IMAGE',
+]) {
+  if (!compose.includes(token)) {
+    process.stderr.write(`FAIL compose.yaml missing ${token}\n`);
+    process.exit(1);
+  }
+}
+if (compose.includes('50052:50052') || compose.includes('50053:50053') || compose.includes('50054:50054')) {
+  process.stderr.write('FAIL compose.yaml publishes a domain gRPC port\n');
+  process.exit(1);
+}
+if (compose.includes('privileged:')) {
+  process.stderr.write('FAIL compose.yaml must not use privileged containers\n');
+  process.exit(1);
+}
+for (const token of ['GATEWAY_IMAGE', 'IAM_IMAGE', 'MIGRATE_IMAGE', 'COMMERCE_IMAGE', 'OPERATIONS_IMAGE', 'EXPERIENCE_IMAGE']) {
+  if (!releaseExample.includes(token)) {
+    process.stderr.write(`FAIL release example missing ${token}\n`);
+    process.exit(1);
+  }
+}
+
+if (!helper.includes('deploy_backend_or_restore') || !helper.includes('current-release')) {
+  process.stderr.write('FAIL deploy failure must restore the last recorded release\n');
+  process.exit(1);
+}
+if (!helper.includes('--enable-domain-services') || !helper.includes('BLOCKER: domain services stay disabled')) {
+  process.stderr.write('FAIL domain services must stay opt-in and blocked until grants are verified\n');
+  process.exit(1);
+}
+const releaseLib = readFileSync(join(root, 'deploy/scripts/lib.sh'), 'utf8');
+if (
+  !releaseLib.includes('--profile domain-services') ||
+  !releaseLib.includes('${MEMORA_DOMAIN_SERVICES:-0}')
+) {
+  process.stderr.write(
+    'FAIL domain profile must be gated by MEMORA_DOMAIN_SERVICES\n',
+  );
+  process.exit(1);
+}
+const installer = readFileSync(
+  join(root, 'deploy/host/install-deploy-helper.sh'),
+  'utf8',
+);
+if (
+  !installer.includes('commerce.env.example') ||
+  !installer.includes('[[ ! -f "$dest" ]]')
+) {
+  process.stderr.write(
+    'FAIL installer must copy domain env examples without overwriting\n',
+  );
+  process.exit(1);
+}
+if (ci.includes('--enable-domain-services')) {
+  process.stderr.write(
+    'FAIL ci.yml must not enable domain services on Mini PC deploy\n',
+  );
+  process.exit(1);
+}
+
+const releaseState = spawnSync('bash', ['scripts/ci/check-release-state.sh'], {
+  cwd: root,
+  encoding: 'utf8',
+});
+if (releaseState.status !== 0) {
+  process.stderr.write(releaseState.stdout || '');
+  process.stderr.write(releaseState.stderr || '');
+  process.stderr.write('FAIL release state checks\n');
+  process.exit(1);
+}
+process.stdout.write(releaseState.stdout);
 
 process.stdout.write('deploy layout and shell syntax ok\n');

@@ -13,6 +13,7 @@ RELEASE_ENV="${RELEASE_ENV:-${MEMORA_ROOT}/backend/release.env}"
 BACKUP_RETAIN_DAYS="${MEMORA_BACKUP_RETAIN_DAYS:-7}"
 
 RESERVED_CONTAINERS=(memora-postgres memora-redis memora-api-gateway memora-iam-service)
+DOMAIN_CONTAINERS=(memora-commerce-service memora-operations-service memora-experience-service)
 RESERVED_VOLUMES=(memora-infra_pgdata memora-infra_redisdata)
 LEGACY_VOLUMES=(memora_pgdata memora_redisdata)
 
@@ -54,9 +55,14 @@ compose_infra() {
 }
 
 compose_backend() {
+  local -a profile=()
+  if [[ "${MEMORA_DOMAIN_SERVICES:-0}" == "1" ]]; then
+    profile=(--profile domain-services)
+  fi
   docker compose --project-name memora-backend \
     --env-file "${RELEASE_ENV}" \
     -f "${BACKEND_COMPOSE}" \
+    "${profile[@]}" \
     "$@"
 }
 
@@ -175,20 +181,62 @@ ghcr_login() {
   fi
 }
 
+assert_domain_database_url() {
+  local url="$1"
+  local expected_user="$2"
+  local label="$3"
+  [[ "$url" == postgresql://* || "$url" == postgres://* ]] || die "${label} URL must be a PostgreSQL URL"
+  local rest="${url#*://}"
+  local userpass="${rest%%@*}"
+  local hostpath="${rest#*@}"
+  [[ "$rest" == *"@"* && "$userpass" == *:* ]] || die "${label} URL must include a user and password"
+  local user="${userpass%%:*}"
+  local password="${userpass#*:}"
+  [[ -n "$password" ]] || die "${label} password is empty"
+  [[ "$password" != replace-with-* ]] || die "${label} password is still a placeholder"
+  [[ "$user" != "postgres" && "$user" != "memora" ]] || die "${label} runtime user must not be the bootstrap superuser"
+  [[ "$user" == "$expected_user" ]] || die "${label} runtime user must be ${expected_user}"
+  local hostport="${hostpath%%/*}"
+  local database="${hostpath#*/}"
+  database="${database%%\?*}"
+  [[ "$hostport" == "postgres:5432" ]] || die "${label} host must be postgres:5432"
+  [[ "$database" == "memora" ]] || die "${label} database must be memora"
+}
+
 write_release_env() {
   local sha="$1"
   local gateway="$2"
   local iam="$3"
   local migrate="$4"
+  local commerce="${5:-}"
+  local operations="${6:-}"
+  local experience="${7:-}"
   validate_digest "$gateway" gateway
   validate_digest "$iam" iam
   validate_digest "$migrate" migrate
+  local domain_services=0
+  if [[ -n "$commerce" || -n "$operations" || -n "$experience" ]]; then
+    [[ -n "$commerce" && -n "$operations" && -n "$experience" ]] || die "domain release requires commerce, operations, and experience digests"
+    validate_digest "$commerce" commerce
+    validate_digest "$operations" operations
+    validate_digest "$experience" experience
+    domain_services=1
+  fi
   umask 077
   cat > "${RELEASE_ENV}" <<EOF
 MEMORA_RELEASE_SHA=${sha}
 GATEWAY_IMAGE=ghcr.io/mainhankiet/memora-api-gateway@${gateway}
 IAM_IMAGE=ghcr.io/mainhankiet/memora-iam-service@${iam}
 MIGRATE_IMAGE=ghcr.io/mainhankiet/memora-iam-migrate@${migrate}
+EOF
+  if [[ "$domain_services" == "1" ]]; then
+    cat >> "${RELEASE_ENV}" <<EOF
+COMMERCE_IMAGE=ghcr.io/mainhankiet/memora-commerce-service@${commerce}
+OPERATIONS_IMAGE=ghcr.io/mainhankiet/memora-operations-service@${operations}
+EXPERIENCE_IMAGE=ghcr.io/mainhankiet/memora-experience-service@${experience}
+EOF
+  fi
+  cat >> "${RELEASE_ENV}" <<EOF
 MEMORA_SECRETS_DIR=${MEMORA_SECRETS_DIR}
 TAILSCALE_IPV4=${TAILSCALE_IPV4:-100.78.222.34}
 EOF
@@ -201,6 +249,17 @@ record_release() {
   local iam="$3"
   local migrate="$4"
   local kind="$5"
+  local commerce="${6:-}"
+  local operations="${7:-}"
+  local experience="${8:-}"
+  local domain_services=0
+  if [[ -n "$commerce" || -n "$operations" || -n "$experience" ]]; then
+    [[ -n "$commerce" && -n "$operations" && -n "$experience" ]] || die "domain release requires commerce, operations, and experience digests"
+    validate_digest "$commerce" commerce
+    validate_digest "$operations" operations
+    validate_digest "$experience" experience
+    domain_services=1
+  fi
   mkdir -p "${MEMORA_STATE_DIR}"
   umask 077
   if [[ -f "${MEMORA_STATE_DIR}/current-release" ]]; then
@@ -212,8 +271,16 @@ sha=${sha}
 gateway=${gateway}
 iam=${iam}
 migrate=${migrate}
+domain_services=${domain_services}
 recorded_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
+  if [[ "$domain_services" == "1" ]]; then
+    cat >> "${MEMORA_STATE_DIR}/current-release" <<EOF
+commerce=${commerce}
+operations=${operations}
+experience=${experience}
+EOF
+  fi
 }
 
 random_secret() {

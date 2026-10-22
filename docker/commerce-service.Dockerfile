@@ -1,9 +1,4 @@
 # syntax=docker/dockerfile:1
-# Build template only. Not published to GHCR and not referenced by deploy/backend/compose.yaml.
-# Do not publish 50052 or 5052 on the host. Join memora-network and use postgres:5432.
-# schema.prisma has 27 models. This image still does not generate or copy Prisma Client.
-# TODO(ci/cd): generate the client and copy apps/commerce-service/generated, as docker/iam-service.Dockerfile does.
-# Runtime uses the pg pool for the database probe. Business repositories are not in this image.
 
 ARG NODE_IMAGE=node:20.20.2-bookworm-slim
 FROM ${NODE_IMAGE} AS deps
@@ -16,7 +11,10 @@ COPY nest-cli.json tsconfig.json tsconfig.base.json tsconfig.build.json ./
 COPY apps ./apps
 COPY libs ./libs
 COPY proto ./proto
-RUN npx nest build commerce-service
+# prisma.config.ts requires COMMERCE_DATABASE_URL; generate does not connect.
+ENV COMMERCE_DATABASE_URL=postgresql://prisma_generate:unused@127.0.0.1:5432/prisma_generate
+RUN npm run prisma:commerce:generate \
+  && npx nest build commerce-service
 
 FROM ${NODE_IMAGE} AS production
 WORKDIR /app
@@ -31,6 +29,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/proto ./proto
+COPY --from=build /app/apps/commerce-service/generated ./apps/commerce-service/generated
 USER memora
 EXPOSE 50052 5052
 CMD ["node", "dist/apps/commerce-service/main.js"]

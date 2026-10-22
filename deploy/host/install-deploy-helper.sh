@@ -30,11 +30,14 @@ copy_example() {
 copy_example "${REPO_ROOT}/deploy/infra/.env.example" "${DEST}/secrets/infra.env.example"
 copy_example "${REPO_ROOT}/deploy/secrets/gateway.env.example" "${DEST}/secrets/gateway.env.example"
 copy_example "${REPO_ROOT}/deploy/secrets/iam.env.example" "${DEST}/secrets/iam.env.example"
+copy_example "${REPO_ROOT}/deploy/secrets/commerce.env.example" "${DEST}/secrets/commerce.env.example"
+copy_example "${REPO_ROOT}/deploy/secrets/operations.env.example" "${DEST}/secrets/operations.env.example"
+copy_example "${REPO_ROOT}/deploy/secrets/experience.env.example" "${DEST}/secrets/experience.env.example"
 copy_example "${REPO_ROOT}/deploy/secrets/ghcr.env.example" "${DEST}/secrets/ghcr.env.example"
 
 if [[ ! -f /etc/sudoers.d/memora-deploy ]]; then
   echo "Install sudoers from ${REPO_ROOT}/deploy/host/sudoers.memora-deploy.example"
 fi
 
-echo "Helper installed. Create gateway.env, iam.env, ghcr.env (and optionally generate infra.env via memora-deploy provision-secrets after copying passwords)."
+echo "Helper installed. Create gateway.env, iam.env, ghcr.env from the examples. commerce.env, operations.env, and experience.env stay unused until domain services are explicitly enabled."
 echo "Never chown these files to the runner user."

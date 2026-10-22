@@ -37,7 +37,8 @@ jobs:
   quality:
     name: Quality gates
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Three extra linux/amd64 image builds each run npm ci on a cold runner.
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:17-alpine
@@ -89,9 +90,19 @@ jobs:
         run: npm run proto:check
 
       - name: Prisma validate and generate
+        env:
+          COMMERCE_DATABASE_URL: postgresql://prisma_generate:unused@127.0.0.1:1/prisma_generate
+          OPERATIONS_DATABASE_URL: postgresql://prisma_generate:unused@127.0.0.1:1/prisma_generate
+          EXPERIENCE_DATABASE_URL: postgresql://prisma_generate:unused@127.0.0.1:1/prisma_generate
         run: |
           npm run prisma:iam:validate
           npm run prisma:iam:generate
+          npm run prisma:commerce:validate
+          npm run prisma:commerce:generate
+          npm run prisma:operations:validate
+          npm run prisma:operations:generate
+          npm run prisma:experience:validate
+          npm run prisma:experience:generate
 
       - name: Prisma migrate deploy (CI database only)
         run: npm run prisma:iam:migrate:deploy
@@ -104,8 +115,17 @@ jobs:
 
       - name: Build applications
         run: |
-          npx nest build api-gateway
+          set -euo pipefail
+          npm run build
           npm run build:iam
+          npm run build:commerce
+          npm run build:operations
+          npm run build:experience
+          test -f dist/apps/api-gateway/main.js
+          test -f dist/apps/iam-service/main.js
+          test -f dist/apps/commerce-service/main.js
+          test -f dist/apps/operations-service/main.js
+          test -f dist/apps/experience-service/main.js
 
       - name: Unit and IAM refresh regression tests
         run: npx jest --runInBand --testPathIgnorePatterns=live.spec.ts
@@ -114,6 +134,132 @@ jobs:
         env:
           MEMORA_REDIS_TEST: '1'
         run: npx jest --runInBand --testPathPatterns=live.spec.ts
+
+      - name: Build service images (linux/amd64, no push)
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 \
+            -f docker/commerce-service.Dockerfile \
+            -t memora-commerce-service:ci .
+          docker build --platform linux/amd64 \
+            -f docker/operations-service.Dockerfile \
+            -t memora-operations-service:ci .
+          docker build --platform linux/amd64 \
+            -f docker/experience-service.Dockerfile \
+            -t memora-experience-service:ci .
+
+      - name: Verify service image structure
+        run: |
+          set -euo pipefail
+          verify_image() {
+            image="$1"
+            service="$2"
+            arch="$(docker image inspect "$image" --format '{{.Architecture}}')"
+            user="$(docker image inspect "$image" --format '{{.Config.User}}')"
+            if [ "$arch" != "amd64" ]; then
+              echo "FAIL ${image} architecture=${arch}" >&2
+              exit 1
+            fi
+            if [ "$user" != "memora" ]; then
+              echo "FAIL ${image} user=${user}" >&2
+              exit 1
+            fi
+            docker run --rm --entrypoint sh "$image" -c "
+              set -eu
+              test \"\$(id -u)\" != 0
+              test -f /app/dist/apps/${service}/main.js
+              test -f /app/proto/grpc/health/v1/health.proto
+              test -f /app/apps/${service}/generated/prisma/client.ts
+              set -- /app/apps/${service}/generated/prisma/models/*.ts
+              test -f \"\$1\"
+              if [ -e /app/.env ] || [ -e /.env ]; then
+                echo 'FAIL: .env present in image' >&2
+                exit 1
+              fi
+              found=\$(find /app \\( -name '.env' -o -name '.env.*' -o -name 'credentials.json' -o -name '*.pem' -o -name '*.p12' -o -name '*.pfx' \\) ! -name '.env.example' || true)
+              if [ -n \"\$found\" ]; then
+                echo 'FAIL: secret-like file present in image' >&2
+                exit 1
+              fi
+              echo \"${service} image structure ok\"
+            "
+          }
+          verify_image memora-commerce-service:ci commerce-service
+          verify_image memora-operations-service:ci operations-service
+          verify_image memora-experience-service:ci experience-service
+
+      - name: Smoke test service images
+        run: |
+          set -euo pipefail
+          cids=()
+          cleanup() {
+            local cid
+            for cid in "${cids[@]}"; do
+              docker rm -f "$cid" >/dev/null 2>&1 || true
+            done
+          }
+          trap cleanup EXIT
+          smoke() {
+            local image="$1"
+            local name="$2"
+            local database_var="$3"
+            local health_var="$4"
+            local port="$5"
+            local cid running live_code ready_code other_code ready_body ports
+            cid="$(docker run -d --name "$name" \
+              -e NODE_ENV=production \
+              -e "${health_var}=0.0.0.0" \
+              -e "${database_var}=postgresql://service_smoke:unused@127.0.0.1:1/memora" \
+              -p "127.0.0.1:${port}:${port}" \
+              "$image")"
+            cids+=("$cid")
+            live_code=""
+            for _ in $(seq 1 20); do
+              live_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:${port}/health/live" 2>/dev/null || true)"
+              if [ "$live_code" = "200" ]; then
+                break
+              fi
+              sleep 1
+            done
+            if [ "$live_code" != "200" ]; then
+              echo "FAIL ${name} /health/live status=${live_code}" >&2
+              docker logs "$cid" >&2 || true
+              exit 1
+            fi
+            ready_body="$(mktemp)"
+            ready_code="$(curl -sS -o "$ready_body" -w '%{http_code}' --max-time 15 "http://127.0.0.1:${port}/health/ready" || true)"
+            if [ "$ready_code" != "503" ] || ! grep -q '"postgres":"down"' "$ready_body"; then
+              echo "FAIL ${name} /health/ready status=${ready_code}" >&2
+              docker logs "$cid" >&2 || true
+              rm -f "$ready_body"
+              exit 1
+            fi
+            rm -f "$ready_body"
+            other_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:${port}/health/unknown" || true)"
+            if [ "$other_code" != "404" ]; then
+              echo "FAIL ${name} unexpected status=${other_code}" >&2
+              exit 1
+            fi
+            running="$(docker inspect -f '{{.State.Running}}' "$cid")"
+            if [ "$running" != "true" ]; then
+              echo "FAIL ${name} exited after startup" >&2
+              docker logs "$cid" >&2 || true
+              exit 1
+            fi
+            ports="$(docker port "$cid")"
+            if ! printf '%s\n' "$ports" | grep -q "127.0.0.1:${port}"; then
+              echo "FAIL ${name} health port is not loopback" >&2
+              exit 1
+            fi
+            if printf '%s\n' "$ports" | grep -Eq '0\.0\.0\.0|5005[2-4]'; then
+              echo "FAIL ${name} published a non-loopback or gRPC port" >&2
+              exit 1
+            fi
+            echo "${name} smoke ok live=200 ready=503"
+          }
+          smoke memora-commerce-service:ci memora-commerce-smoke COMMERCE_DATABASE_URL COMMERCE_HEALTH_HOST 5052
+          smoke memora-operations-service:ci memora-operations-smoke OPERATIONS_DATABASE_URL OPERATIONS_HEALTH_HOST 5053
+          smoke memora-experience-service:ci memora-experience-smoke EXPERIENCE_DATABASE_URL EXPERIENCE_HEALTH_HOST 5054
 
   security:
     name: Security
@@ -161,6 +307,15 @@ jobs:
           - app: iam-migrate
             image: memora-iam-migrate
             file: docker/iam-migrate.Dockerfile
+          - app: commerce-service
+            image: memora-commerce-service
+            file: docker/commerce-service.Dockerfile
+          - app: operations-service
+            image: memora-operations-service
+            file: docker/operations-service.Dockerfile
+          - app: experience-service
+            image: memora-experience-service
+            file: docker/experience-service.Dockerfile
     env:
       TAG: ${{ github.sha }}
     steps:
@@ -266,6 +421,48 @@ jobs:
             npx prisma -v
             echo "migrate image ok"
           '
+
+      - name: Verify service entrypoint and Prisma client
+        if: matrix.app == 'commerce-service' || matrix.app == 'operations-service' || matrix.app == 'experience-service'
+        run: |
+          set -euo pipefail
+          service="${{ matrix.app }}"
+          case "$service" in
+            commerce-service|operations-service|experience-service) ;;
+            *)
+              echo "FAIL unexpected publish app" >&2
+              exit 1
+              ;;
+          esac
+          arch="$(docker image inspect "${IMAGE}:${TAG}" --format '{{.Architecture}}')"
+          user="$(docker image inspect "${IMAGE}:${TAG}" --format '{{.Config.User}}')"
+          if [ "$arch" != "amd64" ]; then
+            echo "FAIL ${service} architecture=${arch}" >&2
+            exit 1
+          fi
+          if [ -z "$user" ] || [ "$user" = "root" ] || [ "$user" = "0" ]; then
+            echo "FAIL ${service} runs as root" >&2
+            exit 1
+          fi
+          docker run --rm --entrypoint sh "${IMAGE}:${TAG}" -c "
+            set -eu
+            test \"\$(id -u)\" != 0
+            test -f /app/dist/apps/${service}/main.js
+            test -f /app/proto/grpc/health/v1/health.proto
+            test -f /app/apps/${service}/generated/prisma/client.ts
+            set -- /app/apps/${service}/generated/prisma/models/*.ts
+            test -f \"\$1\"
+            if [ -e /app/.env ] || [ -e /.env ]; then
+              echo 'FAIL: .env present in image' >&2
+              exit 1
+            fi
+            found=\$(find /app \\( -name '.env' -o -name '.env.*' -o -name 'credentials.json' -o -name '*.pem' -o -name '*.key' -o -name '*.p12' -o -name '*.pfx' \\) ! -name '.env.example' || true)
+            if [ -n \"\$found\" ]; then
+              echo 'FAIL: secret-like file present in image' >&2
+              exit 1
+            fi
+            echo \"${service} entrypoint and prisma client ok\"
+          "
 
       - name: Scan image (fail on CRITICAL)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
