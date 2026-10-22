@@ -4,13 +4,9 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { GrpcExceptionFilter } from '@app/common';
 import { loadIamRuntimeConfig } from '@app/config';
 import { createMemoraLogger } from '@app/logger';
-import {
-  createServer,
-  type IncomingMessage,
-  type ServerResponse,
-} from 'node:http';
 import { join } from 'node:path';
-import { IamReadinessService } from './application/ops/iam-readiness.service';
+import { startHealthHttpServer } from './health/http-health.server';
+import { IamReadinessService } from './health/readiness.service';
 import { IamServiceModule } from './iam-service.module';
 import {
   IAM_POSTGRES_DATABASE,
@@ -73,62 +69,6 @@ async function bootstrap() {
     `IAM health listening on ${iam.IAM_HEALTH_HOST}:${iam.IAM_HEALTH_PORT}`,
     'Bootstrap',
   );
-}
-
-function startHealthHttpServer(
-  host: string,
-  port: number,
-  readiness: IamReadinessService,
-): ReturnType<typeof createServer> {
-  const server = createServer((request, response) => {
-    void handleHealthRequest(request, response, readiness);
-  });
-  server.listen(port, host);
-  return server;
-}
-
-async function handleHealthRequest(
-  request: IncomingMessage,
-  response: ServerResponse,
-  readiness: IamReadinessService,
-): Promise<void> {
-  const path = request.url?.split('?')[0] ?? '';
-  if (request.method === 'GET' && path === '/health/live') {
-    writeJson(response, 200, { status: 'ok' });
-    return;
-  }
-  if (request.method === 'GET' && path === '/health/ready') {
-    const postgres = await readiness.pingPostgres();
-    const redis = await readiness.pingRedis();
-    if (!postgres || !redis) {
-      writeJson(response, 503, {
-        status: 'error',
-        checks: {
-          postgres: postgres ? 'up' : 'down',
-          redis: redis ? 'up' : 'down',
-        },
-      });
-      return;
-    }
-    writeJson(response, 200, {
-      status: 'ok',
-      checks: { postgres: 'up', redis: 'up' },
-    });
-    return;
-  }
-  writeJson(response, 404, { status: 'error' });
-}
-
-function writeJson(
-  response: ServerResponse,
-  statusCode: number,
-  body: Record<string, unknown>,
-): void {
-  response.writeHead(statusCode, {
-    'content-type': 'application/json',
-    'cache-control': 'no-store',
-  });
-  response.end(JSON.stringify(body));
 }
 
 void bootstrap();

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../persistence/prisma/prisma.service';
-import { RedisService } from '../../persistence/redis/redis.service';
+import { PrismaService } from '../persistence/prisma/prisma.service';
+import { RedisService } from '../persistence/redis/redis.service';
 
 @Injectable()
 export class IamReadinessService {

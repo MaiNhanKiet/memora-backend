@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
-import { IamReadinessService } from '../../application/ops/iam-readiness.service';
+import { IamReadinessService } from './readiness.service';
 
 const SERVING = 1;
 const NOT_SERVING = 2;
