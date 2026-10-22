@@ -10,6 +10,7 @@ export default tseslint.config(
       'eslint.config.mjs',
       'apps/iam-service/generated/**',
       'apps/commerce-service/generated/**',
+      'apps/operations-service/generated/**',
     ],
   },
   eslint.configs.recommended,

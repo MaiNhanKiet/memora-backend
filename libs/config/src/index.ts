@@ -18,6 +18,18 @@ export {
   type CommerceOwnedSchema,
 } from './env/commerce.env';
 export {
+  OPERATIONS_DATABASE_NAME,
+  OPERATIONS_FORBIDDEN_SCHEMAS,
+  OPERATIONS_OWNED_SCHEMAS,
+  assertOperationsDatabaseUrl,
+  loadOperationsRuntimeConfig,
+  operationsConfig,
+  toOperationsPoolConnectionString,
+  validateOperationsEnv,
+  type OperationsEnv,
+  type OperationsOwnedSchema,
+} from './env/operations.env';
+export {
   cacheRedisConfig,
   validateCacheRedisEnv,
   type CacheRedisEnv,

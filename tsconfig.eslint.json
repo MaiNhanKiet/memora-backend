@@ -9,6 +9,7 @@
     "node_modules",
     "dist",
     "apps/iam-service/generated",
-    "apps/commerce-service/generated"
+    "apps/commerce-service/generated",
+    "apps/operations-service/generated"
   ]
 }

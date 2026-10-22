@@ -31,10 +31,10 @@ const checks = [
     message: 'IAM must not import API Gateway application code.',
   },
   {
-    name: 'commerce-must-not-import-other-owners',
-    owner: /^apps\/commerce-service\//,
-    forbidden: /^(?:@app\/api-gateway(?:\/.*)?|@app\/iam-service(?:\/.*)?|.*(?:^|\/)apps\/(?:api-gateway|iam-service)(?:\/.*)?)$/,
-    message: 'Commerce must not import Gateway or IAM application code.',
+    name: 'operations-must-not-import-other-owners',
+    owner: /^apps\/operations-service\//,
+    forbidden: /^(?:@app\/api-gateway(?:\/.*)?|@app\/iam-service(?:\/.*)?|@app\/commerce-service(?:\/.*)?|.*(?:^|\/)apps\/(?:api-gateway|iam-service|commerce-service)(?:\/.*)?)$/,
+    message: 'Operations must not import Gateway, IAM, or Commerce application code.',
   },
 ];
 
@@ -87,7 +87,7 @@ function run(argv) {
     files=[argv[fArg+1]];
   }
   else if(argv.includes('--all')) {
-    files=['apps/api-gateway/src','apps/iam-service/src','apps/commerce-service/src','libs/auth','libs/contracts'].flatMap(p=>walk(path.join(ROOT,p)));
+    files=['apps/api-gateway/src','apps/iam-service/src','apps/commerce-service/src','apps/operations-service/src','libs/auth','libs/contracts'].flatMap(p=>walk(path.join(ROOT,p)));
     if(files.length===0) throw Error('No MEMORA application/library sources found. Install kit at repository root before --all.');
   }
   else {process.stdout.write('Use --all or --file <path>\n');return 2;}
