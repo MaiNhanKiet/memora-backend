@@ -30,6 +30,18 @@ export {
   type OperationsOwnedSchema,
 } from './env/operations.env';
 export {
+  EXPERIENCE_DATABASE_NAME,
+  EXPERIENCE_FORBIDDEN_SCHEMAS,
+  EXPERIENCE_OWNED_SCHEMAS,
+  assertExperienceDatabaseUrl,
+  experienceConfig,
+  loadExperienceRuntimeConfig,
+  toExperiencePoolConnectionString,
+  validateExperienceEnv,
+  type ExperienceEnv,
+  type ExperienceOwnedSchema,
+} from './env/experience.env';
+export {
   cacheRedisConfig,
   validateCacheRedisEnv,
   type CacheRedisEnv,

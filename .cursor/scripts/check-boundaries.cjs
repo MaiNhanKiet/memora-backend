@@ -36,6 +36,12 @@ const checks = [
     forbidden: /^(?:@app\/api-gateway(?:\/.*)?|@app\/iam-service(?:\/.*)?|@app\/commerce-service(?:\/.*)?|.*(?:^|\/)apps\/(?:api-gateway|iam-service|commerce-service)(?:\/.*)?)$/,
     message: 'Operations must not import Gateway, IAM, or Commerce application code.',
   },
+  {
+    name: 'experience-must-not-import-other-owners',
+    owner: /^apps\/experience-service\//,
+    forbidden: /^(?:@app\/api-gateway(?:\/.*)?|@app\/iam-service(?:\/.*)?|@app\/commerce-service(?:\/.*)?|@app\/operations-service(?:\/.*)?|.*(?:^|\/)apps\/(?:api-gateway|iam-service|commerce-service|operations-service)(?:\/.*)?)$/,
+    message: 'Experience must not import Gateway, IAM, Commerce, or Operations application code.',
+  },
 ];
 
 function norm(v) { return v.split(path.sep).join('/'); }
@@ -87,7 +93,7 @@ function run(argv) {
     files=[argv[fArg+1]];
   }
   else if(argv.includes('--all')) {
-    files=['apps/api-gateway/src','apps/iam-service/src','apps/commerce-service/src','apps/operations-service/src','libs/auth','libs/contracts'].flatMap(p=>walk(path.join(ROOT,p)));
+    files=['apps/api-gateway/src','apps/iam-service/src','apps/commerce-service/src','apps/operations-service/src','apps/experience-service/src','libs/auth','libs/contracts'].flatMap(p=>walk(path.join(ROOT,p)));
     if(files.length===0) throw Error('No MEMORA application/library sources found. Install kit at repository root before --all.');
   }
   else {process.stdout.write('Use --all or --file <path>\n');return 2;}

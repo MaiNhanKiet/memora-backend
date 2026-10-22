@@ -1,0 +1,242 @@
+// Introspected from database memora. Experience owns memory and platform only.
+// Logical IDs such as user_id and order_id are not foreign keys to other services.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["memory", "platform"]
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model access_grants {
+  id                    String       @id(map: "pk_memory_access_grants") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  memory_card_id        String       @db.Uuid
+  grantee_user_id       String?      @db.Uuid
+  grantee_email         String       @db.Citext
+  status                String       @default("PENDING") @db.VarChar(20)
+  invitation_token_hash String?      @db.VarChar(128)
+  invite_expires_at     DateTime?    @db.Timestamptz(6)
+  accepted_at           DateTime?    @db.Timestamptz(6)
+  linked_to_account_at  DateTime?    @db.Timestamptz(6)
+  revoked_by_user_id    String?      @db.Uuid
+  revoked_at            DateTime?    @db.Timestamptz(6)
+  last_accessed_at      DateTime?    @db.Timestamptz(6)
+  created_at            DateTime     @default(now()) @db.Timestamptz(6)
+  memory_cards          memory_cards @relation(fields: [memory_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_memory_access_grants_memory_card_id")
+
+  @@schema("memory")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model memory_cards {
+  id                         String            @id(map: "pk_memory_memory_cards") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ring_item_id               String            @db.Uuid
+  owner_customer_identity_id String            @db.Uuid
+  owner_email                String            @db.Citext
+  status                     String            @default("PENDING") @db.VarChar(20)
+  activated_at               DateTime?         @db.Timestamptz(6)
+  pin_hash                   String?
+  pin_failed_attempts        Int               @default(0) @db.SmallInt
+  pin_locked_until           DateTime?         @db.Timestamptz(6)
+  pin_updated_at             DateTime?         @db.Timestamptz(6)
+  ar_target_asset_key        String?
+  created_at                 DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime          @default(now()) @db.Timestamptz(6)
+  deleted_at                 DateTime?         @db.Timestamptz(6)
+  access_grants              access_grants[]
+  memory_contents            memory_contents[]
+
+  @@schema("memory")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model memory_contents {
+  id                              String       @id(map: "pk_memory_memory_contents") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  memory_card_id                  String       @db.Uuid
+  content_type                    String       @db.VarChar(20)
+  title                           String?      @db.VarChar(200)
+  text_content                    String?
+  asset_key                       String?
+  sort_order                      Int          @default(0)
+  status                          String       @default("ACTIVE") @db.VarChar(20)
+  created_by_user_id              String?      @db.Uuid
+  created_at                      DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime     @default(now()) @db.Timestamptz(6)
+  deleted_at                      DateTime?    @db.Timestamptz(6)
+  created_by_customer_identity_id String?      @db.Uuid
+  layout_json                     Json?
+  memory_cards                    memory_cards @relation(fields: [memory_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_memory_memory_contents_memory_card_id")
+
+  @@schema("memory")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ai_conversations {
+  id               String        @id(map: "pk_platform_ai_conversations") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String?       @db.Uuid
+  guest_session_id String?       @db.VarChar(120)
+  title            String?       @db.VarChar(200)
+  status           String        @default("ACTIVE") @db.VarChar(20)
+  context_json     Json?         @default("{}")
+  started_at       DateTime      @default(now()) @db.Timestamptz(6)
+  last_message_at  DateTime?     @db.Timestamptz(6)
+  ended_at         DateTime?     @db.Timestamptz(6)
+  ai_messages      ai_messages[]
+
+  @@schema("platform")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ai_messages {
+  id                      String           @id(map: "pk_platform_ai_messages") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id         String           @db.Uuid
+  role                    String           @db.VarChar(15)
+  content                 String
+  structured_context_json Json?            @default("{}")
+  trace_id                String?          @db.VarChar(120)
+  retrieval_query         String?
+  retrieval_trace_json    Json?            @default("{}")
+  model_name              String?          @db.VarChar(100)
+  created_at              DateTime         @default(now()) @db.Timestamptz(6)
+  ai_conversations        ai_conversations @relation(fields: [conversation_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_platform_ai_messages_conversation_id")
+
+  @@schema("platform")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model audit_logs {
+  id                         String   @id(map: "pk_platform_audit_logs") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor_user_id              String?  @db.Uuid
+  action                     String   @db.VarChar(100)
+  entity_type                String   @db.VarChar(50)
+  entity_id                  String?  @db.Uuid
+  request_id                 String?  @db.VarChar(120)
+  trace_id                   String?  @db.VarChar(120)
+  result_status              String?  @db.VarChar(20)
+  change_summary_json        Json?    @default("{}")
+  metadata_json              Json?    @default("{}")
+  ip_address                 String?  @db.Inet
+  user_agent                 String?
+  created_at                 DateTime @default(now()) @db.Timestamptz(6)
+  actor_customer_identity_id String?  @db.Uuid
+
+  @@schema("platform")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model evidence_assets {
+  id                              String    @id(map: "pk_platform_evidence_assets") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_type                      String    @db.VarChar(40)
+  owner_id                        String    @db.Uuid
+  evidence_type                   String    @db.VarChar(50)
+  storage_key                     String
+  mime_type                       String?   @db.VarChar(120)
+  checksum                        String?   @db.VarChar(128)
+  metadata_json                   Json?     @default("{}")
+  created_by_user_id              String?   @db.Uuid
+  created_at                      DateTime  @default(now()) @db.Timestamptz(6)
+  deleted_at                      DateTime? @db.Timestamptz(6)
+  created_by_customer_identity_id String?   @db.Uuid
+
+  @@schema("platform")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model lightrag_knowledge_documents {
+  id                                 String                         @id(map: "pk_platform_lightrag_knowledge_documents") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  document_key                       String                         @db.VarChar(100)
+  title                              String                         @db.VarChar(250)
+  document_type                      String?                        @db.VarChar(80)
+  source_asset_key                   String
+  version_no                         Int                            @default(1)
+  supersedes_document_id             String?                        @db.Uuid
+  status                             String                         @default("DRAFT") @db.VarChar(20)
+  checksum                           String                         @db.VarChar(128)
+  qdrant_collection                  String?                        @db.VarChar(120)
+  index_version                      String?                        @db.VarChar(80)
+  uploaded_by_user_id                String                         @db.Uuid
+  reviewed_by_user_id                String?                        @db.Uuid
+  activated_at                       DateTime?                      @db.Timestamptz(6)
+  deactivated_at                     DateTime?                      @db.Timestamptz(6)
+  created_at                         DateTime                       @default(now()) @db.Timestamptz(6)
+  lightrag_doc_id                    String?                        @db.VarChar(160)
+  ingestion_status                   String                         @default("NOT_STARTED") @db.VarChar(24)
+  indexed_at                         DateTime?                      @db.Timestamptz(6)
+  lightrag_workspace                 String                         @default("memora_consultation") @db.VarChar(100)
+  normalized_asset_key               String?
+  last_ingestion_error               String?
+  reviewed_at                        DateTime?                      @db.Timestamptz(6)
+  index_config_json                  Json?                          @default("{}")
+  lightrag_knowledge_documents       lightrag_knowledge_documents?  @relation("lightrag_knowledge_documentsTolightrag_knowledge_documents", fields: [supersedes_document_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_platform_lightrag_knowledge_documents_supersedes_document_id")
+  other_lightrag_knowledge_documents lightrag_knowledge_documents[] @relation("lightrag_knowledge_documentsTolightrag_knowledge_documents")
+
+  @@unique([document_key, version_no], map: "uidx_platform_lightrag_knowledge_documents_documen_dc12830b0d")
+  @@unique([lightrag_workspace, lightrag_doc_id], map: "uidx_platform_lightrag_knowledge_documents_lightra_7e6b256a30")
+  @@schema("platform")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model notifications {
+  id                             String    @id(map: "pk_platform_notifications") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipient_user_id              String?   @db.Uuid
+  recipient_email                String?   @db.Citext
+  notification_type              String    @db.VarChar(60)
+  title                          String    @db.VarChar(200)
+  body                           String
+  channel                        String    @default("IN_APP") @db.VarChar(20)
+  reference_type                 String?   @db.VarChar(40)
+  reference_id                   String?   @db.Uuid
+  status                         String    @default("PENDING") @db.VarChar(20)
+  scheduled_at                   DateTime? @db.Timestamptz(6)
+  sent_at                        DateTime? @db.Timestamptz(6)
+  read_at                        DateTime? @db.Timestamptz(6)
+  failure_reason                 String?
+  created_at                     DateTime  @default(now()) @db.Timestamptz(6)
+  recipient_customer_identity_id String?   @db.Uuid
+
+  @@schema("platform")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model share_links {
+  id                      String    @id(map: "pk_platform_share_links") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_by_user_id      String?   @db.Uuid
+  guest_session_id        String?   @db.VarChar(120)
+  ring_template_id        String?   @db.Uuid
+  ring_design_draft_id    String?   @db.Uuid
+  token_hash              String    @unique(map: "uidx_platform_share_links_token_hash") @db.VarChar(128)
+  status                  String    @default("ACTIVE") @db.VarChar(20)
+  sanitized_snapshot_json Json      @default("{}")
+  expires_at              DateTime? @db.Timestamptz(6)
+  revoked_at              DateTime? @db.Timestamptz(6)
+  last_accessed_at        DateTime? @db.Timestamptz(6)
+  created_at              DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@schema("platform")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model system_configurations {
+  id                 String    @id(map: "pk_platform_system_configurations") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  config_key         String    @db.VarChar(120)
+  config_value_json  Json
+  value_type         String    @db.VarChar(30)
+  version_no         Int       @default(1)
+  status             String    @default("ACTIVE") @db.VarChar(20)
+  description        String?
+  effective_from     DateTime? @db.Timestamptz(6)
+  effective_to       DateTime? @db.Timestamptz(6)
+  updated_by_user_id String?   @db.Uuid
+  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@unique([config_key, version_no], map: "uidx_platform_system_configurations_config_key_version_no")
+  @@schema("platform")
+}
+
+

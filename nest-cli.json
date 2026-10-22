@@ -85,6 +85,16 @@
         "tsConfigPath": "apps/operations-service/tsconfig.app.json"
       }
     },
+    "experience-service": {
+      "type": "application",
+      "root": "apps/experience-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/experience-service/src",
+      "compilerOptions": {
+        "webpackConfigPath": "apps/experience-service/webpack.config.js",
+        "tsConfigPath": "apps/experience-service/tsconfig.app.json"
+      }
+    },
     "logger": {
       "type": "library",
       "root": "libs/logger",

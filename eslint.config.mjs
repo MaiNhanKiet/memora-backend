@@ -11,6 +11,7 @@ export default tseslint.config(
       'apps/iam-service/generated/**',
       'apps/commerce-service/generated/**',
       'apps/operations-service/generated/**',
+      'apps/experience-service/generated/**',
     ],
   },
   eslint.configs.recommended,
