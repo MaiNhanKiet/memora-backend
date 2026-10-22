@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 # Build template only. Not published to GHCR and not referenced by deploy/backend/compose.yaml.
 # Do not publish 50052 or 5052 on the host. Join memora-network and use postgres:5432.
-# Prisma Client generation stays out of this image until schema.prisma has real models.
+# schema.prisma has 27 models. This image still does not generate or copy Prisma Client.
+# TODO(ci/cd): generate the client and copy apps/commerce-service/generated, as docker/iam-service.Dockerfile does.
+# Runtime uses the pg pool for the database probe. Business repositories are not in this image.
 
 ARG NODE_IMAGE=node:20.20.2-bookworm-slim
 FROM ${NODE_IMAGE} AS deps

@@ -17,6 +17,8 @@ logs
 docs
 apps/iam-service/generated
 apps/commerce-service/generated
+apps/operations-service/generated
+apps/experience-service/generated
 **/*.spec.ts
 **/*.tsbuildinfo
 npm-debug.log*
