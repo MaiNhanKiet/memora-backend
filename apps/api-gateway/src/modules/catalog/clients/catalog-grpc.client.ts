@@ -6,6 +6,12 @@ import {
   mapGrpcErrorToHttpException,
 } from '@app/common';
 import type {
+  GetConfigurationOptionsRequest,
+  GetConfigurationOptionsResponse,
+  GetRingTemplateDetailRequest,
+  GetRingTemplateDetailResponse,
+  GetTemplate3DAssetsRequest,
+  GetTemplate3DAssetsResponse,
   ListRingTemplatesRequest,
   ListRingTemplatesResponse,
 } from '@app/contracts';
@@ -21,6 +27,18 @@ interface CatalogServiceClient {
     request: ListRingTemplatesRequest,
     metadata?: Metadata,
   ): Observable<ListRingTemplatesResponse>;
+  getRingTemplateDetail(
+    request: GetRingTemplateDetailRequest,
+    metadata?: Metadata,
+  ): Observable<GetRingTemplateDetailResponse>;
+  getConfigurationOptions(
+    request: GetConfigurationOptionsRequest,
+    metadata?: Metadata,
+  ): Observable<GetConfigurationOptionsResponse>;
+  getTemplate3DAssets(
+    request: GetTemplate3DAssetsRequest,
+    metadata?: Metadata,
+  ): Observable<GetTemplate3DAssetsResponse>;
 }
 
 @Injectable()
@@ -44,6 +62,31 @@ export class CatalogGrpcClient implements OnModuleInit {
       client.listRingTemplates(request, metadata),
     );
   }
+
+  async getRingTemplateDetail(
+    templateId: string,
+  ): Promise<GetRingTemplateDetailResponse> {
+    return this.invoke((client, metadata) =>
+      client.getRingTemplateDetail({ templateId }, metadata),
+    );
+  }
+
+  async getConfigurationOptions(
+    templateId: string,
+  ): Promise<GetConfigurationOptionsResponse> {
+    return this.invoke((client, metadata) =>
+      client.getConfigurationOptions({ templateId }, metadata),
+    );
+  }
+
+  async getTemplate3DAssets(
+    templateId: string,
+  ): Promise<GetTemplate3DAssetsResponse> {
+    return this.invoke((client, metadata) =>
+      client.getTemplate3DAssets({ templateId }, metadata),
+    );
+  }
+
 
   private async invoke<T>(
     call: (client: CatalogServiceClient, metadata: Metadata) => Observable<T>,

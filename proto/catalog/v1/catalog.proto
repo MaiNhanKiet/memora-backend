@@ -4,6 +4,9 @@ package memora.catalog.v1;
 
 service CatalogService {
   rpc ListRingTemplates (ListRingTemplatesRequest) returns (ListRingTemplatesResponse);
+  rpc GetRingTemplateDetail (GetRingTemplateDetailRequest) returns (GetRingTemplateDetailResponse);
+  rpc GetConfigurationOptions (GetConfigurationOptionsRequest) returns (GetConfigurationOptionsResponse);
+  rpc GetTemplate3DAssets (GetTemplate3DAssetsRequest) returns (GetTemplate3DAssetsResponse);
 }
 
 message ListRingTemplatesRequest {
@@ -28,3 +31,119 @@ message ListRingTemplatesResponse {
   repeated RingTemplateSummaryMessage items = 1;
   int32 total = 2;
 }
+
+message GetRingTemplateDetailRequest {
+  string template_id = 1;
+}
+
+message RingTemplateDetailMessage {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  optional string description = 4;
+  string glb_asset_key = 5;
+  string stone_layout = 6;
+  repeated string design_supported_personalization_packages = 7;
+  optional double theta_min_deg = 8;
+  optional double theta_max_deg = 9;
+  optional double v_min_mm = 10;
+  optional double v_max_mm = 11;
+  optional string boundary_json = 12;
+  optional string forbidden_zones_json = 13;
+  optional double placement_tolerance_mm = 14;
+  string status = 15;
+}
+
+message GetRingTemplateDetailResponse {
+  RingTemplateDetailMessage template = 1;
+}
+
+message GetConfigurationOptionsRequest {
+  string template_id = 1;
+}
+
+message TemplateVariantOptionMessage {
+  string id = 1;
+  string material_id = 2;
+  double standard_size = 3;
+  double local_wall_thickness_mm = 4;
+  double max_safe_engraving_depth_mm = 5;
+  string status = 6;
+}
+
+message MaterialOptionMessage {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  optional string material_family = 4;
+  optional double purity_percent = 5;
+  optional string color = 6;
+}
+
+message GemstoneSlotOptionMessage {
+  string id = 1;
+  int32 slot_index = 2;
+  string code = 3;
+  string glb_node_name = 4;
+}
+
+message GemstoneGroupOptionMessage {
+  string id = 1;
+  string code = 2;
+  optional string name = 3;
+  string selection_mode = 4;
+  bool is_required = 5;
+  int32 sequence_no = 6;
+  repeated GemstoneSlotOptionMessage slots = 7;
+}
+
+message GemstoneOptionItemMessage {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string stone_type = 4;
+  string shape = 5;
+  double length_mm = 6;
+  double width_mm = 7;
+  optional string color_grade = 8;
+  optional string clarity_grade = 9;
+  bool certified_required = 10;
+  repeated string compatible_group_ids = 11;
+}
+
+message GetConfigurationOptionsResponse {
+  repeated TemplateVariantOptionMessage variants = 1;
+  repeated MaterialOptionMessage materials = 2;
+  repeated GemstoneGroupOptionMessage gemstone_groups = 3;
+  repeated GemstoneOptionItemMessage compatible_gemstones = 4;
+}
+
+message GetTemplate3DAssetsRequest {
+  string template_id = 1;
+}
+
+message TemplateSlotAnchorMessage {
+  string slot_id = 1;
+  string group_id = 2;
+  int32 slot_index = 3;
+  string slot_code = 4;
+  string glb_node_name = 5;
+}
+
+message TemplateEngraveSurfaceMessage {
+  optional double theta_min_deg = 1;
+  optional double theta_max_deg = 2;
+  optional double v_min_mm = 3;
+  optional double v_max_mm = 4;
+  optional string boundary_json = 5;
+  optional string forbidden_zones_json = 6;
+  optional double placement_tolerance_mm = 7;
+}
+
+message GetTemplate3DAssetsResponse {
+  string template_id = 1;
+  string glb_asset_key = 2;
+  TemplateEngraveSurfaceMessage engrave_surface = 3;
+  repeated TemplateSlotAnchorMessage slot_anchors = 4;
+}
+
