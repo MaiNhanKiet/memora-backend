@@ -18,7 +18,17 @@ Read and compare the sources that exist. Record every missing or conflicting sou
 - Current Gateway feature code, owning-service handlers, DTOs, `proto/<domain>/v1/`, handwritten `libs/contracts`, and Swagger.
 - `.cursor/rules/` and `.cursor/skills/implement-api/SKILL.md`.
 
-ADR-001 owns the service map. Deployed apps today are only `api-gateway` and `iam-service`. Do not assign work to a service that is not deployed unless the user asks to plan that future service, and do not treat that plan as permission to create the service.
+ADR-001 owns the service map. These applications already exist under `apps/`:
+
+- API Gateway.
+- IAM Service, with implemented business APIs.
+- Commerce Service: domains `catalog`, `pricing`, `inventory`, `design`, `ordering`. Foundation only. No business RPC yet.
+- Operations Service: domains `personalization`, `production`, `fulfillment`, `after_sales`. Foundation only. No business RPC yet.
+- Experience Service: domains `memory`, `platform`. Foundation only. No business RPC yet.
+
+Plan an API on Commerce, Operations, or Experience inside the existing Nest app. Do not ask for a new Nest application. A plan is not permission to implement, deploy, or enable the Compose `domain-services` profile.
+
+Separate four states. **In source** means the app directory exists. **Business API implemented** means a handler and contract exist; today that is IAM, not the three foundation services. **CI/CD configured** means the publish matrix includes the image. **Production deployed** means the default Mini PC release starts it; that is Gateway and IAM only. Do not describe a foundation module or a configured image as a finished business API.
 
 Repository code is current behavior. An approved spec is intended behavior. A conflict is reported in Pending Decisions. `PROPOSED` and `NEEDS_REVIEW` are not approval to implement.
 

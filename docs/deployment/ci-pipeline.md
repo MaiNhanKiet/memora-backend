@@ -5,8 +5,9 @@ GitHub Actions workflow: `.github/workflows/ci.yml`. CI plus **GHCR publish** an
 ## Triggers
 
 - Pull requests (all branches).
-- Push to `main` or `master` (the names used when a GitHub remote exists).
-- `workflow_dispatch` (Actions → CI → Run workflow).
+- Push to `dev`: Quality gates and Security only.
+- Push to `main` or `master`: Quality gates, Security, GHCR publish, and Mini PC deploy. Deploy still starts Gateway and IAM.
+- `workflow_dispatch` (Actions → CI → Run workflow). Publish and deploy still require `main`.
 
 Permissions are `contents: read`. Fork PRs do not receive production secrets. Redis/Postgres in CI are ephemeral service containers with CI-only credentials in the workflow file.
 
@@ -16,9 +17,9 @@ Concurrency cancels superseded runs on the same PR or branch.
 
 | Job | What it proves |
 |---|---|
-| **Quality gates** | Kit, boundaries, proto load, Prisma validate/generate/migrate on CI Postgres, ESLint, `tsc`, Nest builds (`api-gateway`, `iam-service`), Jest unit + IAM refresh mocks, then live Redis cache/queue tests |
+| **Quality gates** | Kit, boundaries, proto load, Prisma validate/generate for IAM, Commerce, Operations, and Experience, IAM migrate on CI Postgres, ESLint, `tsc`, Nest builds for Gateway and the four business services, image smoke for the three newer services, Jest unit + IAM refresh mocks, then live Redis cache/queue tests |
 | **Security** | No tracked `.env` / key material; production `npm audit` with allowlisted Prisma transitive highs only; **critical always fails** |
-| **Publish GHCR** | After both jobs PASS, **push to `main` only** (not PRs): build `linux/amd64` images, smoke/inspect, Trivy CRITICAL, push `ghcr.io/mainhankiet/memora-api-gateway:<sha>` and `memora-iam-service:<sha>` |
+| **Publish GHCR** | After both jobs PASS, **push to `main` only** (not PRs, not `dev`): build `linux/amd64` images, Trivy CRITICAL, push Gateway, IAM, IAM migrate, Commerce, Operations, and Experience at `ghcr.io/mainhankiet/memora-<name>:<sha>`. This document does not claim a registry publish has succeeded. |
 
 Required checks to enable after the workflow has run once on GitHub:
 
