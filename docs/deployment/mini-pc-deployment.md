@@ -44,6 +44,8 @@ On application health failure the helper rolls **images** back to `previous-rele
 | IAM | `ghcr.io/mainhankiet/memora-iam-service@sha256:…` |
 | Migrate job | `ghcr.io/mainhankiet/memora-iam-migrate@sha256:…` |
 
+The publish matrix also builds Commerce, Operations, and Experience. Those containers are not part of this default deploy. Profile `domain-services` stays disabled until a separate approved change removes the helper blocker.
+
 Copy digests from the CI **Publish GHCR** job summary for the chosen SHA.
 
 Gateway HTTP is published as `127.0.0.1:3000` (host curl) and `${TAILSCALE_IPV4:-100.78.222.34}:3000` (Tailscale). Public HTTPS is Cloudflare Tunnel (`memora-cloudflared` in `memora-infra`) to `http://api-gateway:3000` on `memora-network`. Postgres `5432` and Redis `6379` bind the Tailscale IP only — not `0.0.0.0`. IAM gRPC has no host port.
@@ -58,7 +60,7 @@ Do not run these workflows on pull requests. Do not use `memora-cd` for CI.
 
 ## First bootstrap on GitHub
 
-1. Confirm GHCR has three images tagged with the 40-char git SHA.
+1. Confirm GHCR has the Gateway, IAM, and IAM migrate images tagged with the 40-char git SHA. Bootstrap does not require the three newer service images.
 2. Actions → **Bootstrap Mini PC** → Run workflow.
 3. Paste `release_sha` only (images resolve from `:<sha>` tags).
 4. Type `BOOTSTRAP`, and `MIGRATE` if this is an empty `memora` database.

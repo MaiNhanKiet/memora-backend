@@ -1,14 +1,17 @@
 # MEMORA container images (GHCR)
 
-Phase 3.13A publishes **application images only**. There is **no Mini PC deploy job**. PostgreSQL, Redis, Cloudflare Tunnel, and RBAC bootstrap stay outside this pipeline.
+Push to `main` is configured to publish application images and then deploy Gateway and IAM. Push to `dev` runs Quality and Security only. PostgreSQL, Redis, Cloudflare Tunnel, and RBAC bootstrap stay outside the image build. Commerce, Operations, and Experience images are part of the publish matrix. They are not started by the default Mini PC deploy.
 
 ## Images
 
-| Application | Image | Platform |
-|---|---|---|
-| API Gateway | `ghcr.io/mainhankiet/memora-api-gateway` | `linux/amd64` (Mini PC x86_64) |
-| IAM Service | `ghcr.io/mainhankiet/memora-iam-service` | `linux/amd64` |
-| IAM migrate/seed/RBAC job | `ghcr.io/mainhankiet/memora-iam-migrate` | `linux/amd64` |
+| Application | Image | Platform | Default Mini PC start |
+|---|---|---|---|
+| API Gateway | `ghcr.io/mainhankiet/memora-api-gateway` | `linux/amd64` (Mini PC x86_64) | Yes |
+| IAM Service | `ghcr.io/mainhankiet/memora-iam-service` | `linux/amd64` | Yes |
+| IAM migrate/seed/RBAC job | `ghcr.io/mainhankiet/memora-iam-migrate` | `linux/amd64` | Job only, not a service |
+| Commerce Service | `ghcr.io/mainhankiet/memora-commerce-service` | `linux/amd64` | No. Profile `domain-services` is blocked |
+| Operations Service | `ghcr.io/mainhankiet/memora-operations-service` | `linux/amd64` | No. Profile `domain-services` is blocked |
+| Experience Service | `ghcr.io/mainhankiet/memora-experience-service` | `linux/amd64` | No. Profile `domain-services` is blocked |
 
 **Tag:** Git commit SHA (`github.sha`). Do **not** rely on `latest`.
 
@@ -20,6 +23,10 @@ Phase 3.13A publishes **application images only**. There is **no Mini PC deploy 
 
 - `docker/api-gateway.Dockerfile`
 - `docker/iam-service.Dockerfile`
+- `docker/iam-migrate.Dockerfile`
+- `docker/commerce-service.Dockerfile`
+- `docker/operations-service.Dockerfile`
+- `docker/experience-service.Dockerfile`
 
 Multi-stage:
 
@@ -89,7 +96,7 @@ Health:
 
 1. Identify last known-good SHA from GHCR job summary (tag + digest).
 2. Point Compose at that tag/digest.
-3. `docker compose up -d` **only those two app services** (leave Postgres/Redis).
+3. `docker compose up -d` for the default backend services, Gateway and IAM. Leave Postgres/Redis running. Do not start the `domain-services` profile as a rollback step.
 4. Confirm Gateway `/health/live` through the Tunnel.
 
 Do not migrate or re-seed to roll back an application image.

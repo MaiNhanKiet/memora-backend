@@ -10,11 +10,13 @@ You are the senior NestJS backend architect for **MEMORA**. Preserve existing wo
 ## 1. Current repository is the source of truth
 
 - **Stack:** NestJS 11, TypeScript strict mode, native NestJS monorepo, npm, API Gateway (HTTP), NestJS business microservices (primarily gRPC), PostgreSQL + Prisma 7 when persistence is implemented.
-- **Confirmed current applications (2026-10-12):** `apps/api-gateway` and `apps/iam-service` only. **Catalog and Consultation apps were removed**; do not assume they exist or silently recreate them. Treat other proposed services as future architecture, not implemented functionality.
-- **Current libraries:** `libs/common`, `libs/config`, `libs/contracts`, `libs/observability`.
-- **Current proto:** `proto/iam/v1/iam.proto` defines `memora.iam.v1.IamService/Ping`. `libs/contracts/src/iam/iam.grpc.ts` contains **manually maintained** shared IAM gRPC types. Do not claim automatic code generation already exists.
-- **Current gateway route:** `GET /api/v1/iam/ping`; Swagger UI `/api/docs`; OpenAPI JSON `/api/docs-json`.
-- **Existing entry points:** `apps/api-gateway/src/main.ts` and `apps/iam-service/src/main.ts`.
+- **Confirmed current applications:** `apps/api-gateway` plus four business services: `iam-service`, `commerce-service`, `operations-service`, and `experience-service`. Catalog and Consultation apps were removed; do not recreate them. Do not add a separate `platform-service`. **Platform is a domain inside Experience.**
+- **IAM** has business logic (auth, guest identity, RBAC, admin) and versioned Prisma migrations. **Commerce, Operations, and Experience** have foundation modules, health checks, service-local PostgreSQL pools, and Prisma schemas (27, 30, and 11 models). Their domain Nest modules are empty. They have **no business gRPC**. Absence of those RPCs means the feature is not implemented.
+- **Deployed runtime is narrower than the source tree.** Default Mini PC Compose starts Gateway and IAM. The three newer services are configured under Compose profile `domain-services` and stay off. `memora-deploy --enable-domain-services` still stops in a preflight blocker. PostgreSQL role SQL under `deploy/postgres/proposals/` is review-only and has not been applied.
+- **Current libraries:** `libs/auth`, `libs/common`, `libs/config`, `libs/contracts`, `libs/logger`, `libs/observability`, `libs/cache`, `libs/queue`.
+- **Current proto:** IAM business RPCs live in `proto/iam/v1/iam.proto`, plus `proto/grpc/health/v1/health.proto` and `proto/common/v1/pagination.proto`. There is no commerce, operations, or experience business proto. `libs/contracts` remains **handwritten**. Do not claim code generation or unpublished RPCs exist.
+- **Gateway:** public HTTP for IAM features and health. Swagger UI `/api/docs`; OpenAPI JSON `/api/docs-json`. Do not describe a route as present unless the controller exists.
+- **Entry points:** `apps/*/src/main.ts` for Gateway, IAM, Commerce, Operations, and Experience.
 - **Environment:** Windows development / Git Bash, deployable to Docker or Kubernetes later.
 - Always inspect the **actual** repository (`package.json`, `nest-cli.json`, `tsconfig*`, feature modules, proto files, library exports, tests, env loader) first. If this section becomes stale, use the repo as truth and report the difference. Never invent missing files or APIs.
 
@@ -103,7 +105,7 @@ apps/api-gateway/src/
 
 ## 8. Prisma 7 + PostgreSQL — service ownership
 
-- Each **data-owning business service** gets its **own** `prisma/schema.prisma`, migrations, generated Prisma Client, connection lifecycle and persistence module/repositories. **Do not put schemas/migrations/generated clients in a global `libs/database` shared by all services.**
+- Each **data-owning business service** gets its **own** `prisma/schema.prisma`, migrations when a schema change is requested, generated Prisma Client, connection lifecycle and repositories. **Do not put schemas, migrations, or generated clients in a global `libs/database`.** Commerce, Operations, and Experience currently have schemas and pools, and **no** Prisma migration directories. Do not invent those migrations. New business features in those three services follow `docs/architecture/business-service-structure.md`.
 - Initial deployment can use **one PostgreSQL instance and database** with **separate PostgreSQL schemas, roles and privileges** for bounded contexts. A service may own more than one schema when that is its genuine domain boundary.
 - Use **one PrismaClient instance per process** (not per HTTP/RPC request); configure a bounded connection pool, account for replicas, handle graceful shutdown. Adapt Prisma 7 runtime initialization to its adapter/config requirements (e.g. `@prisma/adapter-pg`) instead of copying obsolete Prisma versions.
 - An owning service alone accesses its tables. Other services hold **logical IDs** (e.g. `userId`) and use gRPC for current data or domain events/read models for eventual consistency. Avoid cross-service FK/cross-schema joins and cross-service database writes even on the same PostgreSQL instance.
@@ -114,15 +116,15 @@ apps/api-gateway/src/
 
 - Authenticate external clients at the Gateway; check authorization at the domain owner for sensitive operations as needed. Do not treat a plain userId from an external payload as trusted identity.
 - Propagate validated principal/roles/scopes using **trusted internal** metadata or a verified token; secure service-to-service networking and validate caller trust. Log trace IDs, not passwords/tokens.
-- If Consultation needs only an authenticated `userId`, pass trusted identity; **do not call IAM on every chat request**. If it needs authoritative profile data or policy, call IAM gRPC. Cached/read-model data may be event-synchronized if useful.
+- If another service needs only an authenticated `userId`, pass trusted identity. If it needs authoritative profile data or policy, call IAM gRPC. Cached/read-model data may be event-synchronized if useful.
 - The IAM service owns access-token issuance, password reset and verification; notification delivery code must not independently decide identity validity or generate IAM tokens.
 
 ## 10. Notification architecture (web + mobile + email)
 
-- No dedicated Notification Microservice is required initially. **Future `platform-service/src/modules/notifications/`** can own notification storage, delivery preferences, channels and delivery state; do **not** create `platform-service` prematurely if the task concerns only IAM/Gateway.
+- No dedicated Notification Microservice. Notification storage belongs to the **Experience `platform` domain** when that feature is requested. Do **not** create `platform-service`.
 - Separate **in-app** (persistent records + REST/SSE), **push** (FCM/APNs; web push when configured) and **email** (provider adapters). Web/mobile clients should receive only authorized notifications.
 - Publish business domain events such as `order.paid` to RabbitMQ asynchronously. The notification module can host `notification.rmq.controller.ts` (consumer), `notification.worker.ts` (injectable worker/provider), delivery services, email/FCM adapters and repositories.
-- In the initial layout, `workers/notification.worker.ts` **runs in the platform-service process**, not a separate OS process. Split into a `notification-worker` process only for independent scaling/ops needs and share domain code deliberately.
+- A notification worker, when one is requested, runs inside the Experience service process. Split a separate OS process only for independent scaling and share domain code deliberately.
 - Design delivery for at-least-once processing: durable events, stable idempotency keys, retry/backoff, DLQ, channel-by-channel status, invalid-device-token cleanup, opt-outs for nonessential messages and deduplication.
 - On durable business actions, prefer transactional outbox so committed business state cannot be lost before publish. Never make successful checkout/payment depend synchronously on provider email/push availability.
 
@@ -146,7 +148,7 @@ apps/api-gateway/src/
 | Publish `order.paid` only | Event publisher/client + outbox if required | Add unused RMQ listener in producer `main.ts` |
 | Fetch user from Consultation | Trusted userId if enough; otherwise IAM gRPC | Read IAM Prisma tables from Consultation |
 | Add persistence for IAM | IAM-owned Prisma client/schema/migrations | Global all-tables Prisma library |
-| Send web/mobile/email notification | Notification module + providers/queue in Platform when introduced | Require separate Notification Microservice from day one |
+| Send web/mobile/email notification | Experience `platform` feature when that behavior is requested | Create `platform-service` or a Notification Microservice |
 
 ## 13. Completion checklist for each task
 
