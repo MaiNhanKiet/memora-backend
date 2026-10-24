@@ -1,11 +1,11 @@
 import type {
-  GemstoneGroup,
-  GemstoneOption,
-  GemstoneSlot,
-  Material,
-  RingTemplate,
-  TemplateCompatibility,
-  TemplateVariant,
+  gemstone_groups,
+  gemstone_options,
+  gemstone_slots,
+  materials,
+  ring_templates,
+  template_compatibilities,
+  template_variants,
 } from '../../../generated/prisma/client';
 
 export interface RingTemplateSummaryRecord {
@@ -112,125 +112,124 @@ export interface Template3DAssetsRecord {
 
 
 export function toRingTemplateSummaryRecord(
-  entity: RingTemplate,
+  entity: ring_templates,
 ): RingTemplateSummaryRecord {
   return {
     id: entity.id,
     code: entity.code,
     name: entity.name,
     description: entity.description ?? undefined,
-    glbAssetKey: entity.glbAssetKey,
-    stoneLayout: entity.stoneLayout,
+    glbAssetKey: entity.glb_asset_key,
+    stoneLayout: entity.stone_layout,
     designSupportedPersonalizationPackages: [
-      ...entity.designSupportedPersonalizationPackages,
+      ...entity.design_supported_personalization_packages,
     ],
     status: entity.status,
   };
 }
 
 export function toRingTemplateDetailRecord(
-  entity: RingTemplate,
+  entity: ring_templates,
 ): RingTemplateDetailRecord {
   return {
     ...toRingTemplateSummaryRecord(entity),
     thetaMinDeg:
-      entity.thetaMinDeg !== null && entity.thetaMinDeg !== undefined
-        ? Number(entity.thetaMinDeg)
+      entity.theta_min_deg !== null && entity.theta_min_deg !== undefined
+        ? Number(entity.theta_min_deg)
         : undefined,
     thetaMaxDeg:
-      entity.thetaMaxDeg !== null && entity.thetaMaxDeg !== undefined
-        ? Number(entity.thetaMaxDeg)
+      entity.theta_max_deg !== null && entity.theta_max_deg !== undefined
+        ? Number(entity.theta_max_deg)
         : undefined,
     vMinMm:
-      entity.vMinMm !== null && entity.vMinMm !== undefined
-        ? Number(entity.vMinMm)
+      entity.v_min_mm !== null && entity.v_min_mm !== undefined
+        ? Number(entity.v_min_mm)
         : undefined,
     vMaxMm:
-      entity.vMaxMm !== null && entity.vMaxMm !== undefined
-        ? Number(entity.vMaxMm)
+      entity.v_max_mm !== null && entity.v_max_mm !== undefined
+        ? Number(entity.v_max_mm)
         : undefined,
     boundaryJson:
-      entity.boundaryJson !== null && entity.boundaryJson !== undefined
-        ? JSON.stringify(entity.boundaryJson)
+      entity.boundary_json !== null && entity.boundary_json !== undefined
+        ? JSON.stringify(entity.boundary_json)
         : undefined,
     forbiddenZonesJson:
-      entity.forbiddenZonesJson !== null &&
-      entity.forbiddenZonesJson !== undefined
-        ? JSON.stringify(entity.forbiddenZonesJson)
+      entity.forbidden_zones_json !== null &&
+      entity.forbidden_zones_json !== undefined
+        ? JSON.stringify(entity.forbidden_zones_json)
         : undefined,
     placementToleranceMm:
-      entity.placementToleranceMm !== null &&
-      entity.placementToleranceMm !== undefined
-        ? Number(entity.placementToleranceMm)
+      entity.placement_tolerance_mm !== null &&
+      entity.placement_tolerance_mm !== undefined
+        ? Number(entity.placement_tolerance_mm)
         : undefined,
   };
 }
 
 export function toConfigurationOptionsRecord(data: {
-  variants: (TemplateVariant & { material: Material })[];
-  gemstoneGroups: (GemstoneGroup & { slots: GemstoneSlot[] })[];
-  compatibilities: (TemplateCompatibility & {
-    gemstoneOption: GemstoneOption;
+  template_variants: (template_variants & { materials: materials })[];
+  gemstone_groups: (gemstone_groups & { gemstone_slots: gemstone_slots[] })[];
+  compatibilities: (template_compatibilities & {
+    gemstone_options: gemstone_options;
   })[];
 }): ConfigurationOptionsRecord {
-  const variantRecords: TemplateVariantOptionRecord[] = data.variants.map(
-    (v) => ({
+  const variantRecords: TemplateVariantOptionRecord[] =
+    data.template_variants.map((v) => ({
       id: v.id,
-      materialId: v.materialId,
-      standardSize: Number(v.standardSize),
-      localWallThicknessMm: Number(v.localWallThicknessMm),
-      maxSafeEngravingDepthMm: Number(v.maxSafeEngravingDepthMm),
+      materialId: v.material_id,
+      standardSize: Number(v.standard_size),
+      localWallThicknessMm: Number(v.local_wall_thickness_mm),
+      maxSafeEngravingDepthMm: Number(v.max_safe_engraving_depth_mm),
       status: v.status,
-    }),
-  );
+    }));
 
   const materialsMap = new Map<string, MaterialOptionRecord>();
-  for (const v of data.variants) {
-    if (!materialsMap.has(v.material.id)) {
-      materialsMap.set(v.material.id, {
-        id: v.material.id,
-        code: v.material.code,
-        name: v.material.name,
-        materialFamily: v.material.materialFamily ?? undefined,
+  for (const v of data.template_variants) {
+    if (!materialsMap.has(v.materials.id)) {
+      materialsMap.set(v.materials.id, {
+        id: v.materials.id,
+        code: v.materials.code,
+        name: v.materials.name,
+        materialFamily: v.materials.material_family ?? undefined,
         purityPercent:
-          v.material.purityPercent !== null
-            ? Number(v.material.purityPercent)
+          v.materials.purity_percent !== null
+            ? Number(v.materials.purity_percent)
             : undefined,
-        color: v.material.color ?? undefined,
+        color: v.materials.color ?? undefined,
       });
     }
   }
 
-  const groupRecords: GemstoneGroupOptionRecord[] = data.gemstoneGroups.map(
+  const groupRecords: GemstoneGroupOptionRecord[] = data.gemstone_groups.map(
     (g) => ({
       id: g.id,
       code: g.code,
       name: g.name ?? undefined,
-      selectionMode: g.selectionMode,
-      isRequired: g.isRequired,
-      sequenceNo: g.sequenceNo,
-      slots: g.slots.map((s) => ({
+      selectionMode: g.selection_mode,
+      isRequired: g.is_required,
+      sequenceNo: g.sequence_no,
+      slots: g.gemstone_slots.map((s) => ({
         id: s.id,
-        slotIndex: s.slotIndex,
-        code: s.name ?? `SLOT_${s.slotIndex}`,
-        glbNodeName: s.meshNodeName ?? '',
+        slotIndex: s.slot_index,
+        code: s.code,
+        glbNodeName: s.glb_node_name,
       })),
     }),
   );
 
   const gemstoneOptionsMap = new Map<
     string,
-    { option: GemstoneOption; groupIds: Set<string> }
+    { option: gemstone_options; groupIds: Set<string> }
   >();
 
   for (const c of data.compatibilities) {
-    const existing = gemstoneOptionsMap.get(c.gemstoneOption.id);
+    const existing = gemstoneOptionsMap.get(c.gemstone_options.id);
     if (existing !== undefined) {
-      existing.groupIds.add(c.gemstoneGroupId);
+      existing.groupIds.add(c.gemstone_group_id);
     } else {
-      gemstoneOptionsMap.set(c.gemstoneOption.id, {
-        option: c.gemstoneOption,
-        groupIds: new Set([c.gemstoneGroupId]),
+      gemstoneOptionsMap.set(c.gemstone_options.id, {
+        option: c.gemstone_options,
+        groupIds: new Set([c.gemstone_group_id]),
       });
     }
   }
@@ -241,13 +240,13 @@ export function toConfigurationOptionsRecord(data: {
     id: option.id,
     code: option.code,
     name: option.name,
-    stoneType: option.stoneType,
+    stoneType: option.stone_type,
     shape: option.shape,
-    lengthMm: Number(option.lengthMm),
-    widthMm: Number(option.widthMm),
-    colorGrade: option.colorGrade ?? undefined,
-    clarityGrade: option.clarityGrade ?? undefined,
-    certifiedRequired: option.certifiedRequired,
+    lengthMm: Number(option.length_mm),
+    widthMm: Number(option.width_mm),
+    colorGrade: option.color_grade ?? undefined,
+    clarityGrade: option.clarity_grade ?? undefined,
+    certifiedRequired: option.certified_required,
     compatibleGroupIds: Array.from(groupIds),
   }));
 
@@ -260,62 +259,63 @@ export function toConfigurationOptionsRecord(data: {
 }
 
 export function toTemplate3DAssetsRecord(
-  template: RingTemplate & {
-    gemstoneGroups: (GemstoneGroup & { slots: GemstoneSlot[] })[];
+  template: ring_templates & {
+    gemstone_groups: (gemstone_groups & { gemstone_slots: gemstone_slots[] })[];
   },
 ): Template3DAssetsRecord {
   const slotAnchors: TemplateSlotAnchorRecord[] = [];
-  for (const group of template.gemstoneGroups) {
-    for (const slot of group.slots) {
+  for (const group of template.gemstone_groups) {
+    for (const slot of group.gemstone_slots) {
       slotAnchors.push({
         slotId: slot.id,
         groupId: group.id,
-        slotIndex: slot.slotIndex,
-        slotCode: slot.name ?? `SLOT_${slot.slotIndex}`,
-        glbNodeName: slot.meshNodeName ?? '',
+        slotIndex: slot.slot_index,
+        slotCode: slot.code,
+        glbNodeName: slot.glb_node_name,
       });
     }
   }
 
   const hasEngraveSurface =
-    template.thetaMinDeg !== null ||
-    template.thetaMaxDeg !== null ||
-    template.vMinMm !== null ||
-    template.vMaxMm !== null ||
-    template.boundaryJson !== null;
+    template.theta_min_deg !== null ||
+    template.theta_max_deg !== null ||
+    template.v_min_mm !== null ||
+    template.v_max_mm !== null ||
+    template.boundary_json !== null;
 
   return {
     templateId: template.id,
-    glbAssetKey: template.glbAssetKey,
+    glbAssetKey: template.glb_asset_key,
     engraveSurface: hasEngraveSurface
       ? {
           thetaMinDeg:
-            template.thetaMinDeg !== null
-              ? Number(template.thetaMinDeg)
+            template.theta_min_deg !== null
+              ? Number(template.theta_min_deg)
               : undefined,
           thetaMaxDeg:
-            template.thetaMaxDeg !== null
-              ? Number(template.thetaMaxDeg)
+            template.theta_max_deg !== null
+              ? Number(template.theta_max_deg)
               : undefined,
           vMinMm:
-            template.vMinMm !== null ? Number(template.vMinMm) : undefined,
+            template.v_min_mm !== null ? Number(template.v_min_mm) : undefined,
           vMaxMm:
-            template.vMaxMm !== null ? Number(template.vMaxMm) : undefined,
+            template.v_max_mm !== null ? Number(template.v_max_mm) : undefined,
           boundaryJson:
-            template.boundaryJson !== null
-              ? JSON.stringify(template.boundaryJson)
+            template.boundary_json !== null
+              ? JSON.stringify(template.boundary_json)
               : undefined,
           forbiddenZonesJson:
-            template.forbiddenZonesJson !== null
-              ? JSON.stringify(template.forbiddenZonesJson)
+            template.forbidden_zones_json !== null
+              ? JSON.stringify(template.forbidden_zones_json)
               : undefined,
           placementToleranceMm:
-            template.placementToleranceMm !== null
-              ? Number(template.placementToleranceMm)
+            template.placement_tolerance_mm !== null
+              ? Number(template.placement_tolerance_mm)
               : undefined,
         }
       : undefined,
     slotAnchors,
   };
 }
+
 

@@ -84,8 +84,8 @@ export class CatalogService {
     }
 
     return toConfigurationOptionsRecord({
-      variants: data.template.variants,
-      gemstoneGroups: data.template.gemstoneGroups,
+      template_variants: data.template.template_variants,
+      gemstone_groups: data.template.gemstone_groups,
       compatibilities: data.compatibilities,
     });
   }

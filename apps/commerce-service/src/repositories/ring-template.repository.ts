@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import type { RingTemplate, Prisma } from '../../generated/prisma/client';
+import type { ring_templates, Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../persistence/prisma/prisma.service';
 
 @Injectable()
 export class RingTemplateRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findById(id: string): Promise<RingTemplate | null> {
-    return this.prisma.ringTemplate.findUnique({
+  async findById(id: string): Promise<ring_templates | null> {
+    return this.prisma.ring_templates.findUnique({
       where: { id },
     });
   }
@@ -18,15 +18,15 @@ export class RingTemplateRepository {
     package?: string;
     skip: number;
     take: number;
-  }): Promise<{ rows: RingTemplate[]; total: number }> {
-    const where: Prisma.RingTemplateWhereInput = {
+  }): Promise<{ rows: ring_templates[]; total: number }> {
+    const where: Prisma.ring_templatesWhereInput = {
       ...(input.status !== undefined ? { status: input.status } : {}),
       ...(input.stoneLayout !== undefined
-        ? { stoneLayout: input.stoneLayout }
+        ? { stone_layout: input.stoneLayout }
         : {}),
       ...(input.package !== undefined
         ? {
-            designSupportedPersonalizationPackages: {
+            design_supported_personalization_packages: {
               has: input.package,
             },
           }
@@ -34,34 +34,34 @@ export class RingTemplateRepository {
     };
 
     const [rows, total] = await Promise.all([
-      this.prisma.ringTemplate.findMany({
+      this.prisma.ring_templates.findMany({
         where,
         skip: input.skip,
         take: input.take,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
       }),
-      this.prisma.ringTemplate.count({ where }),
+      this.prisma.ring_templates.count({ where }),
     ]);
 
     return { rows, total };
   }
 
   async findConfigurationOptionsByTemplateId(templateId: string) {
-    const template = await this.prisma.ringTemplate.findUnique({
+    const template = await this.prisma.ring_templates.findUnique({
       where: { id: templateId },
       include: {
-        variants: {
+        template_variants: {
           where: { status: 'ACTIVE' },
-          include: { material: true },
-          orderBy: { standardSize: 'asc' },
+          include: { materials: true },
+          orderBy: { standard_size: 'asc' },
         },
-        gemstoneGroups: {
+        gemstone_groups: {
           include: {
-            slots: {
-              orderBy: { slotIndex: 'asc' },
+            gemstone_slots: {
+              orderBy: { slot_index: 'asc' },
             },
           },
-          orderBy: { sequenceNo: 'asc' },
+          orderBy: { sequence_no: 'asc' },
         },
       },
     });
@@ -70,14 +70,14 @@ export class RingTemplateRepository {
       return null;
     }
 
-    const compatibilities = await this.prisma.templateCompatibility.findMany({
+    const compatibilities = await this.prisma.template_compatibilities.findMany({
       where: {
-        gemstoneGroup: {
-          ringTemplateId: templateId,
+        gemstone_groups: {
+          ring_template_id: templateId,
         },
       },
       include: {
-        gemstoneOption: true,
+        gemstone_options: true,
       },
     });
 
@@ -88,17 +88,17 @@ export class RingTemplateRepository {
   }
 
   async find3DAssetsByTemplateId(templateId: string) {
-    return this.prisma.ringTemplate.findFirst({
+    return this.prisma.ring_templates.findFirst({
       where: {
         id: templateId,
         status: 'ACTIVE',
       },
       include: {
-        gemstoneGroups: {
-          orderBy: { sequenceNo: 'asc' },
+        gemstone_groups: {
+          orderBy: { sequence_no: 'asc' },
           include: {
-            slots: {
-              orderBy: { slotIndex: 'asc' },
+            gemstone_slots: {
+              orderBy: { slot_index: 'asc' },
             },
           },
         },
@@ -106,4 +106,5 @@ export class RingTemplateRepository {
     });
   }
 }
+
 
