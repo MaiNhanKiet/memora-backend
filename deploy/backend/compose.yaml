@@ -102,3 +102,140 @@ services:
       com.memora.managed: 'true'
       com.memora.release: ${MEMORA_RELEASE_SHA:-unknown}
     # No host ports: gRPC and IAM health stay on memora-network.
+
+  # Opt-in only. `docker compose up` does not start this profile.
+  # memora-deploy refuses --enable-domain-services until PostgreSQL grants are verified.
+  commerce-service:
+    profiles: ['domain-services']
+    image: ${COMMERCE_IMAGE:-ghcr.io/mainhankiet/memora-commerce-service:disabled}
+    container_name: memora-commerce-service
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - ${MEMORA_SECRETS_DIR:-/opt/memora/secrets}/commerce.env
+    environment:
+      NODE_ENV: production
+      COMMERCE_GRPC_HOST: 0.0.0.0
+      COMMERCE_GRPC_PORT: '50052'
+      COMMERCE_HEALTH_HOST: 0.0.0.0
+      COMMERCE_HEALTH_PORT: '5052'
+    networks:
+      memora-network:
+        aliases:
+          - commerce-service
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:5052/health/live').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+    labels:
+      com.memora.stack: backend
+      com.memora.managed: 'true'
+      com.memora.release: ${MEMORA_RELEASE_SHA:-unknown}
+
+  operations-service:
+    profiles: ['domain-services']
+    image: ${OPERATIONS_IMAGE:-ghcr.io/mainhankiet/memora-operations-service:disabled}
+    container_name: memora-operations-service
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - ${MEMORA_SECRETS_DIR:-/opt/memora/secrets}/operations.env
+    environment:
+      NODE_ENV: production
+      OPERATIONS_GRPC_HOST: 0.0.0.0
+      OPERATIONS_GRPC_PORT: '50053'
+      OPERATIONS_HEALTH_HOST: 0.0.0.0
+      OPERATIONS_HEALTH_PORT: '5053'
+    networks:
+      memora-network:
+        aliases:
+          - operations-service
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:5053/health/live').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+    labels:
+      com.memora.stack: backend
+      com.memora.managed: 'true'
+      com.memora.release: ${MEMORA_RELEASE_SHA:-unknown}
+
+  experience-service:
+    profiles: ['domain-services']
+    image: ${EXPERIENCE_IMAGE:-ghcr.io/mainhankiet/memora-experience-service:disabled}
+    container_name: memora-experience-service
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - ${MEMORA_SECRETS_DIR:-/opt/memora/secrets}/experience.env
+    environment:
+      NODE_ENV: production
+      EXPERIENCE_GRPC_HOST: 0.0.0.0
+      EXPERIENCE_GRPC_PORT: '50054'
+      EXPERIENCE_HEALTH_HOST: 0.0.0.0
+      EXPERIENCE_HEALTH_PORT: '5054'
+    networks:
+      memora-network:
+        aliases:
+          - experience-service
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:5054/health/live').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+    labels:
+      com.memora.stack: backend
+      com.memora.managed: 'true'
+      com.memora.release: ${MEMORA_RELEASE_SHA:-unknown}

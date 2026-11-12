@@ -1,0 +1,21 @@
+---
+description: Domain, feature, and layer placement for Commerce, Operations, and Experience.
+globs: apps/commerce-service/**/*.ts,apps/operations-service/**/*.ts,apps/experience-service/**/*.ts
+alwaysApply: false
+---
+
+# Business service: Domain -> Feature -> Layer
+
+Applies to Commerce, Operations, and Experience. Read `docs/architecture/business-service-structure.md`. IAM is not the folder template for these services.
+
+- Place new business code at `src/modules/<domain>/<feature>/{presentation,application,domain,infrastructure}` for the layers that feature actually needs. Do not scaffold the other layers, empty modules, or unused providers.
+- The domain module only composes its feature modules. The feature module is the Nest wiring for that feature.
+- gRPC controllers and event consumers stay in `presentation/`. Use cases stay in `application/`. Invariants stay in `domain/`. Prisma repositories and external adapters stay in `infrastructure/`.
+- Dependency direction is presentation → application → domain. Infrastructure implements an application or domain port. Domain code does not import Nest, Prisma, or gRPC.
+- Do not import another service's Prisma client, models, or repositories. Cross-service reads and writes go through an approved contract, not SQL.
+- Do not put business rules, transactions, or Prisma in the API Gateway.
+- Keep this service's pool in its own `src/persistence/prisma/`. Do not create a monorepo-wide PrismaService or put a business repository in `libs/`.
+- Share logic inside the service through a domain port or a domain `shared/` folder without Prisma. Use `libs/` for technical code only.
+- Another domain in the same service may call an exported application port. It may not import that domain's repository.
+- Do not add a proto RPC, event, migration, or seed unless the task asks for that behavior.
+- Authorize the resource in the owning use case. Do not trust a client-supplied actor id.

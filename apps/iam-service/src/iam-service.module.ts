@@ -8,15 +8,14 @@ import {
 import { LoggingInterceptor } from '@app/logger';
 import { ObservabilityModule } from '@app/observability';
 import { ApplicationModule } from './application/application.module';
+import { HealthModule } from './health/health.module';
 import { PrismaModule } from './persistence/prisma/prisma.module';
 import { RedisModule } from './persistence/redis/redis.module';
-import { IamReadinessService } from './application/ops/iam-readiness.service';
 import { AccountGrpcController } from './presentation/grpc/account.grpc.controller';
 import { GuestIdentityGrpcController } from './presentation/grpc/guest-identity.grpc.controller';
 import { IamAdminGrpcController } from './presentation/grpc/iam-admin.grpc.controller';
 import { AuthenticationGrpcController } from './presentation/grpc/authentication.grpc.controller';
 import { AuthorizationGrpcController } from './presentation/grpc/authorization.grpc.controller';
-import { GrpcHealthController } from './presentation/grpc/health.grpc.controller';
 import { InternalGrpcAuthGuard } from './presentation/grpc/internal-grpc-auth.guard';
 
 @Module({
@@ -29,6 +28,7 @@ import { InternalGrpcAuthGuard } from './presentation/grpc/internal-grpc-auth.gu
     PrismaModule,
     RedisModule,
     ApplicationModule,
+    HealthModule,
   ],
   controllers: [
     AuthenticationGrpcController,
@@ -36,10 +36,8 @@ import { InternalGrpcAuthGuard } from './presentation/grpc/internal-grpc-auth.gu
     GuestIdentityGrpcController,
     IamAdminGrpcController,
     AuthorizationGrpcController,
-    GrpcHealthController,
   ],
   providers: [
-    IamReadinessService,
     InternalGrpcAuthGuard,
     {
       provide: APP_INTERCEPTOR,

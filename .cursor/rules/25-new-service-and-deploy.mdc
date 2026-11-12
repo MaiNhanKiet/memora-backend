@@ -6,11 +6,11 @@ alwaysApply: false
 
 # New owning service, database and deploy
 
-Ask first if the change would add a Nest app, a new Postgres/Redis instance, a new GHCR image, or a new Compose service. Current live apps are **only** `api-gateway` and `iam-service`. Do not recreate Catalog/Consultation.
+Ask first if the change would add a Nest app, a new Postgres/Redis instance, a new GHCR image, or a new Compose service. Source apps are Gateway, IAM, Commerce, Operations, and Experience. The default Mini PC deploy still starts only Gateway and IAM. Commerce, Operations, and Experience stay behind the `domain-services` profile until database grants are verified. Do not recreate removed Catalog/Consultation apps, and do not add a separate `platform-service`. Platform is a domain of Experience.
 
 ## Service shape
 
-- One Nest application per bounded context (`apps/<name>-service`), not per transport. Mirror `iam-service`: `main.ts`, feature modules, gRPC presentation, repositories, Prisma only if this context owns data.
+- One Nest application per bounded context (`apps/<name>-service`), not per transport. New business features in Commerce, Operations, and Experience follow `.cursor/rules/13-business-service-structure.mdc`: Domain → Feature → Layer. Do not copy IAM's current folders as the required template. IAM remains the existing identity implementation.
 - Gateway stays HTTP/DTO/Swagger/orchestration. New public REST goes in Gateway; domain writes stay in the owning service. No Prisma in Gateway.
 - Add `nest-cli.json` project, `tsconfig.app.json`, webpack if IAM-style, handwritten contracts in `libs/contracts` plus `proto/` if gRPC. Use `create-grpc-rpc` / `implement-api` skills when those files change.
 - Internal gRPC: verify caller secret from config; never trust client actor IDs. Reuse `IAM_INTERNAL_GRPC_SECRET` pattern or a dedicated shared secret in **both** Gateway and the new service env.

@@ -6,6 +6,42 @@ export {
 } from './env/api-gateway.env';
 export { iamConfig, loadIamRuntimeConfig, validateIamEnv } from './env/iam.env';
 export {
+  COMMERCE_DATABASE_NAME,
+  COMMERCE_FORBIDDEN_SCHEMAS,
+  COMMERCE_OWNED_SCHEMAS,
+  assertCommerceDatabaseUrl,
+  commerceConfig,
+  loadCommerceRuntimeConfig,
+  toCommercePoolConnectionString,
+  validateCommerceEnv,
+  type CommerceEnv,
+  type CommerceOwnedSchema,
+} from './env/commerce.env';
+export {
+  OPERATIONS_DATABASE_NAME,
+  OPERATIONS_FORBIDDEN_SCHEMAS,
+  OPERATIONS_OWNED_SCHEMAS,
+  assertOperationsDatabaseUrl,
+  loadOperationsRuntimeConfig,
+  operationsConfig,
+  toOperationsPoolConnectionString,
+  validateOperationsEnv,
+  type OperationsEnv,
+  type OperationsOwnedSchema,
+} from './env/operations.env';
+export {
+  EXPERIENCE_DATABASE_NAME,
+  EXPERIENCE_FORBIDDEN_SCHEMAS,
+  EXPERIENCE_OWNED_SCHEMAS,
+  assertExperienceDatabaseUrl,
+  experienceConfig,
+  loadExperienceRuntimeConfig,
+  toExperiencePoolConnectionString,
+  validateExperienceEnv,
+  type ExperienceEnv,
+  type ExperienceOwnedSchema,
+} from './env/experience.env';
+export {
   cacheRedisConfig,
   validateCacheRedisEnv,
   type CacheRedisEnv,

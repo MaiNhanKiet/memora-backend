@@ -9,14 +9,17 @@ Implement **one approved API at a time**. Match existing code. Do not invent a c
 
 ## Ownership
 
-ADR-001 approves four business services plus the API Gateway. **Deployed apps today are only `api-gateway` and `iam-service`.** Do not create `commerce-service`, `operations-service`, or `experience-service` unless the user asks for a new service.
+ADR-001 approves four business services plus the API Gateway. All five applications exist under `apps/`. Do not create a second copy of `commerce-service`, `operations-service`, or `experience-service`.
 
-| Service | Owned domains | In `apps/` today |
-| --- | --- | --- |
-| `iam-service` | `iam` | yes |
-| `commerce-service` | `catalog`, `pricing`, `inventory`, `design`, `ordering` | no |
-| `operations-service` | `personalization`, `production`, `fulfillment`, `after_sales` | no |
-| `experience-service` | `memory`, `platform` | no |
+| Service | Owned domains | In `apps/` | Business API |
+| --- | --- | --- | --- |
+| `api-gateway` | none | yes | HTTP for implemented IAM features |
+| `iam-service` | `iam` | yes | Implemented. Keep its current `application/`, `presentation/`, and `repositories/` layout. Do not refactor IAM into the new layer tree. |
+| `commerce-service` | `catalog`, `pricing`, `inventory`, `design`, `ordering` | yes | Foundation only. Empty domain modules. No business RPC. |
+| `operations-service` | `personalization`, `production`, `fulfillment`, `after_sales` | yes | Foundation only. Empty domain modules. No business RPC. |
+| `experience-service` | `memory`, `platform` | yes | Foundation only. Empty domain modules. No business RPC. |
+
+Default production deploy still starts only Gateway and IAM. An empty domain module or a CI image is not a completed business API.
 
 The Gateway owns public HTTP, validation, Swagger, and the gRPC client call. **Only the owning service implements business rules and writes its database.** No Prisma in the Gateway.
 
@@ -53,9 +56,16 @@ Add a schema migration only when this API needs a schema change. Inspect existin
 
 ### 3. Owning service
 
-Put business behavior in the owning service's application layer. Persistence goes through its repositories: status transitions, transactions, uniqueness, idempotency, and audit or business history when this action requires them.
+For Commerce, Operations, and Experience, place the feature at `apps/<service>/src/modules/<domain>/<feature>/`. Create only the layers that have code:
 
-The gRPC controller validates the typed request, checks the existing internal caller secret, delegates to the application service, and maps errors with the existing pattern. No Prisma in the gRPC controller.
+- `presentation/`: gRPC controllers and event consumers. Validate the typed request, check the internal caller secret, delegate, and map errors. No Prisma here.
+- `application/`: use cases. Status transitions, transactions, uniqueness, idempotency, and audit or business history when this action requires them.
+- `domain/`: policies and invariants. No Nest, Prisma, or gRPC imports.
+- `infrastructure/`: repositories and external adapters.
+
+IAM stays on its current layout. Do not move IAM files to match this tree. The Gateway stays on its own Domain → Feature → Layer rule in section 4.
+
+Read `docs/architecture/business-service-structure.md` before adding the first business feature to one of the three foundation services.
 
 Do not trust `userId`, `role`, `actorId`, or `x-actor-*` supplied by the client. Authorization uses the verified access token and the existing internal caller mechanism. A UUID format check alone is not trust.
 

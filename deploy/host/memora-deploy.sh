@@ -2,7 +2,7 @@
 set -euo pipefail
 umask 077
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "$HERE" == "/opt/memora/bin" ]]; then
   export MEMORA_ROOT=/opt/memora
 fi
@@ -16,8 +16,6 @@ else
   echo "FAIL: cannot find lib.sh" >&2
   exit 1
 fi
-
-require_root
 
 COMMAND="${1:-}"
 shift || true
@@ -41,6 +39,7 @@ Commands:
   rollback
   bootstrap   (infra + optional migrate/seed/rbac + backend)
   deploy      (backup + optional migrate + backend + health)
+  deploy --enable-domain-services is refused until PostgreSQL grants are verified
 EOF
 }
 
@@ -57,6 +56,7 @@ parse_opts() {
   RUN_SEED=0
   RUN_RBAC=0
   FROM_SHA_TAGS=0
+  ENABLE_DOMAIN_SERVICES=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --release-sha|--gateway-digest|--iam-digest|--migrate-digest|--confirm|--confirm-bootstrap|--confirm-migrate|--confirm-rbac)
@@ -75,6 +75,7 @@ parse_opts() {
         shift 2
         ;;
       --from-sha-tags) FROM_SHA_TAGS=1; shift ;;
+      --enable-domain-services) ENABLE_DOMAIN_SERVICES=1; shift ;;
       --run-migrate) RUN_MIGRATE=1; shift ;;
       --run-seed) RUN_SEED=1; shift ;;
       --run-rbac) RUN_RBAC=1; shift ;;
@@ -199,12 +200,25 @@ cmd_rbac_apply() {
 cmd_pull() {
   ghcr_login
   load_env_file "${RELEASE_ENV}"
-  docker pull "${GATEWAY_IMAGE}"
-  docker pull "${IAM_IMAGE}"
-  docker pull "${MIGRATE_IMAGE}"
-  docker image inspect "${GATEWAY_IMAGE}" >/dev/null
-  docker image inspect "${IAM_IMAGE}" >/dev/null
-  docker image inspect "${MIGRATE_IMAGE}" >/dev/null
+  docker pull "${GATEWAY_IMAGE}" || die "failed to pull gateway image"
+  docker pull "${IAM_IMAGE}" || die "failed to pull iam image"
+  docker pull "${MIGRATE_IMAGE}" || die "failed to pull migrate image"
+  if [[ "${MEMORA_DOMAIN_SERVICES:-0}" == "1" ]]; then
+    [[ -n "${COMMERCE_IMAGE:-}" && -n "${OPERATIONS_IMAGE:-}" && -n "${EXPERIENCE_IMAGE:-}" ]] || die "domain image refs missing from release.env"
+    docker pull "${COMMERCE_IMAGE}" || die "failed to pull commerce image"
+    docker pull "${OPERATIONS_IMAGE}" || die "failed to pull operations image"
+    docker pull "${EXPERIENCE_IMAGE}" || die "failed to pull experience image"
+  fi
+  docker image inspect "${GATEWAY_IMAGE}" >/dev/null || die "gateway image is not present after pull"
+  docker image inspect "${IAM_IMAGE}" >/dev/null || die "iam image is not present after pull"
+  docker image inspect "${MIGRATE_IMAGE}" >/dev/null || die "migrate image is not present after pull"
+  if [[ "${MEMORA_DOMAIN_SERVICES:-0}" == "1" ]]; then
+    docker image inspect "${COMMERCE_IMAGE}" >/dev/null || die "commerce image is not present after pull"
+    docker image inspect "${OPERATIONS_IMAGE}" >/dev/null || die "operations image is not present after pull"
+    docker image inspect "${EXPERIENCE_IMAGE}" >/dev/null || die "experience image is not present after pull"
+    log "pulled gateway/iam/migrate/commerce/operations/experience images"
+    return 0
+  fi
   log "pulled gateway/iam/migrate images"
 }
 
@@ -212,16 +226,32 @@ cmd_deploy_backend() {
   [[ -f "${MEMORA_STATE_DIR}/infra-ready" ]] || die "infra not bootstrapped"
   assert_managed_or_absent memora-api-gateway backend
   assert_managed_or_absent memora-iam-service backend
+  if [[ "${MEMORA_DOMAIN_SERVICES:-0}" == "1" ]]; then
+    local name
+    for name in "${DOMAIN_CONTAINERS[@]}"; do
+      assert_managed_or_absent "$name" backend
+    done
+  fi
   export MEMORA_SECRETS_DIR
-  compose_backend up -d --pull never
+  compose_backend up -d --pull never || die "backend compose up failed"
   wait_healthy memora-iam-service 48
   wait_healthy memora-api-gateway 36
+  if [[ "${MEMORA_DOMAIN_SERVICES:-0}" == "1" ]]; then
+    wait_healthy memora-commerce-service 48
+    wait_healthy memora-operations-service 48
+    wait_healthy memora-experience-service 48
+  fi
   cmd_health_check
 }
 
 cmd_health_check() {
   docker exec memora-iam-service node -e "fetch('http://127.0.0.1:5051/health/ready').then(async(r)=>{const t=await r.text(); if(!r.ok){console.error(t); process.exit(1)} console.log(t)})"
   docker exec memora-api-gateway node -e "fetch('http://127.0.0.1:3000/health/ready').then(async(r)=>{const t=await r.text(); if(!r.ok){console.error(t); process.exit(1)} console.log(t)})"
+  if [[ "${MEMORA_DOMAIN_SERVICES:-0}" == "1" ]]; then
+    docker exec memora-commerce-service node -e "fetch('http://127.0.0.1:5052/health/ready').then(async(r)=>{const t=await r.text(); if(!r.ok){console.error(t); process.exit(1)} console.log(t)})"
+    docker exec memora-operations-service node -e "fetch('http://127.0.0.1:5053/health/ready').then(async(r)=>{const t=await r.text(); if(!r.ok){console.error(t); process.exit(1)} console.log(t)})"
+    docker exec memora-experience-service node -e "fetch('http://127.0.0.1:5054/health/ready').then(async(r)=>{const t=await r.text(); if(!r.ok){console.error(t); process.exit(1)} console.log(t)})"
+  fi
   log "health checks passed"
 }
 
@@ -247,21 +277,102 @@ cmd_backup() {
   log "backup ${stamp} written"
 }
 
-cmd_rollback() {
-  [[ -f "${MEMORA_STATE_DIR}/previous-release" ]] || die "no previous release recorded"
-  # shellcheck disable=SC1091
-  source "${MEMORA_STATE_DIR}/previous-release"
+stop_domain_services_if_present() {
+  local name
+  for name in "${DOMAIN_CONTAINERS[@]}"; do
+    if ! container_exists "$name"; then
+      continue
+    fi
+    assert_managed_or_absent "$name" backend
+    docker stop "$name" >/dev/null
+    docker rm "$name" >/dev/null
+    log "stopped ${name}; persistent volumes were not removed"
+  done
+}
+
+restore_recorded_release() {
+  local file="$1"
+  local backup status
+  [[ -f "$file" ]] || die "recorded release ${file} is missing"
+  # shellcheck disable=SC1090
+  source "$file"
   validate_sha "${sha}"
   validate_digest "${gateway}" gateway
   validate_digest "${iam}" iam
   validate_digest "${migrate}" migrate
-  write_release_env "${sha}" "${gateway}" "${iam}" "${migrate}"
-  cmd_pull
-  compose_backend up -d --pull never
-  wait_healthy memora-iam-service 48
-  wait_healthy memora-api-gateway 36
-  cmd_health_check
-  log "rolled back to sha=${sha}"
+  if [[ "${domain_services:-0}" == "1" ]]; then
+    validate_digest "${commerce}" commerce
+    validate_digest "${operations}" operations
+    validate_digest "${experience}" experience
+  fi
+  backup="$(mktemp)"
+  if [[ -f "${RELEASE_ENV}" ]]; then
+    cp -a "${RELEASE_ENV}" "$backup"
+  fi
+  if [[ "${domain_services:-0}" == "1" ]]; then
+    export MEMORA_DOMAIN_SERVICES=1
+    write_release_env "${sha}" "${gateway}" "${iam}" "${migrate}" "${commerce}" "${operations}" "${experience}"
+  else
+    export MEMORA_DOMAIN_SERVICES=0
+    write_release_env "${sha}" "${gateway}" "${iam}" "${migrate}"
+  fi
+  # Pull, recreate, and health must all finish before this release is recorded
+  # as restored. A failure reverts release.env and does not claim recovery.
+  set +e
+  (
+    set -e
+    cmd_pull
+    compose_backend up -d --pull never || die "backend compose up failed"
+    wait_healthy memora-iam-service 48
+    wait_healthy memora-api-gateway 36
+    if [[ "${MEMORA_DOMAIN_SERVICES}" == "1" ]]; then
+      wait_healthy memora-commerce-service 48
+      wait_healthy memora-operations-service 48
+      wait_healthy memora-experience-service 48
+    else
+      stop_domain_services_if_present
+    fi
+    cmd_health_check
+  )
+  status=$?
+  set -e
+  if [[ "$status" -ne 0 ]]; then
+    if [[ -s "$backup" ]]; then
+      cp -a "$backup" "${RELEASE_ENV}"
+      chmod 600 "${RELEASE_ENV}"
+    fi
+    rm -f "$backup"
+    die "restore did not finish; release.env was reverted. Containers were not verified and this release was not restored. Persistent volumes and database infrastructure were not changed."
+  fi
+  rm -f "$backup"
+  log "restored sha=${sha} domain_services=${domain_services:-0}"
+}
+
+cmd_rollback() {
+  [[ -f "${MEMORA_STATE_DIR}/previous-release" ]] || die "no previous release recorded"
+  restore_recorded_release "${MEMORA_STATE_DIR}/previous-release"
+}
+
+deploy_backend_or_restore() {
+  # A failing command inside `if ! ( ... )` does not trip set -e, so pull and
+  # health failures would be ignored. Run the attempt as its own subshell.
+  set +e
+  (
+    set -e
+    cmd_pull
+    if [[ "${CONFIRM_MIGRATE:-}" == "MIGRATE" ]]; then
+      cmd_migrate
+    fi
+    cmd_deploy_backend
+  )
+  local status=$?
+  set -e
+  if [[ "$status" -ne 0 ]]; then
+    err "deploy failed; restoring last recorded release"
+    [[ -f "${MEMORA_STATE_DIR}/current-release" ]] || die "deploy failed and no recorded release to restore"
+    restore_recorded_release "${MEMORA_STATE_DIR}/current-release"
+    die "deploy failed; restored the last recorded release"
+  fi
 }
 
 cmd_bootstrap() {
@@ -303,34 +414,69 @@ resolve_digests_from_sha_tags() {
   GATEWAY_DIGEST="$(image_digest_after_pull "ghcr.io/mainhankiet/memora-api-gateway:${RELEASE_SHA}" gateway)"
   IAM_DIGEST="$(image_digest_after_pull "ghcr.io/mainhankiet/memora-iam-service:${RELEASE_SHA}" iam)"
   MIGRATE_DIGEST="$(image_digest_after_pull "ghcr.io/mainhankiet/memora-iam-migrate:${RELEASE_SHA}" migrate)"
+  if [[ "${MEMORA_DOMAIN_SERVICES:-0}" == "1" ]]; then
+    COMMERCE_DIGEST="$(image_digest_after_pull "ghcr.io/mainhankiet/memora-commerce-service:${RELEASE_SHA}" commerce)"
+    OPERATIONS_DIGEST="$(image_digest_after_pull "ghcr.io/mainhankiet/memora-operations-service:${RELEASE_SHA}" operations)"
+    EXPERIENCE_DIGEST="$(image_digest_after_pull "ghcr.io/mainhankiet/memora-experience-service:${RELEASE_SHA}" experience)"
+  fi
+}
+
+preflight_domain_services() {
+  local file
+  for file in commerce.env operations.env experience.env; do
+    [[ -f "${MEMORA_SECRETS_DIR}/${file}" ]] || die "missing ${MEMORA_SECRETS_DIR}/${file}"
+  done
+  load_env_file "${MEMORA_SECRETS_DIR}/commerce.env"
+  load_env_file "${MEMORA_SECRETS_DIR}/operations.env"
+  load_env_file "${MEMORA_SECRETS_DIR}/experience.env"
+  assert_domain_database_url "${COMMERCE_DATABASE_URL}" commerce_app commerce
+  assert_domain_database_url "${OPERATIONS_DATABASE_URL}" operations_app operations
+  assert_domain_database_url "${EXPERIENCE_DATABASE_URL}" experience_app experience
+  die "BLOCKER: domain services stay disabled. PostgreSQL roles, schema privileges, and schema presence are not verified. Run deploy/postgres/proposals/service-roles-review.sql manually. This helper does not execute SQL or start commerce, operations, or experience."
 }
 
 cmd_deploy() {
   parse_opts "$@"
   validate_sha "${RELEASE_SHA}"
+  export MEMORA_DOMAIN_SERVICES=0
+  if [[ "${ENABLE_DOMAIN_SERVICES}" -eq 1 ]]; then
+    preflight_domain_services
+    export MEMORA_DOMAIN_SERVICES=1
+  fi
   if [[ "${FROM_SHA_TAGS}" -eq 1 ]]; then
     resolve_digests_from_sha_tags
   else
     validate_digest "${GATEWAY_DIGEST}" gateway
     validate_digest "${IAM_DIGEST}" iam
     validate_digest "${MIGRATE_DIGEST}" migrate
+    if [[ "${MEMORA_DOMAIN_SERVICES}" == "1" ]]; then
+      validate_digest "${COMMERCE_DIGEST:-}" commerce
+      validate_digest "${OPERATIONS_DIGEST:-}" operations
+      validate_digest "${EXPERIENCE_DIGEST:-}" experience
+    fi
   fi
   [[ -f "${MEMORA_STATE_DIR}/bootstrap-complete" ]] || die "bootstrap not complete; run Bootstrap Mini PC once"
   cmd_preflight
   cmd_backup
-  write_release_env "${RELEASE_SHA}" "${GATEWAY_DIGEST}" "${IAM_DIGEST}" "${MIGRATE_DIGEST}"
-  cmd_pull
-  if [[ "${CONFIRM_MIGRATE}" == "MIGRATE" ]]; then
-    cmd_migrate
+  if [[ "${MEMORA_DOMAIN_SERVICES}" == "1" ]]; then
+    write_release_env "${RELEASE_SHA}" "${GATEWAY_DIGEST}" "${IAM_DIGEST}" "${MIGRATE_DIGEST}" "${COMMERCE_DIGEST}" "${OPERATIONS_DIGEST}" "${EXPERIENCE_DIGEST}"
+  else
+    write_release_env "${RELEASE_SHA}" "${GATEWAY_DIGEST}" "${IAM_DIGEST}" "${MIGRATE_DIGEST}"
   fi
-  if ! cmd_deploy_backend; then
-    err "deploy failed; attempting rollback"
-    cmd_rollback
-    die "deploy failed and rollback was attempted"
+  deploy_backend_or_restore
+  if [[ "${MEMORA_DOMAIN_SERVICES}" == "1" ]]; then
+    record_release "${RELEASE_SHA}" "${GATEWAY_DIGEST}" "${IAM_DIGEST}" "${MIGRATE_DIGEST}" deploy "${COMMERCE_DIGEST}" "${OPERATIONS_DIGEST}" "${EXPERIENCE_DIGEST}"
+  else
+    record_release "${RELEASE_SHA}" "${GATEWAY_DIGEST}" "${IAM_DIGEST}" "${MIGRATE_DIGEST}" deploy
   fi
-  record_release "${RELEASE_SHA}" "${GATEWAY_DIGEST}" "${IAM_DIGEST}" "${MIGRATE_DIGEST}" deploy
   log "deploy complete"
 }
+
+if [[ "${MEMORA_DEPLOY_SOURCE_ONLY:-}" == "1" ]]; then
+  return 0
+fi
+
+require_root
 
 case "${COMMAND}" in
   preflight) cmd_preflight ;;

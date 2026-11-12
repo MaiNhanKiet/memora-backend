@@ -4,7 +4,7 @@
 > **Decision date:** 2026-10-17  
 > **Scope:** NestJS backend monorepo, API Gateway, PostgreSQL domain schemas, microservice boundaries, integration and deployment  
 > **Target:** **4 business microservices + 1 API Gateway**  
-> **Implementation status:** Architecture approved; not all services, schemas or business tables are deployed.
+> **Implementation status:** ADR-001 is accepted. Source now contains all four business services plus the Gateway. Business behavior, database roles, and production rollout are not at the same stage. See [Current source and rollout](#11-current-source-and-rollout) and [business-service-structure.md](business-service-structure.md).
 
 ## 1. Architectural decision
 
@@ -223,7 +223,7 @@ deploy/
 └── backend/          # Gateway and independently built service images
 ```
 
-This is the **target structure**, not a statement that every folder already exists.
+The domain folders above exist. Commerce, Operations, and Experience domain modules are empty. Feature folders and the four layers are the target in [business-service-structure.md](business-service-structure.md), not code that has been written. IAM is organized as `application/`, `presentation/`, and `repositories/`; do not copy that tree into the other three services.
 
 ### 6.1 Gateway modules are domain/feature based
 
@@ -310,7 +310,25 @@ The stage order describes **ownership and priorities**, not a strict requirement
 - [MEMORA Business Flow Decision Tracker](https://docs.google.com/spreadsheets/d/1czN5EyjeTFN3wAwguPuk-Boh4YBlKmjdeOCUVx_C_cE/edit): MF01–MF06 decision summary.
 - MEMORA `REPORT 3.docx` and `REPORT 7.docx`: business behavior, requirements and architecture context.
 - MEMORA architecture decision made 2026-10-17: four service topology and domain ownership.
+- [Business service structure](business-service-structure.md): target Domain → Feature → Layer convention for Commerce, Operations, and Experience.
+
+## 11. Current source and rollout
+
+Labels mean different things. **Accepted** is still section 9. **Implemented** means the repository contains the code. **Configured** means CI or Compose declares it. **Proposed** means a review artifact that has not been executed. **Deployed** means the default Mini PC release starts it. This document does not claim a live GitHub Actions run or a live database check.
+
+| Area | State |
+|---|---|
+| IAM business behavior | **Implemented.** Auth, guest identity, RBAC, and admin gRPC/HTTP exist. Prisma migrations exist. The schema has 8 models; the accepted tracker count remains 6 tables. The two extra models are `RbacBootstrapExecution` and `SecurityAuditEvent`. |
+| Commerce | **Foundation implemented.** Five domain modules (`catalog`, `pricing`, `inventory`, `design`, `ordering`) and **27** Prisma models. Modules are empty. No business RPC. No Prisma migration directory. |
+| Operations | **Foundation implemented.** Four domain modules (`personalization`, `production`, `fulfillment`, `after_sales`) and **30** Prisma models. Modules are empty. No business RPC. No Prisma migration directory. |
+| Experience | **Foundation implemented.** Two domain modules (`memory`, `platform`) and **11** Prisma models. Platform is this domain, not a separate service. Modules are empty. No business RPC. No Prisma migration directory. |
+| Health | **Implemented** on Gateway and all four business services. |
+| Business gRPC for Commerce, Operations, Experience | **Not implemented.** No service proto beyond IAM, health, and pagination. |
+| GHCR | **Configured.** Push to `main` is set up to publish six images: Gateway, IAM, IAM migrate, Commerce, Operations, and Experience. Push to `dev` runs Quality and Security only. This ADR does not claim those packages exist in the registry. |
+| Compose | **Configured.** Default backend project starts Gateway and IAM. Commerce, Operations, and Experience are in profile `domain-services` and are not started by a normal deploy. |
+| PostgreSQL roles | **Proposed.** `deploy/postgres/proposals/` is review SQL. It has not been applied. The deploy helper still refuses `--enable-domain-services` until grants are verified, and that refusal stays in place. |
+| Production domain services | **Not deployed.** A default release does not start them and must not be described as a five-application production rollout. |
 
 ---
 
-**Usage in Cursor:** Store this file at `docs/architecture/memora-backend-architecture.md` in the backend repository. Treat the **Accepted** decisions as architecture baseline; do not represent the **Not yet finalized** items or proposed database tables as already implemented.
+**Usage in Cursor:** This file is `docs/architecture/memora-backend-4-service.md`. Treat the **Accepted** decisions as the architecture baseline. Section 11 separates implemented source from configured CI, proposed SQL, and the default Mini PC deploy.

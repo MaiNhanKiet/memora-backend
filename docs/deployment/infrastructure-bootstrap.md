@@ -13,7 +13,7 @@ One-time path. **Not** tied to `push` on `main`. Live bootstrap is **not** claim
 | Project | File on host | Containers | Volumes |
 |---|---|---|---|
 | `memora-infra` | `/opt/memora/infra/compose.yaml` | `memora-postgres`, `memora-redis`, `memora-cloudflared` | `memora-infra_pgdata`, `memora-infra_redisdata` |
-| `memora-backend` | `/opt/memora/backend/compose.yaml` | `memora-api-gateway`, `memora-iam-service` | none |
+| `memora-backend` | `/opt/memora/backend/compose.yaml` | Default: `memora-api-gateway`, `memora-iam-service`. Profile `domain-services` defines Commerce, Operations, and Experience and is not started here | none |
 
 Shared network: `memora-network` (created by project `memora-infra`; Docker DNS: `postgres`, `redis`, `iam-service`, `api-gateway`). Backend compose marks that network `external`.
 

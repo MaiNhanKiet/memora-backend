@@ -19,12 +19,12 @@ Luồng sau khi `git push origin main`:
 GitHub-hosted                    Mini PC
 Quality + Security
         ↓
-Publish 3 image → GHCR
+Publish 6 image → GHCR (Gateway, IAM, IAM migrate, Commerce, Operations, Experience)
         ↓
 Deploy Mini PC  ──────────────►  sudo /opt/memora/bin/memora-deploy
                                  pull image @sha256
-                                 migrate (nếu xác nhận)
-                                 compose up Gateway + IAM
+                                 migrate IAM nếu xác nhận
+                                 compose up chỉ Gateway + IAM
 ```
 
 PR **không** deploy. Postgres/Redis **không** tạo lại mỗi lần push.
@@ -35,15 +35,18 @@ PR **không** deploy. Postgres/Redis **không** tạo lại mỗi lần push.
 memora-backend/
   apps/
     api-gateway/          HTTP công khai (Nest Gateway)
-    iam-service/          Domain IAM + Prisma (gRPC)
+    iam-service/          Domain IAM + Prisma (gRPC, business đã có)
+    commerce-service/     Foundation + Prisma schema; chưa business RPC
+    operations-service/   Foundation + Prisma schema; chưa business RPC
+    experience-service/   Foundation + Prisma schema; chưa business RPC
   libs/                   Auth, config, contracts, cache, queue, …
   proto/                  Hợp đồng gRPC
-  docker/                 Dockerfile Gateway, IAM, migrate (Prisma CLI)
+  docker/                 Dockerfile Gateway, IAM, migrate, Commerce, Operations, Experience
   deploy/
     infra/compose.yaml    Postgres + Redis + cloudflared (Arcane / Mini PC)
     infra/compose.local.yaml   Chỉ laptop: publish 127.0.0.1:5432/6379, bỏ tunnel
     infra/.env.example    USER/PASSWORD Postgres + Redis + CLOUDFLARE_TUNNEL_TOKEN
-    backend/compose.yaml  Gateway + IAM (image GHCR, không build)
+    backend/compose.yaml  Mặc định Gateway + IAM. Profile domain-services bị helper chặn
     secrets/*.example     Mẫu ghcr/gateway/iam — không commit mật khẩu
     host/                 Cài helper, sudoers, memora-deploy.sh
     scripts/lib.sh        Logic chung (pull GHCR, compose, backup)
@@ -118,6 +121,11 @@ Push `main` → job **Publish GHCR** đẩy:
 - `ghcr.io/mainhankiet/memora-api-gateway:<git-sha>`
 - `ghcr.io/mainhankiet/memora-iam-service:<git-sha>`
 - `ghcr.io/mainhankiet/memora-iam-migrate:<git-sha>`
+- `ghcr.io/mainhankiet/memora-commerce-service:<git-sha>`
+- `ghcr.io/mainhankiet/memora-operations-service:<git-sha>`
+- `ghcr.io/mainhankiet/memora-experience-service:<git-sha>`
+
+Ba image sau có trong workflow. Deploy mặc định không start chúng. `--enable-domain-services` vẫn dừng vì quyền PostgreSQL chưa được xác minh. SQL trong `deploy/postgres/proposals/` chưa được chạy.
 
 Tag = SHA commit. Digest `sha256:` + 64 hex = vân tay image (form Bootstrap cần digest, không phải lệnh `docker pull …:tag`).
 
@@ -179,7 +187,7 @@ Volume local `memora_pgdata` **không** phải volume production. Đừng chạy
 
 | File | Khi nào | Việc |
 |---|---|---|
-| `.github/workflows/ci.yml` | `push`/`PR` `main` | Test trên GitHub-hosted; `push` main thì publish + Deploy |
+| `.github/workflows/ci.yml` | PR mọi nhánh; `push` `dev`; `push` `main` | PR và `dev`: Quality + Security. `main`: thêm publish GHCR và Deploy Gateway/IAM |
 | `.github/workflows/bootstrap.yml` | Bấm tay | Lần đầu infra+app; chỉ cần SHA + `BOOTSTRAP` |
 
 Job CI **không** chứa mật khẩu DB. Runner Mini PC chỉ gọi binary root.
