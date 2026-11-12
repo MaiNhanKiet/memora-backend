@@ -4,6 +4,7 @@ import {
   EnvHostname,
   EnvPort,
   EnvPostgresUrl,
+  EnvSecret,
 } from '../validation/env-constraints';
 import { validateEnv } from '../validation/validate-env';
 import { loadEnvFile } from './load-env-file';
@@ -50,6 +51,10 @@ export class ExperienceEnvironment extends NodeEnvironment {
   @Expose()
   @EnvPostgresUrl()
   EXPERIENCE_DATABASE_URL!: string;
+
+  @Expose()
+  @EnvSecret(32)
+  EXPERIENCE_INTERNAL_GRPC_SECRET!: string;
 }
 
 export interface ExperienceEnv {
@@ -59,6 +64,7 @@ export interface ExperienceEnv {
   EXPERIENCE_HEALTH_HOST: string;
   EXPERIENCE_HEALTH_PORT: number;
   EXPERIENCE_DATABASE_URL: string;
+  EXPERIENCE_INTERNAL_GRPC_SECRET: string;
 }
 
 export function validateExperienceEnv(
@@ -85,6 +91,7 @@ export function validateExperienceEnv(
     EXPERIENCE_HEALTH_HOST: validated.EXPERIENCE_HEALTH_HOST,
     EXPERIENCE_HEALTH_PORT: validated.EXPERIENCE_HEALTH_PORT,
     EXPERIENCE_DATABASE_URL: validated.EXPERIENCE_DATABASE_URL,
+    EXPERIENCE_INTERNAL_GRPC_SECRET: validated.EXPERIENCE_INTERNAL_GRPC_SECRET,
   };
 }
 
@@ -102,6 +109,7 @@ export const experienceConfig = registerAs('experience', () => {
     healthHost: env.EXPERIENCE_HEALTH_HOST,
     healthPort: env.EXPERIENCE_HEALTH_PORT,
     databaseUrl: env.EXPERIENCE_DATABASE_URL,
+    internalGrpcSecret: env.EXPERIENCE_INTERNAL_GRPC_SECRET,
   };
 });
 

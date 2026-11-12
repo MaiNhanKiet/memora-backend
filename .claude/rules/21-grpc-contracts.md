@@ -2,9 +2,12 @@
 description: gRPC protocol contracts, handlers and Gateway client adapters; backward-compatible protobuf evolution.
 paths:
   - "proto/**/*.proto"
-  - "libs/contracts/src/**/*grpc*.ts"
+  - "libs/contracts/src/**/*.ts"
   - "apps/iam-service/src/presentation/grpc/**/*.ts"
+  - "apps/*-service/src/modules/**/presentation/**/*.ts"
+  - "apps/*-service/src/grpc/**/*.ts"
   - "apps/api-gateway/src/modules/**/clients/**/*.ts"
+  - "apps/api-gateway/src/common/grpc/**/*.ts"
 ---
 # gRPC contracts
 

@@ -21,3 +21,6 @@ Applies to Commerce, Operations, and Experience. Read `docs/architecture/busines
 - Another domain in the same service may call an exported application port. It may not import that domain's repository.
 - Do not add a proto RPC, event, migration, or seed unless the task asks for that behavior.
 - Authorize the resource in the owning use case. Do not trust a client-supplied actor id.
+- For a new API, follow `docs/architecture/business-service-api-recipe.md` (skill `implement-business-api`). gRPC hosting, the internal auth guard, `PrismaService` and Gateway client helpers already exist: reuse them, do not add parallel copies.
+- Register a new proto in `src/grpc/<service>-grpc.registry.ts`. Guard every business gRPC controller with `<Service>InternalGrpcAuthGuard`.
+- There are no database foreign keys across services. Verify cross-service ids through a contract in the owning use case.

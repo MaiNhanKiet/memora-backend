@@ -4,6 +4,7 @@ import {
   EnvHostname,
   EnvPort,
   EnvPostgresUrl,
+  EnvSecret,
 } from '../validation/env-constraints';
 import { validateEnv } from '../validation/validate-env';
 import { loadEnvFile } from './load-env-file';
@@ -53,6 +54,10 @@ export class OperationsEnvironment extends NodeEnvironment {
   @Expose()
   @EnvPostgresUrl()
   OPERATIONS_DATABASE_URL!: string;
+
+  @Expose()
+  @EnvSecret(32)
+  OPERATIONS_INTERNAL_GRPC_SECRET!: string;
 }
 
 export interface OperationsEnv {
@@ -62,6 +67,7 @@ export interface OperationsEnv {
   OPERATIONS_HEALTH_HOST: string;
   OPERATIONS_HEALTH_PORT: number;
   OPERATIONS_DATABASE_URL: string;
+  OPERATIONS_INTERNAL_GRPC_SECRET: string;
 }
 
 export function validateOperationsEnv(
@@ -88,6 +94,7 @@ export function validateOperationsEnv(
     OPERATIONS_HEALTH_HOST: validated.OPERATIONS_HEALTH_HOST,
     OPERATIONS_HEALTH_PORT: validated.OPERATIONS_HEALTH_PORT,
     OPERATIONS_DATABASE_URL: validated.OPERATIONS_DATABASE_URL,
+    OPERATIONS_INTERNAL_GRPC_SECRET: validated.OPERATIONS_INTERNAL_GRPC_SECRET,
   };
 }
 
@@ -105,6 +112,7 @@ export const operationsConfig = registerAs('operations', () => {
     healthHost: env.OPERATIONS_HEALTH_HOST,
     healthPort: env.OPERATIONS_HEALTH_PORT,
     databaseUrl: env.OPERATIONS_DATABASE_URL,
+    internalGrpcSecret: env.OPERATIONS_INTERNAL_GRPC_SECRET,
   };
 });
 

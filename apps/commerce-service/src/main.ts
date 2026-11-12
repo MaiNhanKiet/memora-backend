@@ -5,6 +5,7 @@ import { GrpcExceptionFilter } from '@app/common';
 import { loadCommerceRuntimeConfig } from '@app/config';
 import { createMemoraLogger } from '@app/logger';
 import { join } from 'node:path';
+import { COMMERCE_GRPC_PROTOS } from './grpc/commerce-grpc.registry';
 import { CommerceServiceModule } from './commerce-service.module';
 import { startHealthHttpServer } from './health/http-health.server';
 import { CommerceReadinessService } from './health/readiness.service';
@@ -24,8 +25,10 @@ async function bootstrap() {
       transport: Transport.GRPC,
       options: {
         url: grpcUrl,
-        package: ['grpc.health.v1'],
-        protoPath: [join(process.cwd(), 'proto/grpc/health/v1/health.proto')],
+        package: COMMERCE_GRPC_PROTOS.map((proto) => proto.package),
+        protoPath: COMMERCE_GRPC_PROTOS.map((proto) =>
+          join(process.cwd(), 'proto', proto.file),
+        ),
         loader: {
           includeDirs: [join(process.cwd(), 'proto')],
           longs: String,

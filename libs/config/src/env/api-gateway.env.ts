@@ -80,6 +80,12 @@ export interface ApiGatewayEnv {
   SWAGGER_ENABLED: boolean;
   IAM_GRPC_URL: string;
   IAM_INTERNAL_GRPC_SECRET: string;
+  COMMERCE_GRPC_URL: string | undefined;
+  COMMERCE_INTERNAL_GRPC_SECRET: string | undefined;
+  OPERATIONS_GRPC_URL: string | undefined;
+  OPERATIONS_INTERNAL_GRPC_SECRET: string | undefined;
+  EXPERIENCE_GRPC_URL: string | undefined;
+  EXPERIENCE_INTERNAL_GRPC_SECRET: string | undefined;
   AUTH_REFRESH_COOKIE_NAME: string;
   AUTH_CSRF_COOKIE_NAME: string;
   AUTH_COOKIE_PATH: string;
@@ -132,6 +138,9 @@ export function validateApiGatewayEnv(
     SWAGGER_ENABLED: validated.SWAGGER_ENABLED,
     IAM_GRPC_URL: validated.IAM_GRPC_URL,
     IAM_INTERNAL_GRPC_SECRET: validated.IAM_INTERNAL_GRPC_SECRET,
+    ...parseDomainServiceTarget(source, 'COMMERCE'),
+    ...parseDomainServiceTarget(source, 'OPERATIONS'),
+    ...parseDomainServiceTarget(source, 'EXPERIENCE'),
     AUTH_REFRESH_COOKIE_NAME: optionalCookieName(
       source.AUTH_REFRESH_COOKIE_NAME,
       'memora_refresh',
@@ -167,6 +176,12 @@ export const apiGatewayConfig = registerAs('apiGateway', () => {
     swaggerEnabled: env.SWAGGER_ENABLED,
     iamGrpcUrl: env.IAM_GRPC_URL,
     internalGrpcSecret: env.IAM_INTERNAL_GRPC_SECRET,
+    commerceGrpcUrl: env.COMMERCE_GRPC_URL,
+    commerceInternalGrpcSecret: env.COMMERCE_INTERNAL_GRPC_SECRET,
+    operationsGrpcUrl: env.OPERATIONS_GRPC_URL,
+    operationsInternalGrpcSecret: env.OPERATIONS_INTERNAL_GRPC_SECRET,
+    experienceGrpcUrl: env.EXPERIENCE_GRPC_URL,
+    experienceInternalGrpcSecret: env.EXPERIENCE_INTERNAL_GRPC_SECRET,
     refreshCookieName: env.AUTH_REFRESH_COOKIE_NAME,
     csrfCookieName: env.AUTH_CSRF_COOKIE_NAME,
     cookiePath: env.AUTH_COOKIE_PATH,
@@ -187,6 +202,50 @@ export const apiGatewayConfig = registerAs('apiGateway', () => {
     throttleDisabled: env.AUTH_THROTTLE_DISABLED,
   };
 });
+
+type DomainServicePrefix = 'COMMERCE' | 'OPERATIONS' | 'EXPERIENCE';
+
+/**
+ * Optional Gateway -> domain service target. Both `<PREFIX>_GRPC_URL` and
+ * `<PREFIX>_INTERNAL_GRPC_SECRET` are set together, or both are left unset.
+ * A module that creates a client for the service reads them with getOrThrow.
+ */
+function parseDomainServiceTarget<P extends DomainServicePrefix>(
+  source: NodeJS.ProcessEnv | Record<string, unknown>,
+  prefix: P,
+): Record<`${P}_GRPC_URL` | `${P}_INTERNAL_GRPC_SECRET`, string | undefined> {
+  const urlKey = `${prefix}_GRPC_URL` as const;
+  const secretKey = `${prefix}_INTERNAL_GRPC_SECRET` as const;
+  const rawUrl = source[urlKey];
+  const rawSecret = source[secretKey];
+  const url = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+  const secret = typeof rawSecret === 'string' ? rawSecret.trim() : '';
+  if (url === '' && secret === '') {
+    return { [urlKey]: undefined, [secretKey]: undefined } as Record<
+      `${P}_GRPC_URL` | `${P}_INTERNAL_GRPC_SECRET`,
+      string | undefined
+    >;
+  }
+  if (url === '' || secret === '') {
+    throw new Error(
+      `Environment validation failed: ${urlKey} and ${secretKey} must be set together`,
+    );
+  }
+  if (!/^[A-Za-z0-9.-]+:\d{1,5}$/.test(url)) {
+    throw new Error(
+      `Environment validation failed: ${urlKey}: must be host:port`,
+    );
+  }
+  if (secret.length < 32) {
+    throw new Error(
+      `Environment validation failed: ${secretKey}: must be at least 32 characters`,
+    );
+  }
+  return { [urlKey]: url, [secretKey]: secret } as Record<
+    `${P}_GRPC_URL` | `${P}_INTERNAL_GRPC_SECRET`,
+    string | undefined
+  >;
+}
 
 function parseGoogleOAuth(
   source: NodeJS.ProcessEnv | Record<string, unknown>,
