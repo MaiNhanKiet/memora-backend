@@ -1,6 +1,6 @@
 # IAM Admin APIs
 
-Decisions locked on 2026-10-19. IAM-ADM-01 to IAM-ADM-14 are implemented in code and `PENDING_REVIEW` until `review-api`. Progress: `docs/plans/active/iam-admin-api.md`.
+Decisions locked on 2026-10-19. IAM-ADM-01 to IAM-ADM-14 are implemented and **COMPLETED** (tested and accepted according to project-owner confirmation on 2026-10-22). This update synchronizes documentation status only; no new test run or test artifacts are added here. Historical test evidence: `docs/plans/active/iam-admin-api.md`.
 
 Owner: `iam-service` for rules and `iam` tables. HTTP owner: `api-gateway`. Main Flow: N/A (IAM admin extension, RBAC v1 approved 2026-10-15).
 
@@ -26,7 +26,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-01 — GET `/api/v1/admin/users/{userId}`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Gateway: `apps/api-gateway/src/modules/iam/user-management/`
 - Permission: `IAM_USER_READ`
 - gRPC: reuse `GetUserById` after the Gateway check
@@ -35,7 +35,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-02 — GET `/api/v1/admin/users`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_USER_READ`
 - gRPC: new list RPC
 - Query: `page` default 1, `limit` default 10, maximum 100, optional `status`
@@ -45,7 +45,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-03 — GET `/api/v1/admin/roles`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_USER_ROLE_ASSIGN` or `IAM_RBAC_MANAGE`
 - gRPC: new list RPC
 - Success 200 `data`: `{ code, name, description, isActive }[]`
@@ -54,7 +54,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-04 — GET `/api/v1/admin/permissions`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_RBAC_MANAGE`
 - gRPC: new list RPC
 - Success 200 `data`: `{ code, name, description, isActive }[]`
@@ -63,7 +63,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-05 — GET `/api/v1/admin/users/{userId}/roles`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_USER_READ`
 - gRPC: new read RPC over active `user_roles`
 - Success 200 `data`: `{ assignmentId, roleCode, roleName, assignedAt }[]`
@@ -72,7 +72,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-06 — POST `/api/v1/admin/users/{userId}/roles`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_USER_ROLE_ASSIGN`
 - Body: `{ "roleCode": "STORE_STAFF" | "MANAGER" | "JEWELER" | "DELIVERY_STAFF" | "ADMIN" | "CUSTOMER" }`
 - gRPC: new assign RPC
@@ -83,7 +83,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-07 — POST `/api/v1/admin/users/{userId}/roles/{roleCode}/revoke`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_USER_ROLE_ASSIGN`
 - Body: `{ "reason": "string" }` optional
 - gRPC: new revoke RPC
@@ -95,7 +95,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-08 — PATCH `/api/v1/admin/users/{userId}/status`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_USER_STATUS_MANAGE`
 - Body: `{ "status": "ACTIVE" | "LOCKED" | "DISABLED" }`
 - gRPC: new status RPC
@@ -108,7 +108,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-09 — POST `/api/v1/admin/users`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_USER_PROVISION`
 - Body: `{ "email", "fullName", "roleCode" }`
 - gRPC: new provision RPC
@@ -122,7 +122,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-10 — GET `/api/v1/admin/users/{userId}/authorization`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_USER_READ`
 - gRPC: new read RPC over `AuthorizationService.getEffectiveAuthorization`
 - Success 200 `data`: `{ userId, status, roleCodes, permissionCodes }`
@@ -131,7 +131,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-11 — GET `/api/v1/admin/roles/{roleCode}/permissions`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_RBAC_MANAGE`
 - gRPC: new read RPC
 - Success 200 `data`: `{ roleCode, permissionCodes }`
@@ -139,7 +139,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-12 — POST `/api/v1/admin/roles/{roleCode}/permissions`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_RBAC_MANAGE`
 - Body: `{ "permissionCode": "<existing catalog code>" }`
 - gRPC: `GrantRolePermission`. `grantedByUserId` comes from the verified token.
@@ -149,7 +149,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-13 — DELETE `/api/v1/admin/roles/{roleCode}/permissions/{permissionCode}`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_RBAC_MANAGE`
 - gRPC: `RevokeRolePermission`
 - Success 200 `data`: `{ roleCode, permissionCode }`
@@ -158,7 +158,7 @@ Do not add a second route for these.
 
 ## IAM-ADM-14 — GET `/api/v1/admin/users/{userId}/security-audit-events`
 
-- Status: PENDING_REVIEW. Implemented, pending `review-api`.
+- Status: COMPLETED. Implemented; team-confirmed tested/accepted on 2026-10-22 (no new test evidence attached by this documentation update).
 - Permission: `IAM_SECURITY_AUDIT_READ`
 - Query: `page`, `limit`
 - gRPC: `ListUserSecurityAuditEvents`

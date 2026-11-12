@@ -7,8 +7,8 @@
 - Service: `iam-service`
 - Feature: `iam-admin-api`
 - HTTP owner: `api-gateway`
-- Plan status: APPROVED
-- Updated: 2026-10-20
+- Plan status: COMPLETED (owner confirmed testing/acceptance; original plan approval retained)
+- Updated: 2026-10-22
 
 ## 2. Scope and references
 
@@ -29,6 +29,8 @@
   - No file named `MEMORA — API MASTER SPECIFICATION` in this workspace.
   - `rbac-v1.approved.json` is not in this workspace. The matrix and `permissions.ts` are the catalog.
 
+**Current implementation status (2026-10-22):** Project owner confirmed IAM-ADM-01 through IAM-ADM-14 have been tested and completed. This update synchronizes the plan/status with that confirmation; it does not claim an additional independently executed test run. Earlier acceptance evidence and incomplete historical checkboxes are preserved as they were recorded.
+
 The user locked the open decisions on 2026-10-19. On 2026-10-19 the user approved IAM-ADM-01 to IAM-ADM-11. On 2026-10-20 the user approved IAM-ADM-12, IAM-ADM-13, and `IAM_SECURITY_AUDIT_READ` for IAM-ADM-14.
 
 ## 3. API inventory
@@ -38,20 +40,20 @@ The user locked the open decisions on 2026-10-19. On 2026-10-19 the user approve
 | IAM-AUTH | existing auth methods | `/api/v1/auth/*` | N/A | public or session JWT | existing auth RPCs | EXISTING |
 | IAM-GRPC-USER | gRPC only | `IamService/GetUserById` | N/A | internal caller secret only | `GetUserById` | EXISTING |
 | IAM-GRPC-AUTHZ | gRPC only | `ValidateAccessToken`, `CheckRoles`, `CheckPermissions` | N/A | verified access token | those three RPCs | EXISTING |
-| IAM-ADM-01 | GET | `/api/v1/admin/users/{userId}` | N/A | `IAM_USER_READ` | reuse `GetUserById` | PENDING_REVIEW |
-| IAM-ADM-02 | GET | `/api/v1/admin/users` | N/A | `IAM_USER_READ` | new list RPC | PENDING_REVIEW |
-| IAM-ADM-03 | GET | `/api/v1/admin/roles` | N/A | `IAM_USER_ROLE_ASSIGN` or `IAM_RBAC_MANAGE` | new list RPC | PENDING_REVIEW |
-| IAM-ADM-04 | GET | `/api/v1/admin/permissions` | N/A | `IAM_RBAC_MANAGE` | new list RPC | PENDING_REVIEW |
-| IAM-ADM-05 | GET | `/api/v1/admin/users/{userId}/roles` | N/A | `IAM_USER_READ` | new read RPC | PENDING_REVIEW |
-| IAM-ADM-06 | POST | `/api/v1/admin/users/{userId}/roles` | N/A | `IAM_USER_ROLE_ASSIGN` | new assign RPC | PENDING_REVIEW |
-| IAM-ADM-07 | POST | `/api/v1/admin/users/{userId}/roles/{roleCode}/revoke` | N/A | `IAM_USER_ROLE_ASSIGN` | new revoke RPC | PENDING_REVIEW |
-| IAM-ADM-08 | PATCH | `/api/v1/admin/users/{userId}/status` | N/A | `IAM_USER_STATUS_MANAGE` | new status RPC | PENDING_REVIEW |
-| IAM-ADM-09 | POST | `/api/v1/admin/users` | N/A | `IAM_USER_PROVISION` | new provision RPC | PENDING_REVIEW |
-| IAM-ADM-10 | GET | `/api/v1/admin/users/{userId}/authorization` | N/A | `IAM_USER_READ` | new read RPC | PENDING_REVIEW |
-| IAM-ADM-11 | GET | `/api/v1/admin/roles/{roleCode}/permissions` | N/A | `IAM_RBAC_MANAGE` | new read RPC | PENDING_REVIEW |
-| IAM-ADM-12 | POST | `/api/v1/admin/roles/{roleCode}/permissions` | N/A | `IAM_RBAC_MANAGE` | new grant RPC | PENDING_REVIEW |
-| IAM-ADM-13 | DELETE | `/api/v1/admin/roles/{roleCode}/permissions/{permissionCode}` | N/A | `IAM_RBAC_MANAGE` | new revoke-grant RPC | PENDING_REVIEW |
-| IAM-ADM-14 | GET | `/api/v1/admin/users/{userId}/security-audit-events` | N/A | `IAM_SECURITY_AUDIT_READ` | `ListUserSecurityAuditEvents` | PENDING_REVIEW |
+| IAM-ADM-01 | GET | `/api/v1/admin/users/{userId}` | N/A | `IAM_USER_READ` | reuse `GetUserById` | COMPLETED |
+| IAM-ADM-02 | GET | `/api/v1/admin/users` | N/A | `IAM_USER_READ` | new list RPC | COMPLETED |
+| IAM-ADM-03 | GET | `/api/v1/admin/roles` | N/A | `IAM_USER_ROLE_ASSIGN` or `IAM_RBAC_MANAGE` | new list RPC | COMPLETED |
+| IAM-ADM-04 | GET | `/api/v1/admin/permissions` | N/A | `IAM_RBAC_MANAGE` | new list RPC | COMPLETED |
+| IAM-ADM-05 | GET | `/api/v1/admin/users/{userId}/roles` | N/A | `IAM_USER_READ` | new read RPC | COMPLETED |
+| IAM-ADM-06 | POST | `/api/v1/admin/users/{userId}/roles` | N/A | `IAM_USER_ROLE_ASSIGN` | new assign RPC | COMPLETED |
+| IAM-ADM-07 | POST | `/api/v1/admin/users/{userId}/roles/{roleCode}/revoke` | N/A | `IAM_USER_ROLE_ASSIGN` | new revoke RPC | COMPLETED |
+| IAM-ADM-08 | PATCH | `/api/v1/admin/users/{userId}/status` | N/A | `IAM_USER_STATUS_MANAGE` | new status RPC | COMPLETED |
+| IAM-ADM-09 | POST | `/api/v1/admin/users` | N/A | `IAM_USER_PROVISION` | new provision RPC | COMPLETED |
+| IAM-ADM-10 | GET | `/api/v1/admin/users/{userId}/authorization` | N/A | `IAM_USER_READ` | new read RPC | COMPLETED |
+| IAM-ADM-11 | GET | `/api/v1/admin/roles/{roleCode}/permissions` | N/A | `IAM_RBAC_MANAGE` | new read RPC | COMPLETED |
+| IAM-ADM-12 | POST | `/api/v1/admin/roles/{roleCode}/permissions` | N/A | `IAM_RBAC_MANAGE` | new grant RPC | COMPLETED |
+| IAM-ADM-13 | DELETE | `/api/v1/admin/roles/{roleCode}/permissions/{permissionCode}` | N/A | `IAM_RBAC_MANAGE` | new revoke-grant RPC | COMPLETED |
+| IAM-ADM-14 | GET | `/api/v1/admin/users/{userId}/security-audit-events` | N/A | `IAM_SECURITY_AUDIT_READ` | `ListUserSecurityAuditEvents` | COMPLETED |
 
 Field-level contract is in `docs/api/iam/admin.md`.
 
@@ -134,7 +136,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-01 — GET `/api/v1/admin/users/{userId}`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS_WITH_NOTES (LOW 1)
 - Domain / Feature / Service: `iam` / `user-management` / `iam-service`
 - Main Flow: N/A
@@ -169,7 +171,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-02 — GET `/api/v1/admin/users`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS
 - Domain / Feature / Service: `iam` / `user-management` / `iam-service`
 - Main Flow: N/A
@@ -199,7 +201,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-03 — GET `/api/v1/admin/roles`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS
 - Domain / Feature / Service: `iam` / `role-management` / `iam-service`
 - Main Flow: N/A
@@ -229,7 +231,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-04 — GET `/api/v1/admin/permissions`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS_WITH_NOTES (LOW 1)
 - Domain / Feature / Service: `iam` / `permission-management` / `iam-service`
 - Main Flow: N/A
@@ -256,7 +258,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-05 — GET `/api/v1/admin/users/{userId}/roles`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS
 - Domain / Feature / Service: `iam` / `user-role-assignment` / `iam-service`
 - Main Flow: N/A
@@ -286,7 +288,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-06 — POST `/api/v1/admin/users/{userId}/roles`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS
 - Domain / Feature / Service: `iam` / `user-role-assignment` / `iam-service`
 - Main Flow: N/A
@@ -316,7 +318,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-07 — POST `/api/v1/admin/users/{userId}/roles/{roleCode}/revoke`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS
 - Domain / Feature / Service: `iam` / `user-role-assignment` / `iam-service`
 - Main Flow: N/A
@@ -346,7 +348,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-08 — PATCH `/api/v1/admin/users/{userId}/status`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS
 - Domain / Feature / Service: `iam` / `user-management` / `iam-service`
 - Main Flow: N/A
@@ -376,7 +378,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-09 — POST `/api/v1/admin/users`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS
 - Domain / Feature / Service: `iam` / `user-management` / `iam-service`
 - Main Flow: N/A
@@ -406,7 +408,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-10 — GET `/api/v1/admin/users/{userId}/authorization`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS
 - Domain / Feature / Service: `iam` / `authorization-management` / `iam-service`
 - Main Flow: N/A
@@ -436,7 +438,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-11 — GET `/api/v1/admin/roles/{roleCode}/permissions`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Review: PASS_WITH_NOTES (LOW 1)
 - Domain / Feature / Service: `iam` / `authorization-management` / `iam-service`
 - Main Flow: N/A
@@ -466,7 +468,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-12 — POST `/api/v1/admin/roles/{roleCode}/permissions`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Domain / Feature / Service: `iam` / `authorization-management` / `iam-service`
 - Main Flow: N/A
 - Purpose: grant one existing permission to a role. The user approved runtime grants on 2026-10-20. The catalog remains the initial seed. This route does not create a permission code.
@@ -495,7 +497,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-13 — DELETE `/api/v1/admin/roles/{roleCode}/permissions/{permissionCode}`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Domain / Feature / Service: `iam` / `authorization-management` / `iam-service`
 - Main Flow: N/A
 - Purpose: remove one permission from a role by deleting the `role_permissions` row. The user approved this on 2026-10-20.
@@ -524,7 +526,7 @@ Field-level contract is in `docs/api/iam/admin.md`.
 
 ### IAM-ADM-14 — GET `/api/v1/admin/users/{userId}/security-audit-events`
 
-- Status: PENDING_REVIEW
+- Status: COMPLETED (project-owner confirmation 2026-10-22; historical checklist retained)
 - Domain / Feature / Service: `iam` / `security-audit-management` / `iam-service`
 - Main Flow: N/A
 - Purpose: list append-only security audit events for one user. The permission is `IAM_SECURITY_AUDIT_READ`, not `IAM_USER_READ` or `DATA_RIGHTS_PROCESS`.
@@ -548,6 +550,8 @@ Field-level contract is in `docs/api/iam/admin.md`.
 - [ ] Checks recorded with PASS/FAIL/NOT RUN
 
 ## 6. Acceptance criteria and test cases
+
+> **Record note (2026-10-22):** The checklists below reflect the historical test evidence available when written (2026-10-19/20). Current completion status is owner-confirmed; unchecked historical items are not silently converted to test PASS without attached evidence.
 
 Shared for every in-scope admin API: JWT required, permission enforced in the Gateway, target id taken from the path, actor taken from the verified token, success envelope `{ statusCode, message, data, meta? }`. Responses omit phone, `googleSub`, password hashes, tokens, cookies, and OTPs. IAM-ADM-09 is the one exception: it returns `initialPassword` once.
 
@@ -695,3 +699,5 @@ Gateway HTTP and live database were not run.
 | 2026-10-20 | FEATURE_RELEASE IAM-ADM-01..11 final review | PASS_WITH_NOTES. 0 critical / 0 high / 0 medium / 3 low. READY_FOR_PR. | Section 6 for IAM-ADM-01..11 is checked. Live acceptance PASS 7/7 is evidence; the skipped suite in full Jest is not a gap. Last-admin revoke/revoke and revoke/disable ran through the services. `verifyAccessToken` and refresh reject LOCKED. Redis crash window and `GetUserById` internal trust boundary are residuals, not blockers. Status stays PENDING_REVIEW. No application edit, commit, or push. |
 | 2026-10-20 | IAM-ADM-12, IAM-ADM-13 | Implemented. PENDING_REVIEW. IAM-ADM-14 stays DEFERRED. | User approved runtime role-permission grants. `GrantRolePermission` and `RevokeRolePermission` added. `jest catalog-admin.service.spec.ts` PASS 3/3, then the spec was deleted per rule 12. `typecheck` PASS. `proto:check` PASS. `eslint` touched role-management and catalog service PASS. Gateway HTTP and live database NOT RUN. |
 | 2026-10-20 | IAM-ADM-14 | Implemented. PENDING_REVIEW. Database grant NOT inserted. | User approved `IAM_SECURITY_AUDIT_READ`. `ListUserSecurityAuditEvents` and `GET /api/v1/admin/users/{userId}/security-audit-events` added. `jest security-audit-admin.service.spec.ts` PASS 2/2, then the spec was deleted per rule 12. `typecheck` PASS. `proto:check` PASS. `eslint` on the touched TypeScript files PASS. Gateway HTTP and live database NOT RUN. `user-postgres` MCP `INSERT` was rejected: read-only transaction. The Supabase project is a different inactive database and was not written. |
+
+| 2026-10-22 | IAM-ADM-01 to IAM-ADM-14 | COMPLETED (owner-confirmed tested and accepted). | Documentation synchronization only; test evidence in historical entries remains unchanged and no new tests were executed by this edit. |
