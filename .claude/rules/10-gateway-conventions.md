@@ -12,7 +12,7 @@ paths:
 - HTTP controller: validate DTO, annotate Swagger/authorization, map to RPC, return public response. No Prisma, Redis session implementation, IAM token signing or domain transaction logic.
 - `@Public()` must be intentional; absence of RBAC metadata does not make a route public. Preserve guard order `JwtAuthGuard -> RolesGuard -> PermissionsGuard` and public exemptions.
 - For sensitive business actions, Gateway RBAC is coarse; the owning service enforces ownership, assignment and state transitions.
-- Read `docs/architecture/api-gateway-structure.md` if present; otherwise consult `docs/ai/context-map.md`. Existing feature shape takes precedence over examples.
+- Read `docs/architecture/api-gateway-structure.md`. Existing feature shape takes precedence over examples.
 
 ## Feature Transport Organization
 

@@ -1,9 +1,9 @@
 ---
-name: commit-messages
-description: MEMORA Conventional Commit message format, scope naming, breaking changes, and safe Git commit behavior. Use when proposing branch names, commits, PRs, or Git operations.
+name: git-workflow
+description: MEMORA Git workflow - branch naming from dev, Conventional Commit messages with domain scopes, pull requests, and safe Git and secret handling. Use when creating a branch, writing a commit message, preparing a PR, or running any Git operation.
 ---
 
-# MEMORA — Commit Message Rules
+# MEMORA — Git workflow (branches, commits, PRs)
 
 ## 1. Required format
 
@@ -141,9 +141,73 @@ Reasons: missing type/scope, vague summary, wrong casing/tense, trailing period,
 ## 8. Safe commit workflow / Claude behavior
 
 - MEMORA currently uses `dev` for development integration and `main` for release; the release CI/CD pipeline runs when `main` is updated.
-- These rules govern commit messages only. Do not infer permission to change branches, run commits, push, merge, or deploy.
+- Following these rules is not permission to change branches, commit, push, merge, or deploy. Do those only when the user asks.
 - Before suggesting a commit, inspect `git status`, current branch, and staged diff; check for unrelated files.
 - Never stage/commit `.env`, credentials, tokens, secrets, private keys, raw biometric data, or production data.
 - Propose a precise commit message based on the REAL staged diff, not on the initial user request or presumed implementation.
 - Do not execute `git add`, `git commit`, `git push`, `git merge`, `git rebase`, or force-push unless expressly authorized by the user.
 - When squash-merging a PR into `dev` or releasing `dev` to `main`, use a Conventional Commit-style squash subject reflecting the actual changes.
+
+# Branches, pull requests and safety
+
+## Branching Model
+- `dev` is the integration branch and `main` is the release branch. Work happens on short-lived task branches cut from `dev`. Pushing to `main` publishes images and deploys to the Mini PC.
+- Branch format: `<type>/<domain>-<feature>`.
+- Allowed branch types: `feat`, `fix`, `refactor`, `test`, `docs`, `ci`, `infra`, `chore`.
+- Use lowercase ASCII kebab-case; no spaces or Vietnamese accents.
+- Name the branch for the **owning business domain**, not for the technical service.
+- For service-wide foundation tasks, the service name is acceptable (for example, `feat/commerce-foundation`).
+- For cross-service features, use the primary owning domain. A single cohesive feature may change multiple apps, libraries, contracts, and migrations in one branch.
+- Do **not** use permanent branches per service or create extra long-lived branches such as `develop` or `release`.
+- Do not directly develop on `main`.
+- Create every new branch from the latest `dev`. Do not use `main` or another task branch as the source unless the user explicitly names a different base.
+
+### Examples
+- `feat/iam-customer-identity`
+- `feat/catalog-ring-templates`
+- `feat/pricing-price-versions`
+- `feat/design-guest-cart`
+- `feat/ordering-create-order`
+- `feat/personalization-fingerprint-capture`
+- `feat/production-work-orders`
+- `feat/memory-digital-card`
+- `feat/commerce-foundation`
+- `fix/iam-refresh-rotation`
+- `refactor/gateway-grpc-client`
+- `test/ordering-payments`
+- `docs/service-architecture`
+- `ci/ghcr-publish`
+- `infra/mini-pc-deploy`
+- `chore/upgrade-nestjs`
+
+## Safe Worktree and Branch Operations
+Before proposing code changes:
+1. Inspect the current repository and branch (`git rev-parse --show-toplevel`, `git branch --show-current`, `git status`).
+2. Inspect existing remote (`git remote -v`) before assuming it is configured.
+3. Propose an appropriate branch name using the rules above.
+4. Only switch branches, create a branch, commit, push, merge, or rebase **when the user explicitly authorizes it**.
+5. Create every new branch from an up-to-date `dev`: `git fetch origin` and `git switch -c <branch> origin/dev`. Do not branch from `main` unless the user explicitly names another base.
+6. Preserve uncommitted changes. Never reset, discard, force-push, or overwrite local commits without explicit authorization.
+7. Never run `git init` or replace `.git` without explicit authorization. A missing `.git` in the current folder is not proof that the GitHub repository does not exist.
+
+## Pull Request Rules
+- Task branches target `dev`. A release PR merges `dev` into `main` after CI on `dev` is green.
+- Use a descriptive title consistent with Conventional Commits where practical.
+- PR description must cover:
+  - Owning domain and relevant Main Flow (`MF01`–`MF06`, when applicable).
+  - User-visible behavior and affected apps/services.
+  - HTTP/gRPC/event-contract changes and compatibility.
+  - Database schema/migration changes, including rollback considerations.
+  - Tests executed, CI results, and operational risks.
+- Require applicable lint, type-check, tests, build, and security checks before merge.
+- Prefer squash merge for short-lived feature branches; delete the feature branch after merge.
+- Do not claim branch protection or mandatory reviews are enforced unless GitHub settings actually confirm it.
+
+## Secrets and Production Safety
+- Never commit `.env`, `.env.*` containing secrets, keys, credentials, tokens, or production configuration values.
+- Commit only sanitized templates such as `.env.example` and `deploy/secrets/*.env.example`.
+- Review `git status` and staged diffs before commit; verify no secrets are staged.
+- Keep production secrets on the Mini PC under its protected secret directory; do not embed them in images or GitHub workflows.
+- Do not run migrations, bootstrap, deploy, rollback, delete Docker volumes, or modify production databases without explicit authorization.
+- Feature branches must not deploy to production.
+- Production images should be traceable to an approved commit SHA and immutable image digest; follow the repository's configured approval and deployment process.

@@ -15,11 +15,11 @@ ADR-001 approves four business services plus the API Gateway. All five applicati
 | --- | --- | --- | --- |
 | `api-gateway` | none | yes | HTTP for implemented IAM features |
 | `iam-service` | `iam` | yes | Implemented. Keep its current `application/`, `presentation/`, and `repositories/` layout. Do not refactor IAM into the new layer tree. |
-| `commerce-service` | `catalog`, `pricing`, `inventory`, `design`, `ordering` | yes | Foundation only. Empty domain modules. No business RPC. |
-| `operations-service` | `personalization`, `production`, `fulfillment`, `after_sales` | yes | Foundation only. Empty domain modules. No business RPC. |
-| `experience-service` | `memory`, `platform` | yes | Foundation only. Empty domain modules. No business RPC. |
+| `commerce-service` | `catalog`, `pricing`, `inventory`, `design`, `ordering` | yes | Infrastructure wired (gRPC host, internal auth guard, PrismaService, Gateway target config). Empty domain modules. No business RPC yet. Use `implement-business-api`. |
+| `operations-service` | `personalization`, `production`, `fulfillment`, `after_sales` | yes | Infrastructure wired (gRPC host, internal auth guard, PrismaService, Gateway target config). Empty domain modules. No business RPC yet. Use `implement-business-api`. |
+| `experience-service` | `memory`, `platform` | yes | Infrastructure wired (gRPC host, internal auth guard, PrismaService, Gateway target config). Empty domain modules. No business RPC yet. Use `implement-business-api`. |
 
-Default production deploy still starts only Gateway and IAM. An empty domain module or a CI image is not a completed business API.
+For an API owned by Commerce, Operations or Experience, follow `implement-business-api` and `docs/architecture/business-service-api-recipe.md`. Default production deploy still starts only Gateway and IAM. An empty domain module or a CI image is not a completed business API.
 
 The Gateway owns public HTTP, validation, Swagger, and the gRPC client call. **Only the owning service implements business rules and writes its database.** No Prisma in the Gateway.
 
@@ -32,7 +32,7 @@ Repository code is the source for current behavior. Approved specs are the sourc
 - A plan file at `docs/plans/active/<feature>.md` is the checklist **when that file exists**. Read its API ID, method, path, domain, owner service, Main Flow, permission, request/response, and acceptance criteria. Update `[x]` only for checks that actually passed.
 - If that file does not exist, implement the API the user named. Do not create a plan file unless asked, and do not block only because the plan file is missing.
 - If neither a named API nor an approved plan identifies the route, request/response, and permission, stop and ask. Do not invent a contract.
-- Read `docs/ai/context-map.md`, `docs/api/<domain>/`, and `docs/architecture/` when those files exist. Do not claim an external sheet was reviewed if it was not opened.
+- Read `docs/api/<domain>/` and `docs/architecture/` when those files exist. Do not claim an external sheet was reviewed if it was not opened.
 
 ## Workflow
 

@@ -4,9 +4,10 @@ NestJS 11 monorepo: 4 microservices (`iam`, `commerce`, `operations`, `experienc
 
 ## Where the guidance lives
 - `.claude/rules/00-memora-core.md` — always-on core rules (scope, security, verification, Vietnamese summaries). Other files in `.claude/rules/` load automatically when you touch matching paths (Gateway, business services, proto/gRPC, IAM auth, Prisma/RBAC, ops/deploy, HTTP contracts, TypeScript quality).
-- `.claude/skills/` — task workflows: `plan-api`, `implement-api`, `review-api`, `create-grpc-rpc`, `prisma-migration-seed`, `auth-change-review`, `debug-and-fix`, `refactor-structure`, `review-and-verify`, `memora-backend-architecture`, `git-branching`, `commit-messages`.
+- `.claude/skills/` — task workflows: `plan-api`, `implement-api`, `review-api`, `create-grpc-rpc`, `prisma-migration-seed`, `auth-change-review`, `debug-and-fix`, `refactor-structure`, `implement-business-api`, `git-workflow`.
 - `.claude/settings.json` — hooks: block reads of credential files (`.env`, keys); advisory architecture-boundary check after edits.
-- Docs: `docs/architecture/`, `docs/ai/context-map.md`.
+- Docs: `docs/architecture/` (start with `memora-backend-4-service.md`). To add an API to Commerce, Operations or Experience, follow `docs/architecture/business-service-api-recipe.md` (skill `implement-business-api`).
+- Database baseline: `db/` (BM04, 74 tables). No foreign keys across services; verify cross-service ids through contracts.
 
 ## Commands
 - `node .claude/scripts/check-boundaries.cjs --all` — architecture boundary scan
@@ -26,4 +27,4 @@ When generating Git commit messages:
 - Do not generate long paragraphs by default; add a short body only for complex changes.
 - Generate messages based on staged changes.
 - Never include credentials or secrets.
-- Full detail (scopes, breaking changes, body rules): skill `commit-messages`.
+- Full detail (scopes, breaking changes, body rules): skill `git-workflow`.

@@ -2,10 +2,8 @@
 description: Creating a new Nest owning service, Prisma/DB, GHCR image and Mini PC deploy.
 paths:
   - "nest-cli.json"
-  - "apps/**/*"
   - "docker/**/*"
   - "deploy/**/*"
-  - "proto/**/*"
   - ".github/workflows/*.yml"
 ---
 
@@ -18,7 +16,7 @@ Ask first if the change would add a Nest app, a new Postgres/Redis instance, a n
 - One Nest application per bounded context (`apps/<name>-service`), not per transport. New business features in Commerce, Operations, and Experience follow `.claude/rules/13-business-service-structure.md`: Domain → Feature → Layer. Do not copy IAM's current folders as the required template. IAM remains the existing identity implementation.
 - Gateway stays HTTP/DTO/Swagger/orchestration. New public REST goes in Gateway; domain writes stay in the owning service. No Prisma in Gateway.
 - Add `nest-cli.json` project, `tsconfig.app.json`, webpack if IAM-style, handwritten contracts in `libs/contracts` plus `proto/` if gRPC. Use `create-grpc-rpc` / `implement-api` skills when those files change.
-- Internal gRPC: verify caller secret from config; never trust client actor IDs. Reuse `IAM_INTERNAL_GRPC_SECRET` pattern or a dedicated shared secret in **both** Gateway and the new service env.
+- Internal gRPC: each service has its own caller secret `<SERVICE>_INTERNAL_GRPC_SECRET`, set to the same value in the Gateway env and the service env. Never trust client actor IDs. Commerce, Operations and Experience already have this wired (see `docs/architecture/business-service-api-recipe.md`).
 
 ## Database
 

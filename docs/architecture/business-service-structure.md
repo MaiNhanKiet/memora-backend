@@ -2,7 +2,7 @@
 
 Target convention for **Commerce**, **Operations**, and **Experience**. IAM already has business code and is not retrofitted by this document. The Catalog example below is a **target layout**, not a description of code that exists today.
 
-Current source for those three services is a foundation: an app module, empty domain modules, health checks, and a service-local PostgreSQL pool. There are no feature folders, business gRPC handlers, or domain policies yet.
+Current source for those three services is a foundation: an app module, empty domain modules, health checks, a service-local PostgreSQL pool, and shared infrastructure (gRPC proto registry, internal caller guard, `PrismaService`, Gateway client helpers). There are no feature folders, business gRPC handlers, or domain policies yet. `business-service-api-recipe.md` lists what is wired and how to add the first API.
 
 ## 1. Shape
 
