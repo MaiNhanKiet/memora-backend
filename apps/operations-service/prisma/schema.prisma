@@ -1,10 +1,11 @@
-// Introspected from database memora. Operations owns these four schemas only.
+// Introspected from database memora (BM04 baseline, db/). Cross-service FKs are omitted here; they exist only in PostgreSQL. Operations owns these four schemas only.
 // Logical IDs such as user_id, order_id and customer_identity_id are not foreign keys to other services.
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../generated/prisma"
-  moduleFormat = "cjs"
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
+  moduleFormat    = "cjs"
 }
 
 datasource db {
@@ -14,7 +15,7 @@ datasource db {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model chain_of_custody_events {
-  id                    String               @id(map: "pk_after_sales_chain_of_custody_events") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   claim_id              String               @db.Uuid
   ring_item_id          String               @db.Uuid
   work_order_id         String?              @db.Uuid
@@ -32,16 +33,16 @@ model chain_of_custody_events {
   received_by_user_id   String?              @db.Uuid
   handoff_at            DateTime             @db.Timestamptz(6)
   created_at            DateTime             @default(now()) @db.Timestamptz(6)
-  claims                claims               @relation(fields: [claim_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_after_sales_chain_of_custody_events_claim_id")
-  production_attempts   production_attempts? @relation(fields: [production_attempt_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_after_sales_chain_of_custody_events_production_attempt_id")
-  work_orders           work_orders?         @relation(fields: [work_order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_after_sales_chain_of_custody_events_work_order_id")
+  claims                claims               @relation(fields: [claim_id], references: [id], onUpdate: Restrict, map: "fk_after_sales_chain_of_custody_events_claim_id")
+  production_attempts   production_attempts? @relation(fields: [production_attempt_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_after_sales_chain_of_custody_events_production_attempt_id")
+  work_orders           work_orders?         @relation(fields: [work_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_after_sales_chain_of_custody_events_work_order_id")
 
   @@schema("after_sales")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model claim_events {
-  id                         String   @id(map: "pk_after_sales_claim_events") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   claim_id                   String   @db.Uuid
   event_type                 String   @db.VarChar(40)
   from_status                String?  @db.VarChar(30)
@@ -53,19 +54,18 @@ model claim_events {
   metadata_json              Json?    @default("{}")
   occurred_at                DateTime @default(now()) @db.Timestamptz(6)
   actor_customer_identity_id String?  @db.Uuid
-  claims                     claims   @relation(fields: [claim_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_after_sales_claim_events_claim_id")
+  claims                     claims   @relation(fields: [claim_id], references: [id], onUpdate: Restrict, map: "fk_after_sales_claim_events_claim_id")
 
   @@schema("after_sales")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model claims {
-  id                              String                    @id(map: "pk_after_sales_claims") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  claim_no                        String                    @unique(map: "uidx_after_sales_claims_claim_no") @db.VarChar(50)
+  id                              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  claim_no                        String                    @unique(map: "after_sales_claims_claim_no_2f99d15_uq") @db.VarChar(50)
   claim_type                      String                    @db.VarChar(25)
-  request_subtype                 String?                   @db.VarChar(50)
-  order_id                        String?                   @db.Uuid
-  ring_item_id                    String?                   @db.Uuid
+  order_id                        String                    @db.Uuid
+  ring_item_id                    String                    @db.Uuid
   requester_customer_identity_id  String                    @db.Uuid
   created_by_user_id              String?                   @db.Uuid
   issue_category                  String?                   @db.VarChar(80)
@@ -86,7 +86,7 @@ model claims {
   created_by_customer_identity_id String?                   @db.Uuid
   chain_of_custody_events         chain_of_custody_events[]
   claim_events                    claim_events[]
-  maintenance_plans               maintenance_plans?        @relation(fields: [maintenance_plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_after_sales_claims_maintenance_plan_id")
+  maintenance_plans               maintenance_plans?        @relation(fields: [maintenance_plan_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_after_sales_claims_maintenance_plan_id")
   deliveries                      deliveries[]
   handover_records                handover_records[]
   handover_sessions               handover_sessions[]
@@ -99,7 +99,7 @@ model claims {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model maintenance_plans {
-  id                      String    @id(map: "pk_after_sales_maintenance_plans") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ring_item_id            String    @db.Uuid
   plan_code               String    @db.VarChar(60)
   plan_name               String    @db.VarChar(150)
@@ -117,7 +117,7 @@ model maintenance_plans {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model deliveries {
-  id                         String             @id(map: "pk_fulfillment_deliveries") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_id                   String             @db.Uuid
   claim_id                   String?            @db.Uuid
   attempt_no                 Int                @default(1) @db.SmallInt
@@ -146,43 +146,46 @@ model deliveries {
   handover_record_id         String?            @db.Uuid
   created_at                 DateTime           @default(now()) @db.Timestamptz(6)
   updated_at                 DateTime           @default(now()) @db.Timestamptz(6)
-  claims                     claims?            @relation(fields: [claim_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fulfillment_deliveries_claim_id")
-  handover_records           handover_records?  @relation(fields: [handover_record_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fulfillment_deliveries_handover_record_id")
-  handover_sessions          handover_sessions? @relation(fields: [handover_session_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fulfillment_deliveries_handover_session_id")
-  deliveries                 deliveries?        @relation("deliveriesTodeliveries", fields: [parent_delivery_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fulfillment_deliveries_parent_delivery_id")
+  claims                     claims?            @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_deliveries_claim_id")
+  handover_records           handover_records?  @relation(fields: [handover_record_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_deliveries_handover_record_id")
+  handover_sessions          handover_sessions? @relation(fields: [handover_session_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_deliveries_handover_session_id")
+  deliveries                 deliveries?        @relation("deliveriesTodeliveries", fields: [parent_delivery_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_deliveries_parent_delivery_id")
   other_deliveries           deliveries[]       @relation("deliveriesTodeliveries")
 
+  @@unique([claim_id, attempt_no], map: "fulfillment_deliveries_claim_id_attempt_no_f199aa5_uq", where: raw("(claim_id IS NOT NULL)"))
+  @@unique([order_id, attempt_no], map: "fulfillment_deliveries_order_id_attempt_no_8ada59f_uq", where: raw("(claim_id IS NULL)"))
   @@schema("fulfillment")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model handover_records {
-  id                     String            @id(map: "pk_fulfillment_handover_records") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  handover_session_id    String            @unique(map: "uidx_fulfillment_handover_records_handover_session_id") @db.Uuid
-  order_id               String            @db.Uuid
-  claim_id               String?           @db.Uuid
-  ring_item_id           String?           @db.Uuid
-  handover_scope         String            @default("ORDER") @db.VarChar(15)
-  handover_type          String            @db.VarChar(25)
-  verification_method    String            @db.VarChar(25)
-  verification_reference String?           @db.VarChar(150)
-  recipient_reference    String?           @db.VarChar(150)
-  handover_actor_user_id String            @db.Uuid
-  evidence_asset_id      String?           @db.Uuid
-  location_code          String?           @db.VarChar(120)
-  record_hash            String            @db.VarChar(128)
-  completed_at           DateTime          @db.Timestamptz(6)
-  created_at             DateTime          @default(now()) @db.Timestamptz(6)
-  deliveries             deliveries[]
-  claims                 claims?           @relation(fields: [claim_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fulfillment_handover_records_claim_id")
-  handover_sessions      handover_sessions @relation(fields: [handover_session_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fulfillment_handover_records_handover_session_id")
+  id                              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  handover_session_id             String            @unique(map: "fulfillment_handover_records_handover_session_id_8c4593c_uq") @db.Uuid
+  order_id                        String            @db.Uuid
+  claim_id                        String?           @db.Uuid
+  ring_item_id                    String?           @db.Uuid
+  handed_over_items_snapshot_json Json?
+  handover_scope                  String            @default("ORDER") @db.VarChar(15)
+  handover_type                   String            @db.VarChar(25)
+  verification_method             String            @db.VarChar(25)
+  verification_reference          String?           @db.VarChar(150)
+  recipient_reference             String?           @db.VarChar(150)
+  handover_actor_user_id          String            @db.Uuid
+  evidence_asset_id               String?           @db.Uuid
+  location_code                   String?           @db.VarChar(120)
+  record_hash                     String            @db.VarChar(128)
+  completed_at                    DateTime          @db.Timestamptz(6)
+  created_at                      DateTime          @default(now()) @db.Timestamptz(6)
+  deliveries                      deliveries[]
+  claims                          claims?           @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_handover_records_claim_id")
+  handover_sessions               handover_sessions @relation(fields: [handover_session_id], references: [id], onUpdate: Restrict, map: "fk_fulfillment_handover_records_handover_session_id")
 
   @@schema("fulfillment")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model handover_sessions {
-  id                           String            @id(map: "pk_fulfillment_handover_sessions") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_id                     String            @db.Uuid
   claim_id                     String?           @db.Uuid
   handover_type                String            @db.VarChar(25)
@@ -190,7 +193,7 @@ model handover_sessions {
   recipient_email              String?           @db.Citext
   recipient_phone              String?           @db.VarChar(30)
   token_hash                   String            @db.VarChar(128)
-  qr_nonce                     String            @unique(map: "uidx_fulfillment_handover_sessions_qr_nonce") @db.VarChar(120)
+  qr_nonce                     String            @unique(map: "fulfillment_handover_sessions_qr_nonce_72892fe_uq") @db.VarChar(120)
   status                       String            @default("CREATED") @db.VarChar(20)
   expires_at                   DateTime          @db.Timestamptz(6)
   verified_via                 String?           @db.VarChar(25)
@@ -201,15 +204,15 @@ model handover_sessions {
   created_at                   DateTime          @default(now()) @db.Timestamptz(6)
   deliveries                   deliveries[]
   handover_records             handover_records?
-  claims                       claims?           @relation(fields: [claim_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fulfillment_handover_sessions_claim_id")
+  claims                       claims?           @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_handover_sessions_claim_id")
 
   @@schema("fulfillment")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model capture_attempts {
-  id                         String           @id(map: "pk_personalization_capture_attempts") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  capture_session_id         String           @db.Uuid
+  id                         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  capture_session_id         String           @unique(map: "personalization_capture_attempts_capture_session_id__3798e77c", where: raw("((result)::text = 'ACCEPTED'::text)")) @db.Uuid
   attempt_no                 Int              @db.SmallInt
   quality_score              Decimal?         @db.Decimal(10, 3)
   quality_threshold_snapshot Decimal?         @db.Decimal(10, 3)
@@ -217,38 +220,38 @@ model capture_attempts {
   failure_reason             String?          @db.VarChar(100)
   metadata_json              Json?            @default("{}")
   attempted_at               DateTime         @default(now()) @db.Timestamptz(6)
-  capture_sessions           capture_sessions @relation(fields: [capture_session_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personalization_capture_attempts_capture_session_id")
+  capture_sessions           capture_sessions @relation(fields: [capture_session_id], references: [id], onUpdate: Restrict, map: "fk_personalization_capture_attempts_capture_session_id")
 
-  @@unique([capture_session_id, attempt_no], map: "uidx_personalization_capture_attempts_capture_sess_df3d175f36")
+  @@unique([capture_session_id, attempt_no], map: "personalization_capture_attempts_capture_session_id__00d71a5e")
   @@schema("personalization")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model capture_sessions {
-  id                      String                   @id(map: "pk_personalization_capture_sessions") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_id                String                   @db.Uuid
   consent_id              String                   @db.Uuid
   source_plan_mode        String                   @db.VarChar(15)
   device_code             String?                  @db.VarChar(80)
   staff_user_id           String                   @db.Uuid
   status                  String                   @default("CREATED") @db.VarChar(25)
-  accepted_source_id      String?                  @db.Uuid
+  accepted_source_id      String?                  @unique(map: "personalization_capture_sessions_accepted_source_id__539c5a6e") @db.Uuid
   started_at              DateTime?                @db.Timestamptz(6)
   ended_at                DateTime?                @db.Timestamptz(6)
   failure_reason          String?
   created_at              DateTime                 @default(now()) @db.Timestamptz(6)
-  capture_attempts        capture_attempts[]
-  personalization_sources personalization_sources? @relation(fields: [accepted_source_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personalization_capture_sessions_accepted_source_id")
-  consents                consents                 @relation(fields: [consent_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personalization_capture_sessions_consent_id")
+  capture_attempts        capture_attempts?
+  personalization_sources personalization_sources? @relation(fields: [accepted_source_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_personalization_capture_sessions_accepted_source_id")
+  consents                consents                 @relation(fields: [consent_id], references: [id], onUpdate: Restrict, map: "fk_personalization_capture_sessions_consent_id")
 
   @@schema("personalization")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model change_requests {
-  id                                String    @id(map: "pk_personalization_change_requests") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_id                          String    @db.Uuid
-  ring_item_id                      String    @db.Uuid
+  ring_item_id                      String    @unique(map: "personalization_change_requests_ring_item_id_78559ac_uq", where: raw("((status)::text = 'SUBMITTED'::text)")) @db.Uuid
   from_version_id                   String    @db.Uuid
   requested_by_customer_identity_id String    @db.Uuid
   requested_changes_json            Json      @default("{}")
@@ -265,19 +268,19 @@ model change_requests {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model consent_ring_items {
-  id           String   @id(map: "pk_personalization_consent_ring_items") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   consent_id   String   @db.Uuid
   ring_item_id String   @db.Uuid
   created_at   DateTime @default(now()) @db.Timestamptz(6)
-  consents     consents @relation(fields: [consent_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personalization_consent_ring_items_consent_id")
+  consents     consents @relation(fields: [consent_id], references: [id], onUpdate: Restrict, map: "fk_personalization_consent_ring_items_consent_id")
 
-  @@unique([consent_id, ring_item_id], map: "uidx_personalization_consent_ring_items_consent_id_ring_item_id")
+  @@unique([consent_id, ring_item_id], map: "personalization_consent_ring_items_consent_id_ring_i_a805b4ff")
   @@schema("personalization")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model consents {
-  id                        String                   @id(map: "pk_personalization_consents") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                        String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   customer_identity_id      String                   @db.Uuid
   order_id                  String?                  @db.Uuid
   personalization_source_id String?                  @db.Uuid
@@ -291,14 +294,14 @@ model consents {
   created_at                DateTime                 @default(now()) @db.Timestamptz(6)
   capture_sessions          capture_sessions[]
   consent_ring_items        consent_ring_items[]
-  personalization_sources   personalization_sources? @relation(fields: [personalization_source_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personalization_consents_personalization_source_id")
+  personalization_sources   personalization_sources? @relation(fields: [personalization_source_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_personalization_consents_personalization_source_id")
 
   @@schema("personalization")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model design_reviews {
-  id                         String   @id(map: "pk_personalization_design_reviews") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ring_item_version_id       String   @db.Uuid
   review_type                String   @db.VarChar(30)
   actor_user_id              String?  @db.Uuid
@@ -314,8 +317,8 @@ model design_reviews {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model personalization_placements {
-  id                              String                  @id(map: "pk_personalization_personalization_placements") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ring_item_version_id            String                  @unique(map: "uidx_personalization_personalization_placements_ri_d62d9d221d") @db.Uuid
+  id                              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ring_item_version_id            String                  @unique(map: "personalization_personalization_placements_ring_item_df2a87d1") @db.Uuid
   personalization_source_id       String                  @db.Uuid
   center_angle_deg                Decimal                 @db.Decimal(8, 3)
   axial_offset_mm                 Decimal                 @db.Decimal(8, 3)
@@ -330,14 +333,14 @@ model personalization_placements {
   created_by_user_id              String?                 @db.Uuid
   created_at                      DateTime                @default(now()) @db.Timestamptz(6)
   created_by_customer_identity_id String?                 @db.Uuid
-  personalization_sources         personalization_sources @relation(fields: [personalization_source_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personalization_personalization_placements_pers_38e0390f92")
+  personalization_sources         personalization_sources @relation(fields: [personalization_source_id], references: [id], onUpdate: Restrict, map: "fk_personalization_personalization_placements_pers_38e0390f92")
 
   @@schema("personalization")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model personalization_sources {
-  id                              String                       @id(map: "pk_personalization_personalization_sources") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                              String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   owner_customer_identity_id      String                       @db.Uuid
   source_type                     String                       @db.VarChar(20)
   status                          String                       @default("PENDING") @db.VarChar(25)
@@ -353,7 +356,7 @@ model personalization_sources {
   deleted_at                      DateTime?                    @db.Timestamptz(6)
   delete_reason                   String?
   created_at                      DateTime                     @default(now()) @db.Timestamptz(6)
-  capture_sessions                capture_sessions[]
+  capture_sessions                capture_sessions?
   consents                        consents[]
   personalization_placements      personalization_placements[]
   source_bindings                 source_bindings[]
@@ -363,36 +366,36 @@ model personalization_sources {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model source_bindings {
-  id                        String                  @id(map: "pk_personalization_source_bindings") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                        String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_id                  String                  @db.Uuid
-  ring_item_id              String                  @db.Uuid
+  ring_item_id              String                  @unique(map: "personalization_source_bindings_ring_item_id_f370ef8_uq", where: raw("(released_at IS NULL)")) @db.Uuid
   personalization_source_id String                  @db.Uuid
   binding_mode              String                  @db.VarChar(15)
   bound_at                  DateTime                @default(now()) @db.Timestamptz(6)
   released_at               DateTime?               @db.Timestamptz(6)
-  personalization_sources   personalization_sources @relation(fields: [personalization_source_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personalization_source_bindings_personalization_source_id")
+  personalization_sources   personalization_sources @relation(fields: [personalization_source_id], references: [id], onUpdate: Restrict, map: "fk_personalization_source_bindings_personalization_source_id")
 
   @@schema("personalization")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model design_lock_items {
-  id                   String       @id(map: "pk_production_design_lock_items") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   design_lock_id       String       @db.Uuid
   ring_item_id         String       @db.Uuid
   ring_item_version_id String       @db.Uuid
   item_hash            String       @db.VarChar(128)
   created_at           DateTime     @default(now()) @db.Timestamptz(6)
-  design_locks         design_locks @relation(fields: [design_lock_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_design_lock_items_design_lock_id")
+  design_locks         design_locks @relation(fields: [design_lock_id], references: [id], onUpdate: Restrict, map: "fk_production_design_lock_items_design_lock_id")
 
-  @@unique([design_lock_id, ring_item_id], map: "uidx_production_design_lock_items_design_lock_id_ring_item_id")
+  @@unique([design_lock_id, ring_item_id], map: "production_design_lock_items_design_lock_id_ring_ite_0547535e")
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model design_locks {
-  id                    String                @id(map: "pk_production_design_locks") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  order_id              String                @db.Uuid
+  id                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id              String                @unique(map: "production_design_locks_order_id_65ffebe_uq", where: raw("((status)::text = 'ACTIVE'::text)")) @db.Uuid
   final_confirmation_id String                @db.Uuid
   lock_version          Int                   @default(1)
   lock_hash             String                @db.VarChar(128)
@@ -403,13 +406,13 @@ model design_locks {
   design_lock_items     design_lock_items[]
   production_packages   production_packages[]
 
-  @@unique([order_id, lock_version], map: "uidx_production_design_locks_order_id_lock_version")
+  @@unique([order_id, lock_version], map: "production_design_locks_order_id_lock_version_0f2de67_uq")
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model jeweler_skills {
-  id                  String    @id(map: "pk_production_jeweler_skills") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   jeweler_user_id     String    @db.Uuid
   skill_code          String    @db.VarChar(60)
   level               Int       @db.SmallInt
@@ -421,13 +424,13 @@ model jeweler_skills {
   created_at          DateTime  @default(now()) @db.Timestamptz(6)
   updated_at          DateTime  @default(now()) @db.Timestamptz(6)
 
-  @@unique([jeweler_user_id, skill_code], map: "uidx_production_jeweler_skills_jeweler_user_id_skill_code")
+  @@unique([jeweler_user_id, skill_code], map: "production_jeweler_skills_jeweler_user_id_skill_code_53c875a2")
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model laser_executions {
-  id                         String                 @id(map: "pk_production_laser_executions") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   work_order_step_id         String                 @db.Uuid
   ring_item_id               String                 @db.Uuid
   production_package_id      String                 @db.Uuid
@@ -446,16 +449,16 @@ model laser_executions {
   error_note                 String?
   execution_metadata_json    Json?                  @default("{}")
   created_at                 DateTime               @default(now()) @db.Timestamptz(6)
-  laser_process_profiles     laser_process_profiles @relation(fields: [laser_process_profile_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_laser_executions_laser_process_profile_id")
-  production_packages        production_packages    @relation(fields: [production_package_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_laser_executions_production_package_id")
-  work_order_steps           work_order_steps       @relation(fields: [work_order_step_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_laser_executions_work_order_step_id")
+  laser_process_profiles     laser_process_profiles @relation(fields: [laser_process_profile_id], references: [id], onUpdate: Restrict, map: "fk_production_laser_executions_laser_process_profile_id")
+  production_packages        production_packages    @relation(fields: [production_package_id], references: [id], onUpdate: Restrict, map: "fk_production_laser_executions_production_package_id")
+  work_order_steps           work_order_steps       @relation(fields: [work_order_step_id], references: [id], onUpdate: Restrict, map: "fk_production_laser_executions_work_order_step_id")
 
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model laser_process_profiles {
-  id                   String                @id(map: "pk_production_laser_process_profiles") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code                 String                @db.VarChar(80)
   material_id          String                @db.Uuid
   machine_code         String?               @db.VarChar(80)
@@ -480,13 +483,13 @@ model laser_process_profiles {
   laser_executions     laser_executions[]
   production_packages  production_packages[]
 
-  @@unique([code, version_no], map: "uidx_production_laser_process_profiles_code_version_no")
+  @@unique([code, version_no], map: "production_laser_process_profiles_code_version_no_70_d8dd74f5")
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model production_attempts {
-  id                        String                    @id(map: "pk_production_production_attempts") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                        String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ring_item_id              String                    @db.Uuid
   claim_id                  String?                   @db.Uuid
   parent_attempt_id         String?                   @db.Uuid
@@ -499,20 +502,20 @@ model production_attempts {
   completed_at              DateTime?                 @db.Timestamptz(6)
   created_at                DateTime                  @default(now()) @db.Timestamptz(6)
   chain_of_custody_events   chain_of_custody_events[]
-  claims                    claims?                   @relation(fields: [claim_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_production_attempts_claim_id")
-  production_attempts       production_attempts?      @relation("production_attemptsToproduction_attempts", fields: [parent_attempt_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_production_attempts_parent_attempt_id")
+  claims                    claims?                   @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_attempts_claim_id")
+  production_attempts       production_attempts?      @relation("production_attemptsToproduction_attempts", fields: [parent_attempt_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_attempts_parent_attempt_id")
   other_production_attempts production_attempts[]     @relation("production_attemptsToproduction_attempts")
   production_exceptions     production_exceptions[]
   qc_results                qc_results[]
   work_orders               work_orders[]
 
-  @@unique([ring_item_id, attempt_no], map: "uidx_production_production_attempts_ring_item_id_attempt_no")
+  @@unique([ring_item_id, attempt_no], map: "production_production_attempts_ring_item_id_attempt__2c29531e")
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model production_exceptions {
-  id                    String              @id(map: "pk_production_production_exceptions") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   work_order_id         String              @db.Uuid
   work_order_step_id    String?             @db.Uuid
   production_attempt_id String              @db.Uuid
@@ -525,17 +528,17 @@ model production_exceptions {
   resolution_note       String?
   resolved_at           DateTime?           @db.Timestamptz(6)
   created_at            DateTime            @default(now()) @db.Timestamptz(6)
-  production_attempts   production_attempts @relation(fields: [production_attempt_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_production_exceptions_production_attempt_id")
-  work_orders           work_orders         @relation(fields: [work_order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_production_exceptions_work_order_id")
-  work_order_steps      work_order_steps?   @relation(fields: [work_order_step_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_production_exceptions_work_order_step_id")
+  production_attempts   production_attempts @relation(fields: [production_attempt_id], references: [id], onUpdate: Restrict, map: "fk_production_production_exceptions_production_attempt_id")
+  work_orders           work_orders         @relation(fields: [work_order_id], references: [id], onUpdate: Restrict, map: "fk_production_production_exceptions_work_order_id")
+  work_order_steps      work_order_steps?   @relation(fields: [work_order_step_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_exceptions_work_order_step_id")
 
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model production_packages {
-  id                          String                  @id(map: "pk_production_production_packages") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  package_no                  String                  @db.VarChar(50)
+  id                          String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  package_no                  String                  @unique(map: "production_production_packages_package_no_bea8924_uq") @db.VarChar(50)
   ring_item_id                String                  @db.Uuid
   design_lock_id              String                  @db.Uuid
   ring_item_version_id        String                  @db.Uuid
@@ -550,67 +553,47 @@ model production_packages {
   status                      String                  @default("CURRENT") @db.VarChar(20)
   laser_svg_asset_key         String?
   laser_dxf_asset_key         String?
-  placement_snapshot_json     Json
-  mapping_version             String                  @db.VarChar(50)
+  placement_snapshot_json     Json?
+  mapping_version             String?                 @db.VarChar(50)
   file_checksum               String                  @db.VarChar(128)
   generated_by_user_id        String?                 @db.Uuid
   generated_at                DateTime                @default(now()) @db.Timestamptz(6)
   supersedes_package_id       String?                 @db.Uuid
   created_at                  DateTime                @default(now()) @db.Timestamptz(6)
   laser_executions            laser_executions[]
-  design_locks                design_locks            @relation(fields: [design_lock_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_production_packages_design_lock_id")
-  laser_process_profiles      laser_process_profiles? @relation(fields: [laser_process_profile_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_production_packages_laser_process_profile_id")
-  production_packages         production_packages?    @relation("production_packagesToproduction_packages", fields: [supersedes_package_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_production_packages_supersedes_package_id")
+  design_locks                design_locks            @relation(fields: [design_lock_id], references: [id], onUpdate: Restrict, map: "fk_production_production_packages_design_lock_id")
+  laser_process_profiles      laser_process_profiles? @relation(fields: [laser_process_profile_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_packages_laser_process_profile_id")
+  production_packages         production_packages?    @relation("production_packagesToproduction_packages", fields: [supersedes_package_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_packages_supersedes_package_id")
   other_production_packages   production_packages[]   @relation("production_packagesToproduction_packages")
   work_orders                 work_orders[]
 
-  @@unique([design_lock_id, ring_item_id, package_version], map: "uidx_production_production_packages_design_lock_id_4ad69459d8")
-  @@schema("production")
-}
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-model production_route_steps {
-  id                       String             @id(map: "pk_production_production_route_steps") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  production_route_id      String             @db.Uuid
-  step_code                String             @db.VarChar(60)
-  step_name                String             @db.VarChar(150)
-  sequence_no              Int                @db.SmallInt
-  is_required              Boolean            @default(true)
-  condition_json           Json?              @default("{}")
-  required_skills_json     Json?              @default("[]")
-  required_permission_code String?            @db.VarChar(80)
-  work_instruction         String?
-  created_at               DateTime           @default(now()) @db.Timestamptz(6)
-  production_routes        production_routes  @relation(fields: [production_route_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_production_route_steps_production_route_id")
-  work_order_steps         work_order_steps[]
-
-  @@unique([production_route_id, sequence_no], map: "uidx_production_production_route_steps_production__8a7fdac79d")
+  @@unique([design_lock_id, ring_item_id, package_version], map: "production_production_packages_design_lock_id_ring_i_d8d08399")
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model production_routes {
-  id                     String                   @id(map: "pk_production_production_routes") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ring_template_id       String                   @db.Uuid
-  route_code             String                   @db.VarChar(60)
-  name                   String                   @db.VarChar(150)
-  version_no             Int                      @default(1)
-  status                 String                   @default("DRAFT") @db.VarChar(20)
-  effective_from         DateTime?                @db.Timestamptz(6)
-  effective_to           DateTime?                @db.Timestamptz(6)
-  created_by_user_id     String?                  @db.Uuid
-  approved_by_user_id    String?                  @db.Uuid
-  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
-  production_route_steps production_route_steps[]
-  work_orders            work_orders[]
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ring_template_id    String        @db.Uuid
+  route_code          String        @db.VarChar(60)
+  steps_json          Json          @default("[]")
+  name                String        @db.VarChar(150)
+  version_no          Int           @default(1)
+  status              String        @default("DRAFT") @db.VarChar(20)
+  effective_from      DateTime?     @db.Timestamptz(6)
+  effective_to        DateTime?     @db.Timestamptz(6)
+  created_by_user_id  String?       @db.Uuid
+  approved_by_user_id String?       @db.Uuid
+  created_at          DateTime      @default(now()) @db.Timestamptz(6)
+  work_orders         work_orders[]
 
-  @@unique([ring_template_id, version_no], map: "uidx_production_production_routes_ring_template_id_version_no")
+  @@unique([ring_template_id, version_no], map: "production_production_routes_ring_template_id_versio_f084fe6c")
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model qc_results {
-  id                    String              @id(map: "pk_production_qc_results") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ring_item_id          String              @db.Uuid
   production_attempt_id String              @db.Uuid
   work_order_id         String?             @db.Uuid
@@ -623,16 +606,16 @@ model qc_results {
   notes                 String?
   inspected_at          DateTime            @default(now()) @db.Timestamptz(6)
   created_at            DateTime            @default(now()) @db.Timestamptz(6)
-  claims                claims?             @relation(fields: [claim_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_qc_results_claim_id")
-  production_attempts   production_attempts @relation(fields: [production_attempt_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_qc_results_production_attempt_id")
-  work_orders           work_orders?        @relation(fields: [work_order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_qc_results_work_order_id")
+  claims                claims?             @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_qc_results_claim_id")
+  production_attempts   production_attempts @relation(fields: [production_attempt_id], references: [id], onUpdate: Restrict, map: "fk_production_qc_results_production_attempt_id")
+  work_orders           work_orders?        @relation(fields: [work_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_qc_results_work_order_id")
 
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model work_order_assignments {
-  id                           String      @id(map: "pk_production_work_order_assignments") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   work_order_id                String      @db.Uuid
   jeweler_user_id              String      @db.Uuid
   assigned_by_user_id          String      @db.Uuid
@@ -644,16 +627,17 @@ model work_order_assignments {
   jeweler_skill_snapshot_json  Json        @default("[]")
   status                       String      @default("ACTIVE") @db.VarChar(20)
   created_at                   DateTime    @default(now()) @db.Timestamptz(6)
-  work_orders                  work_orders @relation(fields: [work_order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_work_order_assignments_work_order_id")
+  work_orders                  work_orders @relation(fields: [work_order_id], references: [id], onUpdate: Restrict, map: "fk_production_work_order_assignments_work_order_id")
 
+  @@unique([work_order_id, jeweler_user_id], map: "production_work_order_assignments_work_order_id_jewe_550fb12e", where: raw("((status)::text = 'ACTIVE'::text)"))
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model work_order_steps {
-  id                            String                  @id(map: "pk_production_work_order_steps") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                            String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   work_order_id                 String                  @db.Uuid
-  production_route_step_id      String?                 @db.Uuid
+  step_snapshot_json            Json
   sequence_no                   Int                     @db.SmallInt
   step_code                     String                  @db.VarChar(60)
   step_name                     String                  @db.VarChar(150)
@@ -669,17 +653,16 @@ model work_order_steps {
   created_at                    DateTime                @default(now()) @db.Timestamptz(6)
   laser_executions              laser_executions[]
   production_exceptions         production_exceptions[]
-  production_route_steps        production_route_steps? @relation(fields: [production_route_step_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_work_order_steps_production_route_step_id")
-  work_orders                   work_orders             @relation(fields: [work_order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_work_order_steps_work_order_id")
+  work_orders                   work_orders             @relation(fields: [work_order_id], references: [id], onUpdate: Restrict, map: "fk_production_work_order_steps_work_order_id")
 
-  @@unique([work_order_id, sequence_no], map: "uidx_production_work_order_steps_work_order_id_sequence_no")
+  @@unique([work_order_id, sequence_no], map: "production_work_order_steps_work_order_id_sequence_n_f54ecc72")
   @@schema("production")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model work_orders {
-  id                      String                    @id(map: "pk_production_work_orders") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  work_order_no           String                    @unique(map: "uidx_production_work_orders_work_order_no") @db.VarChar(50)
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  work_order_no           String                    @unique(map: "production_work_orders_work_order_no_5976099_uq") @db.VarChar(50)
   order_id                String                    @db.Uuid
   ring_item_id            String                    @db.Uuid
   claim_id                String?                   @db.Uuid
@@ -699,12 +682,10 @@ model work_orders {
   qc_results              qc_results[]
   work_order_assignments  work_order_assignments[]
   work_order_steps        work_order_steps[]
-  claims                  claims?                   @relation(fields: [claim_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_work_orders_claim_id")
-  production_attempts     production_attempts       @relation(fields: [production_attempt_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_work_orders_production_attempt_id")
-  production_packages     production_packages?      @relation(fields: [production_package_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_work_orders_production_package_id")
-  production_routes       production_routes         @relation(fields: [production_route_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_production_work_orders_production_route_id")
+  claims                  claims?                   @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_work_orders_claim_id")
+  production_attempts     production_attempts       @relation(fields: [production_attempt_id], references: [id], onUpdate: Restrict, map: "fk_production_work_orders_production_attempt_id")
+  production_packages     production_packages?      @relation(fields: [production_package_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_work_orders_production_package_id")
+  production_routes       production_routes         @relation(fields: [production_route_id], references: [id], onUpdate: Restrict, map: "fk_production_work_orders_production_route_id")
 
   @@schema("production")
 }
-
-
