@@ -4,7 +4,7 @@
 
 ## Phạm vi
 
-- 12 PostgreSQL schemas, 74 tables, 960 columns và 225 foreign keys.
+- 12 PostgreSQL schemas, 74 tables, 960 columns và 225 foreign keys trong baseline. Sau khi chạy `MEMORA_BM04_Drop_Cross_Service_FKs.sql` còn 106 FK (đã bỏ 119 FK xuyên service).
 - Mỗi bảng có `id UUID PRIMARY KEY`; cột `nullable`/`default` lấy từ `FIELDS`.
 - FK lấy từ `RELATION_RULES`; những FK có chu trình được tạo bằng `ALTER TABLE` sau toàn bộ `CREATE TABLE`.
 - Tạo các `CHECK` tường minh, `UNIQUE` một cột, unique kết hợp/partial index có thể biểu diễn an toàn.
@@ -18,8 +18,11 @@
 # Tạo database dev/staging riêng; KHÔNG chạy trực tiếp trên dữ liệu production.
 createdb memora_bm04_dev
 psql -X -v ON_ERROR_STOP=1 -d memora_bm04_dev -f MEMORA_BM04_PostgreSQL_74_tables.sql
+psql -X -v ON_ERROR_STOP=1 -d memora_bm04_dev -f MEMORA_BM04_Drop_Cross_Service_FKs.sql
 psql -X -v ON_ERROR_STOP=1 -d memora_bm04_dev -f MEMORA_BM04_Verify_Schema.sql
 ```
+
+`MEMORA_BM04_Drop_Cross_Service_FKs.sql` giữ FK trong cùng một service và bỏ FK trỏ sang service khác (iam / commerce / operations / experience). Việc id có tồn tại hay không giữa các service do code kiểm tra qua contract, không do PostgreSQL. Script idempotent và chỉ đổi metadata. `MEMORA_BM04_Verify_Schema.sql` chỉ đạt khi chạy **sau** script này; chạy ngay sau DDL gốc nó báo 225 FK.
 
 **Lưu ý:** `BEGIN`/`COMMIT` được bao ngoài DDL. `CREATE EXTENSION` cần quyền tương ứng. File là **baseline đề xuất**, chưa phải migration/backfill cho database hiện có.
 
@@ -106,7 +109,7 @@ Các ô ghi `CHECK` chung chung, “typed-scope CHECK” hoặc mô tả của B
 ## Đối chiếu
 
 - `CREATE TABLE`: 74.
-- `FOREIGN KEY`: 225.
+- `FOREIGN KEY`: 225 trong baseline, 106 sau khi bỏ FK xuyên service.
 - `CREATE UNIQUE INDEX`: 71.
 - `CHECK`: 156.
 
