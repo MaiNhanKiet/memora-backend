@@ -40,6 +40,11 @@ export class OperationsDatabaseService implements OnModuleDestroy {
     });
   }
 
+  /** Shared pool for PrismaService. Owned and closed by this service. */
+  getPool(): Pool {
+    return this.pool;
+  }
+
   async onModuleDestroy(): Promise<void> {
     await this.pool.end();
     this.logger.log('Operations PostgreSQL pool closed');

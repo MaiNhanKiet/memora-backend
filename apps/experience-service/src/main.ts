@@ -5,6 +5,7 @@ import { GrpcExceptionFilter } from '@app/common';
 import { loadExperienceRuntimeConfig } from '@app/config';
 import { createMemoraLogger } from '@app/logger';
 import { join } from 'node:path';
+import { EXPERIENCE_GRPC_PROTOS } from './grpc/experience-grpc.registry';
 import { ExperienceServiceModule } from './experience-service.module';
 import { startHealthHttpServer } from './health/http-health.server';
 import { ExperienceReadinessService } from './health/readiness.service';
@@ -24,8 +25,10 @@ async function bootstrap() {
       transport: Transport.GRPC,
       options: {
         url: grpcUrl,
-        package: ['grpc.health.v1'],
-        protoPath: [join(process.cwd(), 'proto/grpc/health/v1/health.proto')],
+        package: EXPERIENCE_GRPC_PROTOS.map((proto) => proto.package),
+        protoPath: EXPERIENCE_GRPC_PROTOS.map((proto) =>
+          join(process.cwd(), 'proto', proto.file),
+        ),
         loader: {
           includeDirs: [join(process.cwd(), 'proto')],
           longs: String,

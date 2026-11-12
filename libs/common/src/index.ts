@@ -9,4 +9,5 @@ export * from './exceptions/grpc-error.mapper';
 export * from './pipes/validation.pipe';
 export * from './filters/http-exception.filter';
 export * from './filters/grpc-exception.filter';
+export * from './guards/internal-grpc-auth.guard';
 export * from './utils/pagination';

@@ -7,6 +7,7 @@ import { createMemoraLogger } from '@app/logger';
 import { join } from 'node:path';
 import { startHealthHttpServer } from './health/http-health.server';
 import { OperationsReadinessService } from './health/readiness.service';
+import { OPERATIONS_GRPC_PROTOS } from './grpc/operations-grpc.registry';
 import { OperationsServiceModule } from './operations-service.module';
 
 async function bootstrap() {
@@ -24,8 +25,10 @@ async function bootstrap() {
       transport: Transport.GRPC,
       options: {
         url: grpcUrl,
-        package: ['grpc.health.v1'],
-        protoPath: [join(process.cwd(), 'proto/grpc/health/v1/health.proto')],
+        package: OPERATIONS_GRPC_PROTOS.map((proto) => proto.package),
+        protoPath: OPERATIONS_GRPC_PROTOS.map((proto) =>
+          join(process.cwd(), 'proto', proto.file),
+        ),
         loader: {
           includeDirs: [join(process.cwd(), 'proto')],
           longs: String,

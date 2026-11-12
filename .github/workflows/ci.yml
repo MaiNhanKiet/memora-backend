@@ -206,11 +206,13 @@ jobs:
             local database_var="$3"
             local health_var="$4"
             local port="$5"
+            local secret_var="$6"
             local cid running live_code ready_code other_code ready_body ports
             cid="$(docker run -d --name "$name" \
               -e NODE_ENV=production \
               -e "${health_var}=0.0.0.0" \
               -e "${database_var}=postgresql://service_smoke:unused@127.0.0.1:1/memora" \
+              -e "${secret_var}=0123456789abcdef0123456789abcdef" \
               -p "127.0.0.1:${port}:${port}" \
               "$image")"
             cids+=("$cid")
@@ -258,9 +260,9 @@ jobs:
             fi
             echo "${name} smoke ok live=200 ready=503"
           }
-          smoke memora-commerce-service:ci memora-commerce-smoke COMMERCE_DATABASE_URL COMMERCE_HEALTH_HOST 5052
-          smoke memora-operations-service:ci memora-operations-smoke OPERATIONS_DATABASE_URL OPERATIONS_HEALTH_HOST 5053
-          smoke memora-experience-service:ci memora-experience-smoke EXPERIENCE_DATABASE_URL EXPERIENCE_HEALTH_HOST 5054
+          smoke memora-commerce-service:ci memora-commerce-smoke COMMERCE_DATABASE_URL COMMERCE_HEALTH_HOST 5052 COMMERCE_INTERNAL_GRPC_SECRET
+          smoke memora-operations-service:ci memora-operations-smoke OPERATIONS_DATABASE_URL OPERATIONS_HEALTH_HOST 5053 OPERATIONS_INTERNAL_GRPC_SECRET
+          smoke memora-experience-service:ci memora-experience-smoke EXPERIENCE_DATABASE_URL EXPERIENCE_HEALTH_HOST 5054 EXPERIENCE_INTERNAL_GRPC_SECRET
 
   security:
     name: Security

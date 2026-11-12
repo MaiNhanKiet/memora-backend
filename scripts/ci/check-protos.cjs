@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
-const { join } = require('node:path');
+const { readdirSync } = require('node:fs');
+const { join, relative, sep } = require('node:path');
 const { loadSync } = require('@grpc/proto-loader');
 
 const root = process.cwd();
@@ -13,14 +14,27 @@ const loader = {
   oneofs: true,
 };
 
-const files = [
-  'proto/iam/v1/iam.proto',
-  'proto/grpc/health/v1/health.proto',
-  'proto/common/v1/pagination.proto',
-];
+function collectProtoFiles(directory) {
+  const found = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...collectProtoFiles(full));
+    } else if (entry.name.endsWith('.proto')) {
+      found.push(relative(root, full).split(sep).join('/'));
+    }
+  }
+  return found.sort();
+}
 
-for (const relative of files) {
-  loadSync(join(root, relative), loader);
+// Every proto under proto/ is loaded, so a new domain proto needs no edit here.
+const files = collectProtoFiles(join(root, 'proto'));
+if (files.length === 0) {
+  throw new Error('No .proto files found under proto/');
+}
+
+for (const relativePath of files) {
+  loadSync(join(root, relativePath), loader);
 }
 
 process.stdout.write(`proto load ok: ${files.join(', ')}\n`);

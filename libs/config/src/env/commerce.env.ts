@@ -4,6 +4,7 @@ import {
   EnvHostname,
   EnvPort,
   EnvPostgresUrl,
+  EnvSecret,
 } from '../validation/env-constraints';
 import { validateEnv } from '../validation/validate-env';
 import { loadEnvFile } from './load-env-file';
@@ -53,6 +54,10 @@ export class CommerceEnvironment extends NodeEnvironment {
   @Expose()
   @EnvPostgresUrl()
   COMMERCE_DATABASE_URL!: string;
+
+  @Expose()
+  @EnvSecret(32)
+  COMMERCE_INTERNAL_GRPC_SECRET!: string;
 }
 
 export interface CommerceEnv {
@@ -62,6 +67,7 @@ export interface CommerceEnv {
   COMMERCE_HEALTH_HOST: string;
   COMMERCE_HEALTH_PORT: number;
   COMMERCE_DATABASE_URL: string;
+  COMMERCE_INTERNAL_GRPC_SECRET: string;
 }
 
 export function validateCommerceEnv(
@@ -85,6 +91,7 @@ export function validateCommerceEnv(
     COMMERCE_HEALTH_HOST: validated.COMMERCE_HEALTH_HOST,
     COMMERCE_HEALTH_PORT: validated.COMMERCE_HEALTH_PORT,
     COMMERCE_DATABASE_URL: validated.COMMERCE_DATABASE_URL,
+    COMMERCE_INTERNAL_GRPC_SECRET: validated.COMMERCE_INTERNAL_GRPC_SECRET,
   };
 }
 
@@ -102,6 +109,7 @@ export const commerceConfig = registerAs('commerce', () => {
     healthHost: env.COMMERCE_HEALTH_HOST,
     healthPort: env.COMMERCE_HEALTH_PORT,
     databaseUrl: env.COMMERCE_DATABASE_URL,
+    internalGrpcSecret: env.COMMERCE_INTERNAL_GRPC_SECRET,
   };
 });
 
