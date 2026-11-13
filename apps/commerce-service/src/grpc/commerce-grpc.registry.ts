@@ -5,4 +5,5 @@
  */
 export const COMMERCE_GRPC_PROTOS = [
   { package: 'grpc.health.v1', file: 'grpc/health/v1/health.proto' },
+  { package: 'commerce.v1', file: 'commerce/v1/catalog.proto' },
 ] as const;

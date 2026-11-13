@@ -13,6 +13,7 @@ import { GatewayThrottlerGuard } from './common/guards/gateway-throttler.guard';
 import { ResponseTransformInterceptor } from './common/interceptors/response-transform.interceptor';
 import { HealthModule } from './modules/health/health.module';
 import { IamModule } from './modules/iam/iam.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { IamModule } from './modules/iam/iam.module';
     ObservabilityModule,
     HealthModule,
     IamModule,
+    CatalogModule,
   ],
   providers: [
     {
