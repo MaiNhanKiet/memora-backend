@@ -104,7 +104,7 @@ services:
     # No host ports: gRPC and IAM health stay on memora-network.
 
   # Opt-in only. `docker compose up` does not start this profile.
-  # memora-deploy refuses --enable-domain-services until PostgreSQL grants are verified.
+  # memora-deploy --enable-domain-services starts them only after a read-only PostgreSQL grant check passes.
   commerce-service:
     profiles: ['domain-services']
     image: ${COMMERCE_IMAGE:-ghcr.io/mainhankiet/memora-commerce-service:disabled}

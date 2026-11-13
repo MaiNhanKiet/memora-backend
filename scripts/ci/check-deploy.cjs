@@ -179,9 +179,9 @@ if (
   );
   process.exit(1);
 }
-if (ci.includes('--enable-domain-services')) {
+if (!ci.includes('--enable-domain-services')) {
   process.stderr.write(
-    'FAIL ci.yml must not enable domain services on Mini PC deploy\n',
+    'FAIL ci.yml must deploy every service: pass --enable-domain-services to memora-deploy deploy\n',
   );
   process.exit(1);
 }
