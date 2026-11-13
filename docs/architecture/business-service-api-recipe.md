@@ -127,8 +127,13 @@ message VerifiedActor {
 Each request message of a user-scoped RPC has `memora.common.v1.VerifiedActor actor = 1;`
 (`import "common/v1/actor.proto";`). The TypeScript mirror lives in
 `libs/contracts/src/common/actor.ts` and is exported from `libs/contracts/src/index.ts`.
-The first API that needs it adds these two files. Later APIs reuse them; nobody defines a
-per-domain actor message.
+Both files exist. Reuse them; nobody defines a per-domain actor message.
+
+| Side | Helper | Use |
+|---|---|---|
+| Gateway | `toVerifiedActor(principal)` in `apps/api-gateway/src/common/grpc/verified-actor.ts` | `actor: toVerifiedActor(principal)` where `principal` comes from `@CurrentUser()`. A missing principal throws 401 |
+| Service | `parseVerifiedActor(request.actor)` from `@app/common` | In the gRPC controller. Returns `{ userId, customerIdentityId \| undefined }`, or `INVALID_ARGUMENT` |
+| Service | `requireCustomerActor(actor)` from `@app/common` | For customer-only RPCs. Missing customer identity gives `INVALID_ARGUMENT` |
 
 **Gateway rules**
 
