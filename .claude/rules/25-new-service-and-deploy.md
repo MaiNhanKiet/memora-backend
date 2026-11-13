@@ -9,7 +9,7 @@ paths:
 
 # New owning service, database and deploy
 
-Ask first if the change would add a Nest app, a new Postgres/Redis instance, a new GHCR image, or a new Compose service. Source apps are Gateway, IAM, Commerce, Operations, and Experience. The default Mini PC deploy still starts only Gateway and IAM. Commerce, Operations, and Experience stay behind the `domain-services` profile until database grants are verified. Do not recreate removed Catalog/Consultation apps, and do not add a separate `platform-service`. Platform is a domain of Experience.
+Ask first if the change would add a Nest app, a new Postgres/Redis instance, a new GHCR image, or a new Compose service. Source apps are Gateway, IAM, Commerce, Operations, and Experience. CD on `main` deploys Gateway, IAM, Commerce, Operations and Experience: it passes `--enable-domain-services`, and `memora-deploy` runs a read-only PostgreSQL grant check first. A missing `<service>.env` or a failed grant check stops the whole release, so keep those files and the `*_app` roles in place. Do not recreate removed Catalog/Consultation apps, and do not add a separate `platform-service`. Platform is a domain of Experience.
 
 ## Service shape
 
