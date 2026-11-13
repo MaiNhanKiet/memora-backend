@@ -24,3 +24,13 @@ Applies to Commerce, Operations, and Experience. Read `docs/architecture/busines
 - For a new API, follow `docs/architecture/business-service-api-recipe.md` (skill `implement-business-api`). gRPC hosting, the internal auth guard, `PrismaService` and Gateway client helpers already exist: reuse them, do not add parallel copies.
 - Register a new proto in `src/grpc/<service>-grpc.registry.ts`. Guard every business gRPC controller with `<Service>InternalGrpcAuthGuard`.
 - There are no database foreign keys across services. Verify cross-service ids through a contract in the owning use case.
+
+## More than one inbound protocol
+
+- gRPC is the default and the only inbound transport wired today (`NestFactory.createMicroservice` in `main.ts`, plus the plain HTTP health server). Do not change `main.ts` to add a transport unless the task needs it.
+- When a service must also consume events or run another protocol, keep the gRPC microservice and attach each extra transport with `connectMicroservice` / `startAllMicroservices`. Do not replace the gRPC server, and do not split the service just because it has a second transport.
+- A feature with one transport keeps its files directly in `presentation/` (for example `ring-templates.grpc.controller.ts`). Once a feature has two or more transports, move each into its own folder under `presentation/` (`grpc/`, `events/`). Create only the folders the feature uses. Do not restructure existing features only to follow this.
+- Transport adapters stay thin: validate and map the payload, call one application service, map the result or error. Business rules, transactions and idempotency live in `application/` and `domain/`, never duplicated per transport.
+- An event consumer must be idempotent, must not trust the payload as authorization, and must follow the contract in `libs/contracts`. Do not add an event, queue, topic or outbox table unless the task asks for it.
+- The event transport between services is **not decided** (see `docs/architecture/memora-backend-4-service.md`, "Event transport TBD"). Do not introduce RabbitMQ, a new broker dependency or a new Redis role on your own: ask first. BullMQ (`@app/queue`) is for background jobs inside one service, not for cross-service events.
+- The producer side (publishing an event) is an `infrastructure/` adapter behind an application port. It is not a consumer transport and needs no `connectMicroservice`.
