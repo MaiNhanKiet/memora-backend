@@ -85,9 +85,9 @@ Stop and ask before any step marked **ASK**.
   `ordering.orders.owner_customer_identity_id` is a plain UUID. The owning use case checks
   that the id exists by calling the other service over its contract (gRPC). PostgreSQL will
   not do it.
-- The internal secret proves the caller is the Gateway. It does not authorize a user. Derive
-  the actor from the verified access token and check ownership, assignment and state in the
-  owning use case. Never trust `userId`, `role` or `x-actor-*` sent by a client.
+- The internal secret proves the caller is the Gateway. It does not authorize a user. The
+  actor reaches the service only as `VerifiedActor` (section 5). Check ownership, assignment
+  and state in the owning use case. Never trust `userId`, `role` or `x-actor-*` sent by a client.
 - No new endpoint, proto field, permission, migration or seed without an approved plan.
   `PROPOSED`, `To Review` and `Decision Required` items are not permission to implement.
 - Schema changes follow the `db/` baseline. Do not run migrations or DDL against the server
@@ -95,16 +95,93 @@ Stop and ask before any step marked **ASK**.
 - Do not add a Nest app, Postgres instance, GHCR image or Compose service.
 - Do not log secrets, tokens, OTPs or full request bodies.
 
-## 5. Definition of done
+## 5. Actor context: Gateway to business service (decided 2026-11-13)
+
+Decision D-P-03 applies to every RPC that acts for a signed-in user in Commerce,
+Operations and Experience. The Gateway authenticates the user, then passes the verified
+identity as a typed field in the gRPC request. The service does not receive or validate
+the access token.
+
+**Who does what**
+
+| Step | Owner | How |
+|---|---|---|
+| Authenticate the bearer token | Gateway | Existing `JwtAuthGuard` calls IAM `ValidateAccessToken` |
+| Check the permission code of the route | Gateway | `@RequirePermissions(PERMISSIONS.X)`, which calls IAM `CheckPermissions` |
+| Prove the caller is the Gateway | Service | `<Svc>InternalGrpcAuthGuard` with `<SVC>_INTERNAL_GRPC_SECRET` |
+| Authorize the resource (owner, store, order, state) | Service use case | Compare `VerifiedActor` with the stored record |
+
+**Wire contract.** Defined once and imported by every domain proto:
+
+```proto
+// proto/common/v1/actor.proto
+syntax = "proto3";
+package memora.common.v1;
+
+message VerifiedActor {
+  string user_id = 1;               // IAM user id (UUID), always set
+  string customer_identity_id = 2;  // empty when the user has no customer identity
+}
+```
+
+Each request message of a user-scoped RPC has `memora.common.v1.VerifiedActor actor = 1;`
+(`import "common/v1/actor.proto";`). The TypeScript mirror lives in
+`libs/contracts/src/common/actor.ts` and is exported from `libs/contracts/src/index.ts`.
+The first API that needs it adds these two files. Later APIs reuse them; nobody defines a
+per-domain actor message.
+
+**Gateway rules**
+
+- Build `actor` only from the authenticated principal (`@CurrentUser()`, `request.user`).
+  Never copy it from the body, query, path or a header.
+- Do not forward the access token to Commerce, Operations or Experience.
+- An `@Public()` route has no actor. Its RPC does not take `VerifiedActor`, and it needs an
+  approved anonymous flow.
+
+**Service rules**
+
+- The gRPC controller parses `actor` once. A missing or non-UUID `user_id`, or a non-UUID
+  `customer_identity_id`, returns `INVALID_ARGUMENT`. Pass a typed actor to the use case.
+- The use case authorizes the resource. It returns `NOT_FOUND` for a customer-owned record
+  that does not belong to the actor, so ids cannot be probed. It returns `PERMISSION_DENIED`
+  for a known record when the actor is not allowed to act on it. It returns
+  `FAILED_PRECONDITION` for a state that blocks the action.
+- Do not re-check the route's permission code in the service, and do not send role or
+  permission lists in `VerifiedActor`. When customers and staff can both reach a resource,
+  add one RPC per access scope (for example `GetMyConsent` and `GetConsent`). Gateway routes
+  each one behind its own permission. Do not use a role flag in the request.
+- Need more facts about the actor, such as a staff member's store? Call the owning service
+  (IAM) by `user_id` over an approved contract. Never use a token.
+- Persist actor ids as plain UUID columns (`created_by_user_id`, and so on). There is no
+  foreign key to `iam`.
+- Background jobs carry the actor ids recorded when the job was queued, not a token.
+
+**Not this contract**
+
+- The `x-actor-type`, `x-actor-id` and `x-customer-identity-id` metadata (set by `libs/observability`)
+  is correlation data for logs. It is not verified and must not be used for authorization.
+- Devices (for example ESP32/AS608) and service-to-service jobs without a user need their own
+  approved credential. Do not fake a `VerifiedActor` for them.
+
+**Accepted trade-off.** Anyone who holds a service's internal secret can claim any actor.
+This is mitigated by one secret per service (32+ chars), gRPC ports that are not published,
+and the internal Docker network. Never log the secret or the full request.
+
+**Tests per user-scoped RPC.** Missing actor gives `INVALID_ARGUMENT`. Another user's record
+gives `NOT_FOUND` or `PERMISSION_DENIED`. A wrong internal secret gives `UNAUTHENTICATED`.
+The Gateway test shows that a client-supplied actor field is ignored.
+
+## 6. Definition of done
 
 - Contract matches the approved plan or the named API.
 - Proto, contract types and registry entry are consistent. `proto:check` passes.
-- gRPC controller is guarded. The use case enforces ownership and invariants.
+- gRPC controller is guarded. A user-scoped RPC takes `VerifiedActor` (section 5). The use
+  case enforces ownership and invariants.
 - Gateway client, DTOs, Swagger, error mapping and RBAC match the contract.
 - Typecheck, lint, tests and builds ran, with results recorded.
 - Plan checkboxes updated only for checks that passed.
 
-## 6. Not yet available (blockers to raise, not to work around)
+## 7. Not yet available (blockers to raise, not to work around)
 
 - The service must be deployed before the API is reachable on the server: database
   grants for `<svc>_app`, secret files and the `domain-services` profile are separate
