@@ -39,7 +39,7 @@ Commands:
   rollback
   bootstrap   (infra + optional migrate/seed/rbac + backend)
   deploy      (backup + optional migrate + backend + health)
-  deploy --enable-domain-services is refused until PostgreSQL grants are verified
+  deploy --enable-domain-services   (also starts commerce/operations/experience after a read-only PostgreSQL grant check)
 EOF
 }
 
@@ -432,7 +432,57 @@ preflight_domain_services() {
   assert_domain_database_url "${COMMERCE_DATABASE_URL}" commerce_app commerce
   assert_domain_database_url "${OPERATIONS_DATABASE_URL}" operations_app operations
   assert_domain_database_url "${EXPERIENCE_DATABASE_URL}" experience_app experience
-  die "BLOCKER: domain services stay disabled. PostgreSQL roles, schema privileges, and schema presence are not verified. Run deploy/postgres/proposals/service-roles-review.sql manually. This helper does not execute SQL or start commerce, operations, or experience."
+  verify_domain_grants || die "BLOCKER: domain services stay disabled. PostgreSQL roles, schema privileges, and schema presence did not verify. Apply deploy/postgres/proposals/service-roles.sql, set the *_app passwords, and check with service-roles-review.sql."
+  log "domain service PostgreSQL roles and grants verified"
+}
+
+# Read-only check, run as the bootstrap superuser inside memora-postgres.
+# Passes only when every *_app role exists, is not a superuser, can log in, has a
+# password, has USAGE and DML on exactly its own schemas (no iam, no other
+# service), every owned schema exists, and no foreign key crosses a service.
+verify_domain_grants() {
+  local problems
+  problems="$(docker exec -i memora-postgres sh -c 'psql -X -q -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d memora' 2>/dev/null <<'SQL'
+BEGIN TRANSACTION READ ONLY;
+WITH svc(service, role_name, schemas) AS (VALUES
+  ('commerce', 'commerce_app', ARRAY['catalog','pricing','inventory','design','ordering']),
+  ('operations', 'operations_app', ARRAY['personalization','production','fulfillment','after_sales']),
+  ('experience', 'experience_app', ARRAY['memory','platform'])
+),
+schema_owner(schema_name, service) AS (
+  SELECT 'iam', 'iam' UNION ALL
+  SELECT unnest(schemas), service FROM svc
+),
+problems AS (
+  SELECT 1 FROM svc LEFT JOIN pg_authid a ON a.rolname = svc.role_name
+  WHERE a.oid IS NULL OR a.rolsuper OR NOT a.rolcanlogin OR a.rolpassword IS NULL
+  UNION ALL
+  SELECT 1 FROM schema_owner WHERE schema_name NOT IN (SELECT nspname FROM pg_namespace)
+  UNION ALL
+  SELECT 1 FROM svc JOIN pg_roles r ON r.rolname = svc.role_name
+  CROSS JOIN schema_owner so JOIN pg_namespace n ON n.nspname = so.schema_name
+  WHERE has_schema_privilege(svc.role_name, so.schema_name, 'USAGE') <> (so.service = svc.service)
+  UNION ALL
+  SELECT 1 FROM svc JOIN pg_roles r ON r.rolname = svc.role_name
+  JOIN pg_class c ON c.relkind IN ('r', 'p')
+  JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = ANY (svc.schemas)
+  WHERE NOT (has_table_privilege(svc.role_name, c.oid, 'SELECT')
+    AND has_table_privilege(svc.role_name, c.oid, 'INSERT')
+    AND has_table_privilege(svc.role_name, c.oid, 'UPDATE')
+    AND has_table_privilege(svc.role_name, c.oid, 'DELETE'))
+  UNION ALL
+  SELECT 1 FROM pg_constraint co
+  JOIN pg_class cs ON cs.oid = co.conrelid JOIN pg_namespace ns ON ns.oid = cs.relnamespace
+  JOIN pg_class ct ON ct.oid = co.confrelid JOIN pg_namespace nt ON nt.oid = ct.relnamespace
+  JOIN schema_owner a ON a.schema_name = ns.nspname
+  JOIN schema_owner b ON b.schema_name = nt.nspname
+  WHERE co.contype = 'f' AND a.service <> b.service
+)
+SELECT count(*) FROM problems;
+ROLLBACK;
+SQL
+)" || return 1
+  [[ "${problems}" == "0" ]] || { err "domain grant check found ${problems:-unknown} problem(s)"; return 1; }
 }
 
 cmd_deploy() {
