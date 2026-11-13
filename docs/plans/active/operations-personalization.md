@@ -334,7 +334,7 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
   - The nonce and device evidence go in `capture_attempts.metadata_json`.
   - Only an accepted capture writes `personalization_sources.raw_asset_key`.
   - Processing state uses `personalization_sources.status`. The order link goes through `source_bindings` and `capture_sessions.accepted_source_id`.
-- [x] D-P-12 DECIDED: change `capture_sessions.capture_attempts` to a list in `schema.prisma`. Keep the partial unique index in the DB. Prisma-only change, checked with `prisma validate`.
+- [x] D-P-12 DECIDED: change `capture_sessions.capture_attempts` to a list in `schema.prisma`. Keep the partial unique index in the DB. Prisma-only change, checked with `prisma validate`. Done on `feat/business-prisma-baseline`: `prisma validate` passes, `migrate diff` against the baseline is empty.
 - [ ] D-P-13 DECIDED (retention open): revoking Consent is allowed only while no linked Ring Item Version is SUBMITTED or locked. Otherwise return `FAILED_PRECONDITION`. Data retention after the order (D-OPS-08) stays NEEDS_REVIEW.
 - [x] D-P-14 DECIDED: Soundwave accepts WAV, MP3 and M4A/AAC, up to 10 MB. Both file upload and in-app recording are limited to 30 s. The selected segment is exactly 3000 ms.
 - [ ] D-P-15 DEFERRED: Catalog engraving constraints (`ENGRAVE_SURFACE`, min/max scale, SW fixed geometry) are decided when placement is planned. They do not block Consent, capture or processing.
@@ -342,6 +342,7 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
   - Generate `0_baseline` from `db/` for each service's schemas.
   - Keep each service's `_prisma_migrations` table separate from IAM's.
   - Mark the baseline applied on the server with `prisma migrate resolve --applied`. That server step needs explicit authorization and a backup check when it runs.
+  - Repo part done on `feat/business-prisma-baseline`: `_prisma_migrations` lives in `catalog`, `after_sales` and `memory`. Local checks passed: fresh deploy, resolve on a `db/` copy, empty `migrate diff`, identical `pg_dump`. The server resolve has NOT been run.
 
 ## 9. Implementation progress log
 

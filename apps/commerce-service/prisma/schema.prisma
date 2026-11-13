@@ -1,4 +1,4 @@
-// Introspected from database memora (BM04 baseline, db/). Cross-service FKs are omitted here; they exist only in PostgreSQL. Commerce owns these five schemas only.
+// Introspected from database memora (BM04 baseline, db/). No cross-service FKs exist (db/MEMORA_BM04_Drop_Cross_Service_FKs.sql). DDL history: prisma/migrations (0_baseline = db/ for this service). Commerce owns these five schemas only.
 // Logical IDs such as user_id and customer_identity_id are not foreign keys to IAM.
 
 generator client {
@@ -24,7 +24,7 @@ model gemstone_groups {
   sequence_no              Int                        @default(1) @db.SmallInt
   created_at               DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
-  ring_templates           ring_templates             @relation(fields: [ring_template_id], references: [id], onUpdate: Restrict, map: "fk_catalog_gemstone_groups_ring_template_id")
+  ring_templates           ring_templates             @relation(fields: [ring_template_id], references: [id], onUpdate: Restrict, map: "catalog_gemstone_groups_ring_template_id_fk")
   gemstone_slots           gemstone_slots[]
   template_compatibilities template_compatibilities[]
 
@@ -65,7 +65,7 @@ model gemstone_slots {
   glb_node_name               String                        @db.VarChar(120)
   created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
   updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
-  gemstone_groups             gemstone_groups               @relation(fields: [gemstone_group_id], references: [id], onUpdate: Restrict, map: "fk_catalog_gemstone_slots_gemstone_group_id")
+  gemstone_groups             gemstone_groups               @relation(fields: [gemstone_group_id], references: [id], onUpdate: Restrict, map: "catalog_gemstone_slots_gemstone_group_id_fk")
   ring_item_version_gemstones ring_item_version_gemstones[]
 
   @@unique([gemstone_group_id, code], map: "catalog_gemstone_slots_gemstone_group_id_code_4f59516_uq")
@@ -122,9 +122,9 @@ model template_compatibilities {
   gemstone_group_id   String            @db.Uuid
   gemstone_option_id  String            @db.Uuid
   created_at          DateTime          @default(now()) @db.Timestamptz(6)
-  gemstone_groups     gemstone_groups   @relation(fields: [gemstone_group_id], references: [id], onUpdate: Restrict, map: "fk_catalog_template_compatibilities_gemstone_group_id")
-  gemstone_options    gemstone_options  @relation(fields: [gemstone_option_id], references: [id], onUpdate: Restrict, map: "fk_catalog_template_compatibilities_gemstone_option_id")
-  template_variants   template_variants @relation(fields: [template_variant_id], references: [id], onUpdate: Restrict, map: "fk_catalog_template_compatibilities_template_variant_id")
+  gemstone_groups     gemstone_groups   @relation(fields: [gemstone_group_id], references: [id], onUpdate: Restrict, map: "catalog_template_compatibilities_gemstone_group_id_fk")
+  gemstone_options    gemstone_options  @relation(fields: [gemstone_option_id], references: [id], onUpdate: Restrict, map: "catalog_template_compatibilities_gemstone_option_id_fk")
+  template_variants   template_variants @relation(fields: [template_variant_id], references: [id], onUpdate: Restrict, map: "catalog_template_compatibilities_template_variant_id_fk")
 
   @@unique([template_variant_id, gemstone_group_id, gemstone_option_id], map: "catalog_template_compatibilities_template_variant_id_e8f87843")
   @@schema("catalog")
@@ -148,8 +148,8 @@ model template_variants {
   created_at                      DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at                      DateTime                   @default(now()) @db.Timestamptz(6)
   template_compatibilities        template_compatibilities[]
-  materials                       materials                  @relation(fields: [material_id], references: [id], onUpdate: Restrict, map: "fk_catalog_template_variants_material_id")
-  ring_templates                  ring_templates             @relation(fields: [ring_template_id], references: [id], onUpdate: Restrict, map: "fk_catalog_template_variants_ring_template_id")
+  materials                       materials                  @relation(fields: [material_id], references: [id], onUpdate: Restrict, map: "catalog_template_variants_material_id_fk")
+  ring_templates                  ring_templates             @relation(fields: [ring_template_id], references: [id], onUpdate: Restrict, map: "catalog_template_variants_ring_template_id_fk")
   ring_design_drafts              ring_design_drafts[]
   stock_lots                      stock_lots[]
   ring_item_versions              ring_item_versions[]
@@ -194,8 +194,8 @@ model ring_design_drafts {
   updated_at                                                           DateTime          @default(now()) @db.Timestamptz(6)
   design_codes_design_codes_redeemed_into_draft_idToring_design_drafts design_codes[]    @relation("design_codes_redeemed_into_draft_idToring_design_drafts")
   design_codes_design_codes_ring_design_draft_idToring_design_drafts   design_codes[]    @relation("design_codes_ring_design_draft_idToring_design_drafts")
-  carts                                                                carts?            @relation(fields: [cart_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_design_ring_design_drafts_cart_id")
-  template_variants                                                    template_variants @relation(fields: [template_variant_id], references: [id], onUpdate: Restrict, map: "fk_design_ring_design_drafts_template_variant_id")
+  carts                                                                carts?            @relation(fields: [cart_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "design_ring_design_drafts_cart_id_fk")
+  template_variants                                                    template_variants @relation(fields: [template_variant_id], references: [id], onUpdate: Restrict, map: "design_ring_design_drafts_template_variant_id_fk")
   ring_items                                                           ring_items?
 
   @@schema("design")
@@ -214,8 +214,8 @@ model allocations {
   allocated_by_user_id  String?               @db.Uuid
   created_at            DateTime              @default(now()) @db.Timestamptz(6)
   updated_at            DateTime              @default(now()) @db.Timestamptz(6)
-  certified_gemstones   certified_gemstones?  @relation(fields: [certified_gemstone_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_inventory_allocations_certified_gemstone_id")
-  ring_items            ring_items            @relation(fields: [ring_item_id], references: [id], onUpdate: Restrict, map: "fk_inventory_allocations_ring_item_id")
+  certified_gemstones   certified_gemstones?  @relation(fields: [certified_gemstone_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_allocations_certified_gemstone_id_fk")
+  ring_items            ring_items            @relation(fields: [ring_item_id], references: [id], onUpdate: Restrict, map: "inventory_allocations_ring_item_id_fk")
   stock_lots            stock_lots?           @relation(fields: [stock_lot_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_allocations_stock_lot_id_fk")
   inventory_movements   inventory_movements[]
 
@@ -237,7 +237,7 @@ model certified_gemstones {
   received_at               DateTime?             @db.Timestamptz(6)
   updated_at                DateTime              @default(now()) @db.Timestamptz(6)
   allocations               allocations[]
-  gemstone_options          gemstone_options      @relation(fields: [gemstone_option_id], references: [id], onUpdate: Restrict, map: "fk_inventory_certified_gemstones_gemstone_option_id")
+  gemstone_options          gemstone_options      @relation(fields: [gemstone_option_id], references: [id], onUpdate: Restrict, map: "inventory_certified_gemstones_gemstone_option_id_fk")
   inventory_movements       inventory_movements[]
   price_items               price_items?
 
@@ -260,9 +260,9 @@ model inventory_movements {
   performed_by_user_id  String?              @db.Uuid
   occurred_at           DateTime             @default(now()) @db.Timestamptz(6)
   metadata_json         Json?                @default("{}")
-  allocations           allocations?         @relation(fields: [allocation_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_inventory_inventory_movements_allocation_id")
-  certified_gemstones   certified_gemstones? @relation(fields: [certified_gemstone_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_inventory_inventory_movements_certified_gemstone_id")
-  ring_items            ring_items?          @relation(fields: [ring_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_inventory_inventory_movements_ring_item_id")
+  allocations           allocations?         @relation(fields: [allocation_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_inventory_movements_allocation_id_fk")
+  certified_gemstones   certified_gemstones? @relation(fields: [certified_gemstone_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_inventory_movements_certified_gemstone_id_fk")
+  ring_items            ring_items?          @relation(fields: [ring_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_inventory_movements_ring_item_id_fk")
   stock_lots            stock_lots?          @relation(fields: [stock_lot_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_inventory_movements_stock_lot_id_fk")
 
   @@schema("inventory")
@@ -275,9 +275,9 @@ model final_confirmation_items {
   ring_item_id          String              @db.Uuid
   ring_item_version_id  String              @db.Uuid
   created_at            DateTime            @default(now()) @db.Timestamptz(6)
-  final_confirmations   final_confirmations @relation(fields: [final_confirmation_id], references: [id], onUpdate: Restrict, map: "fk_ordering_final_confirmation_items_final_confirmation_id")
-  ring_items            ring_items          @relation(fields: [ring_item_id], references: [id], onUpdate: Restrict, map: "fk_ordering_final_confirmation_items_ring_item_id")
-  ring_item_versions    ring_item_versions  @relation(fields: [ring_item_version_id], references: [id], onUpdate: Restrict, map: "fk_ordering_final_confirmation_items_ring_item_version_id")
+  final_confirmations   final_confirmations @relation(fields: [final_confirmation_id], references: [id], onUpdate: Restrict, map: "ordering_final_confirmation_items_final_confirmation_id_fk")
+  ring_items            ring_items          @relation(fields: [ring_item_id], references: [id], onUpdate: Restrict, map: "ordering_final_confirmation_items_ring_item_id_fk")
+  ring_item_versions    ring_item_versions  @relation(fields: [ring_item_version_id], references: [id], onUpdate: Restrict, map: "ordering_final_confirmation_items_ring_item_version_id_fk")
 
   @@unique([final_confirmation_id, ring_item_id], map: "ordering_final_confirmation_items_final_confirmation_785844bd")
   @@schema("ordering")
@@ -294,8 +294,8 @@ model final_confirmations {
   invalidated_at                    DateTime?                  @db.Timestamptz(6)
   invalidation_reason               String?
   final_confirmation_items          final_confirmation_items[]
-  orders                            orders                     @relation(fields: [order_id], references: [id], onUpdate: Restrict, map: "fk_ordering_final_confirmations_order_id")
-  quotes                            quotes                     @relation(fields: [quote_id], references: [id], onUpdate: Restrict, map: "fk_ordering_final_confirmations_quote_id")
+  orders                            orders                     @relation(fields: [order_id], references: [id], onUpdate: Restrict, map: "ordering_final_confirmations_order_id_fk")
+  quotes                            quotes                     @relation(fields: [quote_id], references: [id], onUpdate: Restrict, map: "ordering_final_confirmations_quote_id_fk")
 
   @@schema("ordering")
 }
@@ -329,8 +329,8 @@ model orders {
   created_at                             DateTime               @default(now()) @db.Timestamptz(6)
   updated_at                             DateTime               @default(now()) @db.Timestamptz(6)
   final_confirmations                    final_confirmations?
-  carts                                  carts?                 @relation(fields: [created_from_cart_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_orders_created_from_cart_id")
-  quotes_orders_current_quote_idToquotes quotes?                @relation("orders_current_quote_idToquotes", fields: [current_quote_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_orders_current_quote_id")
+  carts                                  carts?                 @relation(fields: [created_from_cart_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_orders_created_from_cart_id_fk")
+  quotes_orders_current_quote_idToquotes quotes?                @relation("orders_current_quote_idToquotes", fields: [current_quote_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_orders_current_quote_id_fk")
   payment_transactions                   payment_transactions[]
   quotes_quotes_order_idToorders         quotes[]               @relation("quotes_order_idToorders")
   ring_items                             ring_items[]
@@ -366,9 +366,9 @@ model payment_transactions {
   receipt_issued_at          DateTime?                  @db.Timestamptz(6)
   metadata_json              Json?                      @default("{}")
   payment_item_allocations   payment_item_allocations[]
-  orders                     orders?                    @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_payment_transactions_order_id")
-  quotes                     quotes?                    @relation(fields: [quote_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_payment_transactions_quote_id")
-  payment_transactions       payment_transactions?      @relation("payment_transactionsTopayment_transactions", fields: [related_transaction_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_payment_transactions_related_transaction_id")
+  orders                     orders?                    @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_payment_transactions_order_id_fk")
+  quotes                     quotes?                    @relation(fields: [quote_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_payment_transactions_quote_id_fk")
+  payment_transactions       payment_transactions?      @relation("payment_transactionsTopayment_transactions", fields: [related_transaction_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_payment_transactions_related_transaction_id_fk")
   other_payment_transactions payment_transactions[]     @relation("payment_transactionsTopayment_transactions")
 
   @@unique([provider, provider_order_code], map: "ordering_payment_transactions_provider_provider_orde_85beb578", where: raw("(provider_order_code IS NOT NULL)"))
@@ -391,10 +391,10 @@ model quote_items {
   pricing_rule_id   String?         @db.Uuid
   metadata_json     Json?           @default("{}")
   created_at        DateTime        @default(now()) @db.Timestamptz(6)
-  price_versions    price_versions? @relation(fields: [price_version_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_quote_items_price_version_id")
-  pricing_rules     pricing_rules?  @relation(fields: [pricing_rule_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_quote_items_pricing_rule_id")
-  quotes            quotes          @relation(fields: [quote_id], references: [id], onUpdate: Restrict, map: "fk_ordering_quote_items_quote_id")
-  ring_items        ring_items?     @relation(fields: [ring_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_quote_items_ring_item_id")
+  price_versions    price_versions? @relation(fields: [price_version_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_quote_items_price_version_id_fk")
+  pricing_rules     pricing_rules?  @relation(fields: [pricing_rule_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_quote_items_pricing_rule_id_fk")
+  quotes            quotes          @relation(fields: [quote_id], references: [id], onUpdate: Restrict, map: "ordering_quote_items_quote_id_fk")
+  ring_items        ring_items?     @relation(fields: [ring_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_quote_items_ring_item_id_fk")
 
   @@schema("ordering")
 }
@@ -424,8 +424,8 @@ model quotes {
   orders_orders_current_quote_idToquotes orders[]               @relation("orders_current_quote_idToquotes")
   payment_transactions                   payment_transactions[]
   quote_items                            quote_items[]
-  orders_quotes_order_idToorders         orders?                @relation("quotes_order_idToorders", fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_quotes_order_id")
-  quotes                                 quotes?                @relation("quotesToquotes", fields: [supersedes_quote_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_quotes_supersedes_quote_id")
+  orders_quotes_order_idToorders         orders?                @relation("quotes_order_idToorders", fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_quotes_order_id_fk")
+  quotes                                 quotes?                @relation("quotesToquotes", fields: [supersedes_quote_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_quotes_supersedes_quote_id_fk")
   other_quotes                           quotes[]               @relation("quotesToquotes")
 
   @@unique([claim_id, quote_type, version_no], map: "ordering_quotes_claim_id_quote_type_version_no_205d2c6_uq", where: raw("(claim_id IS NOT NULL)"))
@@ -440,9 +440,9 @@ model ring_item_version_gemstones {
   gemstone_slot_id     String             @db.Uuid
   gemstone_option_id   String             @db.Uuid
   created_at           DateTime           @default(now()) @db.Timestamptz(6)
-  gemstone_options     gemstone_options   @relation(fields: [gemstone_option_id], references: [id], onUpdate: Restrict, map: "fk_ordering_ring_item_version_gemstones_gemstone_option_id")
-  gemstone_slots       gemstone_slots     @relation(fields: [gemstone_slot_id], references: [id], onUpdate: Restrict, map: "fk_ordering_ring_item_version_gemstones_gemstone_slot_id")
-  ring_item_versions   ring_item_versions @relation(fields: [ring_item_version_id], references: [id], onUpdate: Restrict, map: "fk_ordering_ring_item_version_gemstones_ring_item_version_id")
+  gemstone_options     gemstone_options   @relation(fields: [gemstone_option_id], references: [id], onUpdate: Restrict, map: "ordering_ring_item_version_gemstones_gemstone_option_id_fk")
+  gemstone_slots       gemstone_slots     @relation(fields: [gemstone_slot_id], references: [id], onUpdate: Restrict, map: "ordering_ring_item_version_gemstones_gemstone_slot_id_fk")
+  ring_item_versions   ring_item_versions @relation(fields: [ring_item_version_id], references: [id], onUpdate: Restrict, map: "ordering_ring_item_version_gemstones_ring_item_versi_c478276e")
 
   @@schema("ordering")
 }
@@ -465,10 +465,10 @@ model ring_item_versions {
   created_by_customer_identity_id                              String?                       @db.Uuid
   final_confirmation_items                                     final_confirmation_items[]
   ring_item_version_gemstones                                  ring_item_version_gemstones[]
-  ring_item_versions                                           ring_item_versions?           @relation("ring_item_versionsToring_item_versions", fields: [parent_version_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_ring_item_versions_parent_version_id")
+  ring_item_versions                                           ring_item_versions?           @relation("ring_item_versionsToring_item_versions", fields: [parent_version_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_ring_item_versions_parent_version_id_fk")
   other_ring_item_versions                                     ring_item_versions[]          @relation("ring_item_versionsToring_item_versions")
-  ring_items_ring_item_versions_ring_item_idToring_items       ring_items                    @relation("ring_item_versions_ring_item_idToring_items", fields: [ring_item_id], references: [id], onUpdate: Restrict, map: "fk_ordering_ring_item_versions_ring_item_id")
-  template_variants                                            template_variants             @relation(fields: [template_variant_id], references: [id], onUpdate: Restrict, map: "fk_ordering_ring_item_versions_template_variant_id")
+  ring_items_ring_item_versions_ring_item_idToring_items       ring_items                    @relation("ring_item_versions_ring_item_idToring_items", fields: [ring_item_id], references: [id], onUpdate: Restrict, map: "ordering_ring_item_versions_ring_item_id_fk")
+  template_variants                                            template_variants             @relation(fields: [template_variant_id], references: [id], onUpdate: Restrict, map: "ordering_ring_item_versions_template_variant_id_fk")
   ring_items_ring_items_current_version_idToring_item_versions ring_items[]                  @relation("ring_items_current_version_idToring_item_versions")
 
   @@unique([ring_item_id, version_no], map: "ordering_ring_item_versions_ring_item_id_version_no__903f3e22")
@@ -493,9 +493,9 @@ model ring_items {
   payment_item_allocations                                             payment_item_allocations[]
   quote_items                                                          quote_items[]
   ring_item_versions_ring_item_versions_ring_item_idToring_items       ring_item_versions[]       @relation("ring_item_versions_ring_item_idToring_items")
-  ring_item_versions_ring_items_current_version_idToring_item_versions ring_item_versions?        @relation("ring_items_current_version_idToring_item_versions", fields: [current_version_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_ordering_ring_items_current_version_id")
-  orders                                                               orders                     @relation(fields: [order_id], references: [id], onUpdate: Restrict, map: "fk_ordering_ring_items_order_id")
-  ring_design_drafts                                                   ring_design_drafts         @relation(fields: [source_ring_design_draft_id], references: [id], onUpdate: Restrict, map: "fk_ordering_ring_items_source_ring_design_draft_id")
+  ring_item_versions_ring_items_current_version_idToring_item_versions ring_item_versions?        @relation("ring_items_current_version_idToring_item_versions", fields: [current_version_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_ring_items_current_version_id_fk")
+  orders                                                               orders                     @relation(fields: [order_id], references: [id], onUpdate: Restrict, map: "ordering_ring_items_order_id_fk")
+  ring_design_drafts                                                   ring_design_drafts         @relation(fields: [source_ring_design_draft_id], references: [id], onUpdate: Restrict, map: "ordering_ring_items_source_ring_design_draft_id_fk")
 
   @@unique([order_id, item_no], map: "ordering_ring_items_order_id_item_no_3980e3f_uq")
   @@schema("ordering")
@@ -513,9 +513,9 @@ model price_items {
   status                  String               @default("ACTIVE") @db.VarChar(20)
   created_at              DateTime             @default(now()) @db.Timestamptz(6)
   updated_at              DateTime             @default(now()) @db.Timestamptz(6)
-  certified_gemstones     certified_gemstones? @relation(fields: [certified_gemstone_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_pricing_price_items_certified_gemstone_id")
-  gemstone_options        gemstone_options?    @relation(fields: [gemstone_option_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_pricing_price_items_gemstone_option_id")
-  template_variants       template_variants?   @relation(fields: [template_variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_pricing_price_items_template_variant_id")
+  certified_gemstones     certified_gemstones? @relation(fields: [certified_gemstone_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "pricing_price_items_certified_gemstone_id_fk")
+  gemstone_options        gemstone_options?    @relation(fields: [gemstone_option_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "pricing_price_items_gemstone_option_id_fk")
+  template_variants       template_variants?   @relation(fields: [template_variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "pricing_price_items_template_variant_id_fk")
   price_versions          price_versions?
 
   @@schema("pricing")
@@ -539,7 +539,7 @@ model price_versions {
   reviewed_at          DateTime?     @db.Timestamptz(6)
   created_at           DateTime      @default(now()) @db.Timestamptz(6)
   quote_items          quote_items[]
-  price_items          price_items   @relation(fields: [price_item_id], references: [id], onUpdate: Restrict, map: "fk_pricing_price_versions_price_item_id")
+  price_items          price_items   @relation(fields: [price_item_id], references: [id], onUpdate: Restrict, map: "pricing_price_versions_price_item_id_fk")
 
   @@unique([price_item_id, version_no], map: "pricing_price_versions_price_item_id_version_no_950b9f7_uq")
   @@schema("pricing")
