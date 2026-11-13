@@ -5,15 +5,19 @@ import { createHash } from 'node:crypto';
  * Canonical runtime catalog. Approval spec: `rbac-v1.approved.json`.
  * Codes are user-approved v1 technical names (2026-10-15), not historical MF tracker names
  * except DESIGN_REVIEW, FINAL_QC, and LASER_OPERATE which also appear in the DB Tracker.
+ * v1.1 (user-approved 2026-11-13, decision D-P-01 in docs/plans/active/operations-personalization.md):
+ * CONSENT_MANAGE_OWN and DESIGN_CHANGE_REQUEST_OWN for CUSTOMER. Existing databases receive
+ * them through IAM migration 20261113090000_iam_rbac_v1_1_personalization.
+ * The bootstrap marker key stays RBAC v1; its checksum now covers the v1.1 grants.
  */
 export const RBAC_V1_MARKER_KEY = 'MEMORA_RBAC_V1_2026_10_15';
 export const RBAC_V1_APPROVAL_DATE = '2026-10-15';
 export const RBAC_V1_APPROVAL_STATUS = 'APPROVED';
-export const RBAC_V1_SCHEMA_VERSION = '1.0.0';
+export const RBAC_V1_SCHEMA_VERSION = '1.1.0';
 export const RBAC_V1_EXPECTED = {
   roles: 6,
-  permissions: 46,
-  rolePermissionMappings: 49,
+  permissions: 48,
+  rolePermissionMappings: 51,
 } as const;
 
 export const PERMISSION_DEFINITIONS = [
@@ -156,6 +160,15 @@ export const PERMISSION_DEFINITIONS = [
     businessSource: 'MF03-05 to MF03-06; user-approved RBAC v1',
   },
   {
+    code: 'DESIGN_CHANGE_REQUEST_OWN',
+    name: 'Request change to own design',
+    description:
+      'Request a change to own submitted ring item design; service enforces stage and ownership.',
+    domain: 'ORDERING_DESIGN',
+    businessSource:
+      'BM04 WF-02 F-12; PERSO-023; D-P-01; user-approved RBAC v1.1',
+  },
+  {
     code: 'SOURCE_CAPTURE',
     name: 'Capture fingerprint at store',
     description:
@@ -169,6 +182,15 @@ export const PERMISSION_DEFINITIONS = [
     description: 'Record/upload source audio for permitted ring item.',
     domain: 'PERSONALIZATION',
     businessSource: 'MF02-09 to MF02-10; user-approved RBAC v1',
+  },
+  {
+    code: 'CONSENT_MANAGE_OWN',
+    name: 'Manage own personalization consent',
+    description:
+      'Accept, read and revoke own source- and ring item-scoped Consent.',
+    domain: 'PERSONALIZATION',
+    businessSource:
+      'BM04 WF-01 F-02/F-13; PERSO-001..003; D-P-01; user-approved RBAC v1.1',
   },
   {
     code: 'PRODUCTION_PLAN',
@@ -385,7 +407,9 @@ export const RBAC_V1_ROLE_PERMISSIONS = {
     'ORDER_FINAL_CONFIRM',
     'ORDER_CANCEL_REQUEST_OWN',
     'DESIGN_SUBMIT_OWN',
+    'DESIGN_CHANGE_REQUEST_OWN',
     'SOURCE_AUDIO_UPLOAD_OWN',
+    'CONSENT_MANAGE_OWN',
     'FULFILLMENT_PREFERENCE_UPDATE_OWN',
     'CLAIM_SUBMIT_OWN',
     'DATA_RIGHTS_REQUEST_OWN',

@@ -1,7 +1,7 @@
 # MEMORA IAM — RBAC v1 permission matrix
 
-- **Approval:** `APPROVED` by MEMORA user on **2026-10-15**.
-- **Canonical spec:** `rbac-v1.approved.json` (6 roles, 45 permissions, 48 mappings).
+- **Approval:** `APPROVED` by MEMORA user on **2026-10-15**. v1.1 `APPROVED` on **2026-11-13** (D-P-01, `docs/plans/active/operations-personalization.md`).
+- **Current totals (v1.1):** 6 roles, 48 permissions, 51 mappings. The older `rbac-v1.approved.json` spec (45/48) is not in the repository; `permissions.ts` is the source.
 - **Runtime registry:** `libs/contracts/src/iam/permissions.ts`.
 - **Marker key:** `MEMORA_RBAC_V1_2026_10_15`.
 
@@ -27,11 +27,13 @@ There is **no ADMIN wildcard**. ADMIN has seven explicit grants. `IAM_SECURITY_A
 
 Existing role UUIDs must not be recreated. Seed inserts missing roles/permissions only.
 
-## Grants (48)
+v1.1 adds `CUSTOMER` → `CONSENT_MANAGE_OWN` and `CUSTOMER` → `DESIGN_CHANGE_REQUEST_OWN`. Existing databases get them from IAM migration `20261113090000_iam_rbac_v1_1_personalization`, which is idempotent and does not re-activate or touch other rows. The marker key stays `MEMORA_RBAC_V1_2026_10_15`. A database that already holds a v1 marker reports a checksum mismatch in the bootstrap dry-run; that is expected, and the migration has already applied the delta.
 
-### CUSTOMER (13)
+## Grants (51)
 
-`CART_MANAGE_OWN`, `ORDER_CREATE`, `ORDER_READ_OWN`, `ORDER_FINAL_CONFIRM`, `ORDER_CANCEL_REQUEST_OWN`, `DESIGN_SUBMIT_OWN`, `SOURCE_AUDIO_UPLOAD_OWN`, `FULFILLMENT_PREFERENCE_UPDATE_OWN`, `CLAIM_SUBMIT_OWN`, `DATA_RIGHTS_REQUEST_OWN`, `MEMORY_MANAGE_OWN`, `MEMORY_SHARE_OWN`, `MEMORY_REVOKE_SHARE_OWN`
+### CUSTOMER (15)
+
+`CART_MANAGE_OWN`, `ORDER_CREATE`, `ORDER_READ_OWN`, `ORDER_FINAL_CONFIRM`, `ORDER_CANCEL_REQUEST_OWN`, `DESIGN_SUBMIT_OWN`, `DESIGN_CHANGE_REQUEST_OWN`, `SOURCE_AUDIO_UPLOAD_OWN`, `CONSENT_MANAGE_OWN`, `FULFILLMENT_PREFERENCE_UPDATE_OWN`, `CLAIM_SUBMIT_OWN`, `DATA_RIGHTS_REQUEST_OWN`, `MEMORY_MANAGE_OWN`, `MEMORY_SHARE_OWN`, `MEMORY_REVOKE_SHARE_OWN`
 
 ### STORE_STAFF (7)
 
@@ -53,9 +55,9 @@ Existing role UUIDs must not be recreated. Seed inserts missing roles/permission
 
 `IAM_USER_READ`, `IAM_USER_PROVISION`, `IAM_USER_STATUS_MANAGE`, `IAM_USER_ROLE_ASSIGN`, `IAM_RBAC_MANAGE`, `IAM_SECURITY_AUDIT_READ`, `DATA_RIGHTS_PROCESS`
 
-`ORDER_READ_OPERATIONS`, `RECIPIENT_VERIFY`, and `HANDOVER_RECORD` are granted to more than one role (49 mappings of 46 distinct codes).
+`ORDER_READ_OPERATIONS`, `RECIPIENT_VERIFY`, and `HANDOVER_RECORD` are granted to more than one role (51 mappings of 48 distinct codes).
 
-## Permission catalog (46)
+## Permission catalog (48)
 
 | Domain | Code | Name | Business source |
 |---|---|---|---|
@@ -78,8 +80,10 @@ Existing role UUIDs must not be recreated. Seed inserts missing roles/permission
 | ORDERING_DESIGN | `DESIGN_SUBMIT_OWN` | Submit own design for review | MF02-15 to MF02-17; MF03-01; user-approved RBAC v1 |
 | ORDERING_DESIGN | `DESIGN_REVIEW` | Review submitted design | MF03-02 to MF03-03; code appears in DB Tracker; user-approved RBAC v1 |
 | ORDERING_DESIGN | `DESIGN_CHANGE_APPROVE` | Approve design change | MF03-05 to MF03-06; user-approved RBAC v1 |
+| ORDERING_DESIGN | `DESIGN_CHANGE_REQUEST_OWN` | Request change to own design | BM04 WF-02 F-12; PERSO-023; D-P-01; user-approved RBAC v1.1 |
 | PERSONALIZATION | `SOURCE_CAPTURE` | Capture fingerprint at store | MF02-07; user-approved RBAC v1 |
 | PERSONALIZATION | `SOURCE_AUDIO_UPLOAD_OWN` | Upload own audio | MF02-09 to MF02-10; user-approved RBAC v1 |
+| PERSONALIZATION | `CONSENT_MANAGE_OWN` | Manage own personalization consent | BM04 WF-01 F-02/F-13; PERSO-001..003; D-P-01; user-approved RBAC v1.1 |
 | PRODUCTION | `PRODUCTION_PLAN` | Plan production | MF04-01 to MF04-03; user-approved RBAC v1 |
 | PRODUCTION | `PRODUCTION_ASSIGN` | Assign production work | MF04-17; user-approved RBAC v1 |
 | PRODUCTION | `PRODUCTION_STEP_EXECUTE` | Execute assigned production step | MF04-06; MF04-17; user-approved RBAC v1 |

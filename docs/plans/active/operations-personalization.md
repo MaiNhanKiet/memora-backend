@@ -308,7 +308,7 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
   - Staff and Manager reads use `ORDER_READ_OPERATIONS` or `DESIGN_REVIEW`.
   - Capture uses `SOURCE_CAPTURE`. Soundwave upload uses `SOURCE_AUDIO_UPLOAD_OWN`.
   - New for CUSTOMER: `CONSENT_MANAGE_OWN` (Consent accept/list/revoke) and `DESIGN_CHANGE_REQUEST_OWN`.
-  - This makes RBAC v1.1: 46 → 48 permissions, and +2 CUSTOMER mappings. It needs an IAM catalog, contract and seed change (skill `prisma-migration-seed`) before the Consent and change-request APIs.
+  - This makes RBAC v1.1: 46 → 48 permissions, 49 → 51 mappings. Delivered by `permissions.ts` plus IAM migration `20261113090000_iam_rbac_v1_1_personalization` (idempotent, runs with the IAM migrate step on the next `main` deploy). The user chose this over a manual bootstrap because the server lost `iam.rbac_bootstrap_executions`.
 - [x] D-P-02 DECIDED: `consents.status` is `ACCEPTED` or `REVOKED`. `consent_type` is `FINGERPRINT_PROCESSING` or `SOUNDWAVE_PROCESSING`. `policy_version` comes from config. The legal and notice text belongs to product/FE (D-OPS-05). The backend stores only the version and evidence.
 - [x] D-P-03 DECIDED: the Gateway authenticates and checks the permission, then passes `memora.common.v1.VerifiedActor` (`user_id`, `customer_identity_id`) as `actor = 1` in each user-scoped request, protected by the internal secret. No token forwarding. Operations authorizes the resource. Contract: `docs/architecture/business-service-api-recipe.md` section 5. This applies to Commerce and Experience too.
 - [x] D-P-04 DECIDED: start with one Commerce read RPC, `GetOrderPersonalizationContext(order_id)`.
@@ -342,7 +342,7 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
   - Generate `0_baseline` from `db/` for each service's schemas.
   - Keep each service's `_prisma_migrations` table separate from IAM's.
   - Mark the baseline applied on the server with `prisma migrate resolve --applied`. That server step needs explicit authorization and a backup check when it runs.
-  - Repo part done on `feat/business-prisma-baseline`: `_prisma_migrations` lives in `catalog`, `after_sales` and `memory`. Local checks passed: fresh deploy, resolve on a `db/` copy, empty `migrate diff`, identical `pg_dump`. The server resolve has NOT been run.
+  - Repo part done on `feat/business-prisma-baseline`: `_prisma_migrations` lives in `catalog`, `after_sales` and `memory`. Local checks passed: fresh deploy, resolve on a `db/` copy, empty `migrate diff`, identical `pg_dump`. Server: `migrate resolve --applied 0_baseline` ran on 2026-11-13 for all three services (status up to date; app-role grants on the new tables came from existing default privileges).
 
 ## 9. Implementation progress log
 
