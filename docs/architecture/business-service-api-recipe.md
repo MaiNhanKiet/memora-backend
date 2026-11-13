@@ -18,6 +18,7 @@ Read `docs/plans/active/<feature>.md` first when it exists. Use the
 | Internal secret env | `<SVC>_INTERNAL_GRPC_SECRET` (required, 32+ chars) | Validated in `libs/config/src/env/<svc>.env.ts`. Read as `<svc>.internalGrpcSecret` |
 | Database access | `PrismaService` in `apps/<svc>-service/src/persistence/prisma/` | Global provider. One pool per process, shared with the health probe. Connects on first query |
 | Prisma schema | `apps/<svc>-service/prisma/schema.prisma` | Models match the BM04 baseline in `db/`. Cross-service ids are plain UUID columns |
+| Prisma migrations | `apps/<svc>-service/prisma/migrations/0_baseline` | The service's part of `db/` (same-service FKs only). `_prisma_migrations` lives in the service's own schema (`catalog`, `after_sales`, `memory`), set in `prisma.config.ts`. `npm run prisma:<svc>:migrate:status` / `:migrate:deploy` |
 | Gateway target config | `<SVC>_GRPC_URL` + `<SVC>_INTERNAL_GRPC_SECRET` | Optional until used, set together. Config keys `apiGateway.<svc>GrpcUrl` and `apiGateway.<svc>InternalGrpcSecret` |
 | Gateway client helpers | `apps/api-gateway/src/common/grpc/domain-grpc.ts` | `domainGrpcClientOptions(...)` and the `DomainGrpcClient` base class (secret, correlation metadata, timeout, error mapping) |
 | Proto validation | `npm run proto:check` | Loads every `proto/**/*.proto`. No list to edit |
@@ -92,6 +93,14 @@ Stop and ask before any step marked **ASK**.
   `PROPOSED`, `To Review` and `Decision Required` items are not permission to implement.
 - Schema changes follow the `db/` baseline. Do not run migrations or DDL against the server
   without explicit authorization and a backup.
+- A schema change is a new folder `prisma/migrations/<yyyymmddHHMMSS>_<snake_name>/migration.sql`
+  next to `0_baseline`, plus the matching `schema.prisma` edit. Never edit `0_baseline` or
+  an applied migration. Do not run `prisma migrate dev`/`reset` against a shared database:
+  the local `.env` can point at the server. Check with a throwaway local Postgres:
+  `migrate deploy`, then `prisma migrate diff --from-config-datasource --to-schema
+  <schema.prisma> --script` must print an empty migration. Use skill `prisma-migration-seed`.
+- Keep `map:` names in `schema.prisma` equal to the database constraint names. A different
+  name shows as a rename in `migrate diff`.
 - Do not add a Nest app, Postgres instance, GHCR image or Compose service.
 - Do not log secrets, tokens, OTPs or full request bodies.
 
@@ -193,3 +202,10 @@ The Gateway test shows that a client-supplied actor field is ignored.
   operations steps.
 - RBAC permission codes for Commerce, Operations and Experience come from the approved
   catalog. If one is missing, ask for approval.
+- CD does not run Commerce, Operations or Experience migrations. Only IAM has a migrate image.
+  On the server, the baseline must be marked applied once with
+  `prisma migrate resolve --applied 0_baseline`. Every later migration needs an approved
+  apply step. Both need explicit authorization.
+- Existing tables on the server are owned by `memora`, not `<svc>_migrate`. A migration that
+  alters them must run as the owner until ownership is changed, which is a separate approved
+  step.
