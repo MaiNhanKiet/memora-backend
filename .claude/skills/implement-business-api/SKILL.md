@@ -36,11 +36,11 @@ Gateway client helper, env validation for the secret, or a `proto:check` list en
 - The internal secret authenticates the Gateway, not the user. Follow the actor contract in
   recipe section 5:
   - A user-scoped RPC takes `memora.common.v1.VerifiedActor actor = 1`.
-  - Gateway builds it from `@CurrentUser()` only and never forwards the token.
-  - The service controller validates it, and the use case checks owner, store, order and state.
-  - If `proto/common/v1/actor.proto` and `libs/contracts/src/common/actor.ts` do not exist yet,
-    add them exactly as the recipe shows. Never trust client actor fields or `x-actor-*` / `x-customer-identity-id`
-    metadata.
+  - Gateway builds it with `toVerifiedActor(principal)` (`apps/api-gateway/src/common/grpc/verified-actor.ts`)
+    from `@CurrentUser()` only, and never forwards the token.
+  - The service controller calls `parseVerifiedActor(request.actor)` (and `requireCustomerActor`
+    for customer-only RPCs) from `@app/common`. The use case checks owner, store, order and state.
+  - Never trust client actor fields or `x-actor-*` / `x-customer-identity-id` metadata.
 - Create only the layers the feature needs. No empty folders, modules, providers or RPCs.
 - Domain code imports no Nest, Prisma or gRPC. `presentation` never imports `infrastructure`.
 - Do not add a Nest app, GHCR image, Compose service, Postgres instance, migration, seed,

@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package memora.common.v1;
+
+// Danh tính người dùng do API Gateway đã xác thực (quyết định D-P-03).
+// Gateway điền từ principal sau JwtAuthGuard, không lấy từ body/query/header của client.
+// Commerce, Operations, Experience nhúng vào request của RPC có người dùng:
+//
+//   import "common/v1/actor.proto";
+//
+//   message GetMyConsentRequest {
+//     memora.common.v1.VerifiedActor actor = 1;
+//     string consent_id = 2;
+//   }
+//
+// Chỉ tin được vì caller đã qua internal gRPC secret. Không chứa role/permission:
+// Gateway kiểm tra permission, service kiểm tra quyền trên resource.
+// Chi tiết: docs/architecture/business-service-api-recipe.md mục 5.
+message VerifiedActor {
+  // IAM user id (UUID). Luôn có.
+  string user_id = 1;
+  // Customer identity id (UUID). Rỗng khi user chưa có customer identity.
+  string customer_identity_id = 2;
+}

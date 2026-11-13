@@ -23,7 +23,7 @@ Applies to Commerce, Operations, and Experience. Read `docs/architecture/busines
 - Authorize the resource in the owning use case. Do not trust a client-supplied actor id.
 - Actor context (decision D-P-03; full contract in `business-service-api-recipe.md` section 5):
   - A user-scoped RPC takes `memora.common.v1.VerifiedActor actor = 1` (`proto/common/v1/actor.proto`). Gateway fills it only from the authenticated principal. The service never receives or validates the access token.
-  - The controller parses `actor` once (`INVALID_ARGUMENT` if invalid). The use case checks owner, store, order and state.
+  - The controller parses `actor` once with `parseVerifiedActor` (`@app/common`, `INVALID_ARGUMENT` if invalid). Gateway builds it with `toVerifiedActor`. The use case checks owner, store, order and state.
   - Do not re-check the route permission in the service. Do not put roles or permissions in the request. Use one RPC per access scope.
   - `x-actor-*` / `x-customer-identity-id` metadata is log correlation only, never authorization.
 - For a new API, follow `docs/architecture/business-service-api-recipe.md` (skill `implement-business-api`). gRPC hosting, the internal auth guard, `PrismaService` and Gateway client helpers already exist: reuse them, do not add parallel copies.

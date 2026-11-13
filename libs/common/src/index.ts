@@ -11,3 +11,4 @@ export * from './filters/http-exception.filter';
 export * from './filters/grpc-exception.filter';
 export * from './guards/internal-grpc-auth.guard';
 export * from './utils/pagination';
+export * from './utils/verified-actor';
