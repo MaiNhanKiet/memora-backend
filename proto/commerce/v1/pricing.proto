@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package commerce.v1;
+
+service PricingService {
+  rpc EstimatePrice (EstimatePriceRequest) returns (EstimatePriceResponse);
+}
+
+message EstimatePriceRequest {
+  string template_variant_id = 1;
+  double target_size = 2;
+  repeated string gemstone_option_ids = 3;
+  string personalization_package = 4;
+}
+
+message PriceBreakdown {
+  double base_blank_price = 1;
+  double gemstones_price = 2;
+  double personalization_fee = 3;
+  double resize_fee = 4;
+}
+
+message GemstonePriceLineItem {
+  string gemstone_option_id = 1;
+  double price = 2;
+}
+
+message EstimatePriceResponse {
+  double estimated_total = 1;
+  string currency = 2;
+  string estimated_at = 3;
+  PriceBreakdown breakdown = 4;
+  repeated GemstonePriceLineItem gemstone_line_items = 5;
+}
