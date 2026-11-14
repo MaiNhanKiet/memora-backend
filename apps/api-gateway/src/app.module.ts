@@ -15,6 +15,7 @@ import { HealthModule } from './modules/health/health.module';
 import { IamModule } from './modules/iam/iam.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { PricingModule } from './modules/pricing/pricing.module';
+import { DesignModule } from './modules/design/design.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
     IamModule,
     CatalogModule,
     PricingModule,
+    DesignModule,
   ],
   providers: [
     {

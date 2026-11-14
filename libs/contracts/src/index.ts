@@ -4,3 +4,4 @@ export * from './iam/iam.grpc';
 export * from './iam/permissions';
 export * from './commerce/catalog.grpc';
 export * from './commerce/pricing.grpc';
+export * from './commerce/cart.grpc';
