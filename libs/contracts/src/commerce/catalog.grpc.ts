@@ -219,6 +219,144 @@ export interface ValidateConfigurationResponse {
 }
 
 // -----------------------------------------------------------------------------
+// Admin Catalog Interfaces
+// -----------------------------------------------------------------------------
+
+export interface CreateTemplateRequest {
+  code: string;
+  name: string;
+  description?: string;
+  glbAssetKey: string;
+  stoneLayout?: string;
+  designSupportedPersonalizationPackages?: string[];
+  gender?: string;
+  createdByUserId?: string;
+}
+
+export interface UpdateTemplateRequest {
+  templateId: string;
+  name?: string;
+  description?: string;
+  glbAssetKey?: string;
+  stoneLayout?: string;
+  designSupportedPersonalizationPackages?: string[];
+  gender?: string;
+}
+
+export interface PublishTemplateRequest {
+  templateId: string;
+}
+
+export interface ArchiveTemplateRequest {
+  templateId: string;
+}
+
+export interface CreateMaterialRequest {
+  code: string;
+  name: string;
+  materialFamily?: string;
+  purityPercent?: number;
+  color?: string;
+}
+
+export interface UpdateMaterialRequest {
+  materialId: string;
+  name?: string;
+  materialFamily?: string;
+  purityPercent?: number;
+  color?: string;
+  status?: string;
+}
+
+export interface CreateVariantRequest {
+  ringTemplateId: string;
+  materialId: string;
+  standardSize: number;
+  maxUpDelta?: number;
+  maxDownDelta?: number;
+  resizeMethod?: string;
+  addedMetalAllowed?: boolean;
+  localWallThicknessMm: number;
+  minRemainingWallThicknessMm: number;
+  maxSafeEngravingDepthMm: number;
+  createdByUserId?: string;
+}
+
+export interface UpdateVariantRequest {
+  variantId: string;
+  standardSize?: number;
+  maxUpDelta?: number;
+  maxDownDelta?: number;
+  resizeMethod?: string;
+  addedMetalAllowed?: boolean;
+  localWallThicknessMm?: number;
+  minRemainingWallThicknessMm?: number;
+  maxSafeEngravingDepthMm?: number;
+  status?: string;
+}
+
+export interface CreateGemstoneOptionRequest {
+  code: string;
+  name: string;
+  stoneType: string;
+  shape: string;
+  lengthMm: number;
+  widthMm: number;
+  colorGrade?: string;
+  clarityGrade?: string;
+  certifiedRequired?: boolean;
+}
+
+export interface UpdateCompatibilitiesRequest {
+  templateVariantId: string;
+  gemstoneGroupId: string;
+  gemstoneOptionIds: string[];
+}
+
+export interface UpdateCompatibilitiesResponse {
+  templateVariantId: string;
+  gemstoneGroupId: string;
+  allowedOptionIds: string[];
+  updatedCount: number;
+}
+
+export interface GetResizePoliciesRequest {
+  templateVariantId?: string;
+  templateId?: string;
+}
+
+export interface ResizePolicyItem {
+  templateVariantId: string;
+  templateId: string;
+  templateName: string;
+  materialName: string;
+  standardSize: number;
+  minSize: number;
+  maxSize: number;
+  maxUpDelta: number;
+  maxDownDelta: number;
+  resizeMethod: string;
+  addedMetalAllowed: boolean;
+  localWallThicknessMm: number;
+  minRemainingWallThicknessMm: number;
+  maxSafeEngravingDepthMm: number;
+}
+
+export interface ResizePoliciesResponse {
+  data: ResizePolicyItem[];
+}
+
+export interface UpdateResizePoliciesRequest {
+  templateVariantId: string;
+  maxUpDelta?: number;
+  maxDownDelta?: number;
+  resizeMethod?: string;
+  addedMetalAllowed?: boolean;
+  minRemainingWallThicknessMm?: number;
+  maxSafeEngravingDepthMm?: number;
+}
+
+// -----------------------------------------------------------------------------
 // Service Interfaces
 // -----------------------------------------------------------------------------
 
@@ -259,6 +397,56 @@ export interface CatalogServiceClient {
     request: ValidateConfigurationRequest,
     metadata?: Metadata,
   ): Observable<ValidateConfigurationResponse>;
+
+  // Admin APIs
+  createTemplate(
+    request: CreateTemplateRequest,
+    metadata?: Metadata,
+  ): Observable<TemplateResponse>;
+  updateTemplate(
+    request: UpdateTemplateRequest,
+    metadata?: Metadata,
+  ): Observable<TemplateResponse>;
+  publishTemplate(
+    request: PublishTemplateRequest,
+    metadata?: Metadata,
+  ): Observable<TemplateResponse>;
+  archiveTemplate(
+    request: ArchiveTemplateRequest,
+    metadata?: Metadata,
+  ): Observable<TemplateResponse>;
+  createMaterial(
+    request: CreateMaterialRequest,
+    metadata?: Metadata,
+  ): Observable<MaterialResponse>;
+  updateMaterial(
+    request: UpdateMaterialRequest,
+    metadata?: Metadata,
+  ): Observable<MaterialResponse>;
+  createVariant(
+    request: CreateVariantRequest,
+    metadata?: Metadata,
+  ): Observable<TemplateVariantResponse>;
+  updateVariant(
+    request: UpdateVariantRequest,
+    metadata?: Metadata,
+  ): Observable<TemplateVariantResponse>;
+  createGemstoneOption(
+    request: CreateGemstoneOptionRequest,
+    metadata?: Metadata,
+  ): Observable<GemstoneOptionResponse>;
+  updateCompatibilities(
+    request: UpdateCompatibilitiesRequest,
+    metadata?: Metadata,
+  ): Observable<UpdateCompatibilitiesResponse>;
+  getResizePolicies(
+    request: GetResizePoliciesRequest,
+    metadata?: Metadata,
+  ): Observable<ResizePoliciesResponse>;
+  updateResizePolicies(
+    request: UpdateResizePoliciesRequest,
+    metadata?: Metadata,
+  ): Observable<ResizePoliciesResponse>;
 }
 
 export interface CatalogServiceHandler {
@@ -283,4 +471,30 @@ export interface CatalogServiceHandler {
   validateConfiguration(
     request: ValidateConfigurationRequest,
   ): Promise<ValidateConfigurationResponse>;
+
+  // Admin APIs
+  createTemplate(request: CreateTemplateRequest): Promise<TemplateResponse>;
+  updateTemplate(request: UpdateTemplateRequest): Promise<TemplateResponse>;
+  publishTemplate(request: PublishTemplateRequest): Promise<TemplateResponse>;
+  archiveTemplate(request: ArchiveTemplateRequest): Promise<TemplateResponse>;
+  createMaterial(request: CreateMaterialRequest): Promise<MaterialResponse>;
+  updateMaterial(request: UpdateMaterialRequest): Promise<MaterialResponse>;
+  createVariant(
+    request: CreateVariantRequest,
+  ): Promise<TemplateVariantResponse>;
+  updateVariant(
+    request: UpdateVariantRequest,
+  ): Promise<TemplateVariantResponse>;
+  createGemstoneOption(
+    request: CreateGemstoneOptionRequest,
+  ): Promise<GemstoneOptionResponse>;
+  updateCompatibilities(
+    request: UpdateCompatibilitiesRequest,
+  ): Promise<UpdateCompatibilitiesResponse>;
+  getResizePolicies(
+    request: GetResizePoliciesRequest,
+  ): Promise<ResizePoliciesResponse>;
+  updateResizePolicies(
+    request: UpdateResizePoliciesRequest,
+  ): Promise<ResizePoliciesResponse>;
 }

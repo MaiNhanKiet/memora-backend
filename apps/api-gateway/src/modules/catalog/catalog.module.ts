@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { domainGrpcClientOptions } from '../../common/grpc/domain-grpc';
 import { CatalogController } from './controllers/catalog.controller';
+import { AdminCatalogController } from './controllers/admin-catalog.controller';
 import {
   CatalogGrpcClient,
   COMMERCE_CATALOG_GRPC_CLIENT,
@@ -18,7 +19,7 @@ import {
       }),
     ]),
   ],
-  controllers: [CatalogController],
+  controllers: [CatalogController, AdminCatalogController],
   providers: [CatalogGrpcClient],
   exports: [CatalogGrpcClient],
 })

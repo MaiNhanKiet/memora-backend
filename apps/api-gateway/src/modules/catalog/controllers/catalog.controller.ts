@@ -185,4 +185,20 @@ export class CatalogController {
     const res = await this.catalogClient.listGemstoneSlots({ templateId });
     return res.data;
   }
+
+  // ---------------------------------------------------------------------------
+  // [CATAL-019] GET /api/v1/catalog/resize-policies
+  // ---------------------------------------------------------------------------
+  @Public()
+  @Get('resize-policies')
+  async getResizePolicies(
+    @Query('templateVariantId') templateVariantId?: string,
+    @Query('templateId') templateId?: string,
+  ) {
+    const res = await this.catalogClient.getResizePolicies({
+      templateVariantId,
+      templateId,
+    });
+    return res.data;
+  }
 }

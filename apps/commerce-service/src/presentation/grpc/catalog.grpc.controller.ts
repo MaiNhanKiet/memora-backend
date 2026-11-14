@@ -1,7 +1,14 @@
 import { Controller, UseGuards } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import type {
+  ArchiveTemplateRequest,
   CatalogServiceHandler,
+  CreateGemstoneOptionRequest,
+  CreateMaterialRequest,
+  CreateTemplateRequest,
+  CreateVariantRequest,
+  GemstoneOptionResponse,
+  GetResizePoliciesRequest,
   GetTemplate3DAssetsRequest,
   GetTemplateByIdRequest,
   GetTemplateConfigurationOptionsRequest,
@@ -15,9 +22,19 @@ import type {
   ListTemplatesResponse,
   ListTemplateVariantsRequest,
   ListTemplateVariantsResponse,
+  MaterialResponse,
+  PublishTemplateRequest,
+  ResizePoliciesResponse,
   Template3DAssetsResponse,
   TemplateConfigurationOptionsResponse,
   TemplateResponse,
+  TemplateVariantResponse,
+  UpdateCompatibilitiesRequest,
+  UpdateCompatibilitiesResponse,
+  UpdateMaterialRequest,
+  UpdateResizePoliciesRequest,
+  UpdateTemplateRequest,
+  UpdateVariantRequest,
   ValidateConfigurationRequest,
   ValidateConfigurationResponse,
 } from '@app/contracts';
@@ -84,5 +101,81 @@ export class CatalogGrpcController implements CatalogServiceHandler {
     request: ValidateConfigurationRequest,
   ): Promise<ValidateConfigurationResponse> {
     return this.catalogService.validateConfiguration(request);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin APIs
+  // ---------------------------------------------------------------------------
+
+  @GrpcMethod('CatalogService', 'CreateTemplate')
+  createTemplate(request: CreateTemplateRequest): Promise<TemplateResponse> {
+    return this.catalogService.createTemplate(request);
+  }
+
+  @GrpcMethod('CatalogService', 'UpdateTemplate')
+  updateTemplate(request: UpdateTemplateRequest): Promise<TemplateResponse> {
+    return this.catalogService.updateTemplate(request);
+  }
+
+  @GrpcMethod('CatalogService', 'PublishTemplate')
+  publishTemplate(request: PublishTemplateRequest): Promise<TemplateResponse> {
+    return this.catalogService.publishTemplate(request);
+  }
+
+  @GrpcMethod('CatalogService', 'ArchiveTemplate')
+  archiveTemplate(request: ArchiveTemplateRequest): Promise<TemplateResponse> {
+    return this.catalogService.archiveTemplate(request);
+  }
+
+  @GrpcMethod('CatalogService', 'CreateMaterial')
+  createMaterial(request: CreateMaterialRequest): Promise<MaterialResponse> {
+    return this.catalogService.createMaterial(request);
+  }
+
+  @GrpcMethod('CatalogService', 'UpdateMaterial')
+  updateMaterial(request: UpdateMaterialRequest): Promise<MaterialResponse> {
+    return this.catalogService.updateMaterial(request);
+  }
+
+  @GrpcMethod('CatalogService', 'CreateVariant')
+  createVariant(
+    request: CreateVariantRequest,
+  ): Promise<TemplateVariantResponse> {
+    return this.catalogService.createVariant(request);
+  }
+
+  @GrpcMethod('CatalogService', 'UpdateVariant')
+  updateVariant(
+    request: UpdateVariantRequest,
+  ): Promise<TemplateVariantResponse> {
+    return this.catalogService.updateVariant(request);
+  }
+
+  @GrpcMethod('CatalogService', 'CreateGemstoneOption')
+  createGemstoneOption(
+    request: CreateGemstoneOptionRequest,
+  ): Promise<GemstoneOptionResponse> {
+    return this.catalogService.createGemstoneOption(request);
+  }
+
+  @GrpcMethod('CatalogService', 'UpdateCompatibilities')
+  updateCompatibilities(
+    request: UpdateCompatibilitiesRequest,
+  ): Promise<UpdateCompatibilitiesResponse> {
+    return this.catalogService.updateCompatibilities(request);
+  }
+
+  @GrpcMethod('CatalogService', 'GetResizePolicies')
+  getResizePolicies(
+    request: GetResizePoliciesRequest,
+  ): Promise<ResizePoliciesResponse> {
+    return this.catalogService.getResizePolicies(request);
+  }
+
+  @GrpcMethod('CatalogService', 'UpdateResizePolicies')
+  updateResizePolicies(
+    request: UpdateResizePoliciesRequest,
+  ): Promise<ResizePoliciesResponse> {
+    return this.catalogService.updateResizePolicies(request);
   }
 }

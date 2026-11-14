@@ -85,6 +85,12 @@ export class CatalogMapper {
     };
   }
 
+  toTemplateVariantResponse(
+    entity: template_variants,
+  ): TemplateVariantResponse {
+    return this.toVariantResponse(entity);
+  }
+
   toGemstoneOptionResponse(entity: gemstone_options): GemstoneOptionResponse {
     return {
       id: entity.id,
