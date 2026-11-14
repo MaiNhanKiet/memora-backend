@@ -15,6 +15,7 @@ import { HealthModule } from './modules/health/health.module';
 import { IamModule } from './modules/iam/iam.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { PricingModule } from './modules/pricing/pricing.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 import { DesignModule } from './modules/design/design.module';
 import { OrderingModule } from './modules/ordering/ordering.module';
 
@@ -43,6 +44,7 @@ import { OrderingModule } from './modules/ordering/ordering.module';
     IamModule,
     CatalogModule,
     PricingModule,
+    InventoryModule,
     DesignModule,
     OrderingModule,
   ],

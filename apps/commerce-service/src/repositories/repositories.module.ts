@@ -3,6 +3,7 @@ import { CatalogRepository } from './catalog.repository';
 import { PricingRepository } from './pricing.repository';
 import { CartRepository } from './cart.repository';
 import { OrderingRepository } from './ordering.repository';
+import { InventoryRepository } from './inventory.repository';
 import { PrismaModule } from '../persistence/prisma/prisma.module';
 
 @Module({
@@ -12,12 +13,14 @@ import { PrismaModule } from '../persistence/prisma/prisma.module';
     PricingRepository,
     CartRepository,
     OrderingRepository,
+    InventoryRepository,
   ],
   exports: [
     CatalogRepository,
     PricingRepository,
     CartRepository,
     OrderingRepository,
+    InventoryRepository,
   ],
 })
 export class RepositoriesModule {}

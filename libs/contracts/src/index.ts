@@ -6,3 +6,4 @@ export * from './commerce/catalog.grpc';
 export * from './commerce/pricing.grpc';
 export * from './commerce/cart.grpc';
 export * from './commerce/ordering.grpc';
+export * from './commerce/inventory.grpc';
