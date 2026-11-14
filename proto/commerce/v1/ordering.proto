@@ -1,0 +1,186 @@
+syntax = "proto3";
+
+package commerce.v1;
+
+service OrderingService {
+  rpc CreateOrder (CreateOrderRequest) returns (CreateOrderResponse);
+  rpc ListOrders (ListOrdersRequest) returns (ListOrdersResponse);
+  rpc GetOrderById (GetOrderByIdRequest) returns (GetOrderByIdResponse);
+  rpc GetOrderTimeline (GetOrderTimelineRequest) returns (GetOrderTimelineResponse);
+  rpc GetRingItemDetails (GetRingItemDetailsRequest) returns (GetRingItemDetailsResponse);
+}
+
+message OrderActorIdentity {
+  string user_id = 1;
+  string guest_session_id = 2;
+}
+
+message OrderPreP1Acknowledgement {
+  string notice_version = 1;
+  bool privacy_notice_acknowledged = 2;
+  bool p1_nonrefund_acknowledged = 3;
+}
+
+message CreateOrderRequest {
+  OrderActorIdentity actor = 1;
+  repeated string selected_draft_ids = 2;
+  string fulfillment_mode = 3;
+  string recipient_name = 4;
+  string recipient_phone = 5;
+  string recipient_email = 6;
+  string delivery_address_json = 7;
+  string source_plan_mode = 8;
+  OrderPreP1Acknowledgement pre_p1_acknowledgement = 9;
+}
+
+message CreateOrderResponse {
+  string order_id = 1;
+  string order_no = 2;
+  string status = 3;
+  string source_plan_mode = 4;
+  int32 items_count = 5;
+  double total_amount = 6;
+  double deposit_amount = 7;
+  string currency = 8;
+  string created_at = 9;
+}
+
+message ListOrdersRequest {
+  OrderActorIdentity actor = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  string status = 4;
+}
+
+message OrderSummaryItem {
+  string id = 1;
+  string order_no = 2;
+  string status = 3;
+  string source_plan_mode = 4;
+  int32 items_count = 5;
+  double total_amount = 6;
+  string currency = 7;
+  string recipient_name = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+message ListOrdersResponse {
+  repeated OrderSummaryItem items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 limit = 4;
+}
+
+message GetOrderByIdRequest {
+  OrderActorIdentity actor = 1;
+  string order_id = 2;
+}
+
+message OrderQuoteSummary {
+  string quote_id = 1;
+  string quote_no = 2;
+  string quote_type = 3;
+  double subtotal_amount = 4;
+  double delivery_amount = 5;
+  double adjustment_amount = 6;
+  double total_amount = 7;
+  string currency = 8;
+  string status = 9;
+}
+
+message RingItemSummary {
+  string id = 1;
+  int32 item_no = 2;
+  string source_ring_design_draft_id = 3;
+  string current_version_id = 4;
+  int32 version_no = 5;
+  string template_variant_id = 6;
+  string template_code = 7;
+  string template_name = 8;
+  string material_name = 9;
+  double target_size = 10;
+  string personalization_package = 11;
+  bool memory_enabled = 12;
+}
+
+message GetOrderByIdResponse {
+  string id = 1;
+  string order_no = 2;
+  string status = 3;
+  string source_plan_mode = 4;
+  string fulfillment_mode = 5;
+  string recipient_name = 6;
+  string recipient_phone = 7;
+  string recipient_email = 8;
+  string delivery_address_json = 9;
+  OrderQuoteSummary current_quote = 10;
+  repeated RingItemSummary items = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}
+
+message GetOrderTimelineRequest {
+  OrderActorIdentity actor = 1;
+  string order_id = 2;
+}
+
+message TimelineEventItem {
+  string event_type = 1;
+  string title = 2;
+  string description = 3;
+  string occurred_at = 4;
+  string status = 5;
+}
+
+message StageGateItem {
+  string stage_code = 1;
+  string stage_name = 2;
+  string status = 3; // PENDING, ACTIVE, COMPLETED, SKIPPED
+  bool is_current = 4;
+  string completed_at = 5;
+}
+
+message GetOrderTimelineResponse {
+  string order_id = 1;
+  string order_no = 2;
+  string current_status = 3;
+  repeated TimelineEventItem events = 4;
+  repeated StageGateItem stage_gates = 5;
+}
+
+message GetRingItemDetailsRequest {
+  OrderActorIdentity actor = 1;
+  string order_id = 2;
+  string ring_item_id = 3;
+}
+
+message RingItemGemstoneDetail {
+  int32 slot_number = 1;
+  string gemstone_slot_id = 2;
+  string gemstone_option_id = 3;
+  string gemstone_type = 4;
+  string gemstone_name = 5;
+  string shape = 6;
+  double carat_weight = 7;
+  string color = 8;
+  string clarity = 9;
+}
+
+message GetRingItemDetailsResponse {
+  string id = 1;
+  string order_id = 2;
+  int32 item_no = 3;
+  string source_ring_design_draft_id = 4;
+  string current_version_id = 5;
+  int32 version_no = 6;
+  string template_variant_id = 7;
+  string template_code = 8;
+  string template_name = 9;
+  string material_name = 10;
+  double target_size = 11;
+  string personalization_package = 12;
+  bool memory_enabled = 13;
+  repeated RingItemGemstoneDetail gemstones = 14;
+  string created_at = 15;
+}

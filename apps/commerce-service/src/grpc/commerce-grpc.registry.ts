@@ -8,4 +8,5 @@ export const COMMERCE_GRPC_PROTOS = [
   { package: 'commerce.v1', file: 'commerce/v1/catalog.proto' },
   { package: 'commerce.v1', file: 'commerce/v1/pricing.proto' },
   { package: 'commerce.v1', file: 'commerce/v1/cart.proto' },
+  { package: 'commerce.v1', file: 'commerce/v1/ordering.proto' },
 ] as const;
