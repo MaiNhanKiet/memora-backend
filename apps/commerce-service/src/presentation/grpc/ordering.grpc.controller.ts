@@ -3,15 +3,21 @@ import { GrpcMethod } from '@nestjs/microservices';
 import type {
   CreateOrderRequest,
   CreateOrderResponse,
+  GetAdminOrderDetailsRequest,
+  GetAdminOrderDetailsResponse,
   GetOrderByIdRequest,
   GetOrderByIdResponse,
   GetOrderTimelineRequest,
   GetOrderTimelineResponse,
   GetRingItemDetailsRequest,
   GetRingItemDetailsResponse,
+  ListAdminOrdersRequest,
+  ListAdminOrdersResponse,
   ListOrdersRequest,
   ListOrdersResponse,
   OrderingServiceHandler,
+  UpdateOrderStatusRequest,
+  UpdateOrderStatusResponse,
 } from '@app/contracts';
 import { OrderingService } from '../../application/ordering/ordering.service';
 import { CommerceInternalGrpcAuthGuard } from '../../grpc/commerce-internal-grpc-auth.guard';
@@ -48,5 +54,26 @@ export class OrderingGrpcController implements OrderingServiceHandler {
     request: GetRingItemDetailsRequest,
   ): Promise<GetRingItemDetailsResponse> {
     return this.orderingService.getRingItemDetails(request);
+  }
+
+  @GrpcMethod('OrderingService', 'ListAdminOrders')
+  listAdminOrders(
+    request: ListAdminOrdersRequest,
+  ): Promise<ListAdminOrdersResponse> {
+    return this.orderingService.listAdminOrders(request);
+  }
+
+  @GrpcMethod('OrderingService', 'GetAdminOrderDetails')
+  getAdminOrderDetails(
+    request: GetAdminOrderDetailsRequest,
+  ): Promise<GetAdminOrderDetailsResponse> {
+    return this.orderingService.getAdminOrderDetails(request);
+  }
+
+  @GrpcMethod('OrderingService', 'UpdateOrderStatus')
+  updateOrderStatus(
+    request: UpdateOrderStatusRequest,
+  ): Promise<UpdateOrderStatusResponse> {
+    return this.orderingService.updateOrderStatus(request);
   }
 }

@@ -18,6 +18,9 @@ describe('OrderingService', () => {
     listOrders: jest.fn(),
     findOrderById: jest.fn(),
     findRingItemWithDetails: jest.fn(),
+    listAdminOrders: jest.fn(),
+    findAdminOrderById: jest.fn(),
+    updateOrderStatus: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -268,6 +271,167 @@ describe('OrderingService', () => {
       expect(
         res.stageGates.find((s) => s.stageCode === 'DEPOSIT_P1')?.status,
       ).toBe('ACTIVE');
+    });
+  });
+
+  describe('listAdminOrders', () => {
+    it('should return mapped admin order items and pagination', async () => {
+      mockRepository.listAdminOrders.mockResolvedValue({
+        items: [
+          {
+            id: 'ord-1',
+            order_no: 'ORD-123',
+            status: 'AWAITING_P1',
+            source_plan_mode: 'N/A',
+            owner_customer_identity_id: 'cust-1',
+            recipient_name: 'Nguyen Van A',
+            recipient_phone: '0901234567',
+            recipient_email: 'a@example.com',
+            _count: { ring_items: 2 },
+            quotes_orders_current_quote_idToquotes: {
+              total_amount: new Prisma.Decimal(15000000),
+              currency: 'VND',
+            },
+            created_at: new Date('2026-11-14T10:00:00.000Z'),
+            updated_at: new Date('2026-11-14T10:00:00.000Z'),
+          },
+        ],
+        total: 1,
+        page: 1,
+        limit: 20,
+      });
+
+      const res = await service.listAdminOrders({ page: 1, limit: 20 });
+
+      expect(res.total).toBe(1);
+      expect(res.items).toHaveLength(1);
+      expect(res.items[0].orderNo).toBe('ORD-123');
+      expect(res.items[0].itemsCount).toBe(2);
+      expect(res.items[0].totalAmount).toBe(15000000);
+    });
+  });
+
+  describe('getAdminOrderDetails', () => {
+    it('should throw NotFoundException if order does not exist', async () => {
+      mockRepository.findAdminOrderById.mockResolvedValue(null);
+
+      await expect(
+        service.getAdminOrderDetails({ orderId: 'missing-ord' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return admin order details successfully', async () => {
+      mockRepository.findAdminOrderById.mockResolvedValue({
+        id: 'ord-1',
+        order_no: 'ORD-123',
+        status: 'AWAITING_P1',
+        source_plan_mode: 'N/A',
+        owner_customer_identity_id: 'cust-1',
+        guest_email: null,
+        guest_phone: null,
+        guest_email_verified_at: null,
+        recipient_name: 'Nguyen Van A',
+        recipient_phone: '0901234567',
+        recipient_email: 'a@example.com',
+        delivery_address_json: { city: 'HCM' },
+        pre_p1_evidence_json: { ack: true },
+        quotes_orders_current_quote_idToquotes: {
+          id: 'q-1',
+          quote_no: 'QUO-123',
+          quote_type: 'PROVISIONAL',
+          subtotal_amount: new Prisma.Decimal(15000000),
+          delivery_amount: new Prisma.Decimal(0),
+          adjustment_amount: new Prisma.Decimal(0),
+          total_amount: new Prisma.Decimal(15000000),
+          currency: 'VND',
+          status: 'ISSUED',
+        },
+        ring_items: [
+          {
+            id: 'item-1',
+            item_no: 1,
+            source_ring_design_draft_id: 'draft-1',
+            current_version_id: 'ver-1',
+            ring_item_versions_ring_items_current_version_idToring_item_versions:
+              {
+                version_no: 1,
+                target_size: new Prisma.Decimal(14),
+                personalization_package: 'SOUNDWAVE',
+                memory_enabled: true,
+                template_variants: {
+                  id: 'tv-1',
+                  materials: { name: 'Vàng 18K' },
+                  ring_templates: { code: 'T01', name: 'Nhẫn Cưới' },
+                },
+              },
+          },
+        ],
+        cancelled_at: null,
+        cancellation_reason: null,
+        created_at: new Date('2026-11-14T10:00:00.000Z'),
+        updated_at: new Date('2026-11-14T10:00:00.000Z'),
+      });
+
+      const res = await service.getAdminOrderDetails({ orderId: 'ord-1' });
+
+      expect(res.id).toBe('ord-1');
+      expect(res.currentQuote?.totalAmount).toBe(15000000);
+      expect(res.items).toHaveLength(1);
+      expect(res.items[0].personalizationPackage).toBe('SOUNDWAVE');
+    });
+  });
+
+  describe('updateOrderStatus', () => {
+    it('should throw NotFoundException if order does not exist', async () => {
+      mockRepository.findAdminOrderById.mockResolvedValue(null);
+
+      await expect(
+        service.updateOrderStatus({
+          orderId: 'missing-ord',
+          targetStatus: 'CANCELLED',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if transition is invalid', async () => {
+      mockRepository.findAdminOrderById.mockResolvedValue({
+        id: 'ord-1',
+        status: 'DELIVERED',
+      });
+
+      await expect(
+        service.updateOrderStatus({
+          orderId: 'ord-1',
+          targetStatus: 'AWAITING_P1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should transition status successfully', async () => {
+      mockRepository.findAdminOrderById.mockResolvedValue({
+        id: 'ord-1',
+        status: 'AWAITING_P1',
+      });
+
+      mockRepository.updateOrderStatus.mockResolvedValue({
+        id: 'ord-1',
+        order_no: 'ORD-123',
+        status: 'PENDING_FINAL_QUOTE',
+        updated_at: new Date('2026-11-14T11:00:00.000Z'),
+      });
+
+      const res = await service.updateOrderStatus({
+        orderId: 'ord-1',
+        targetStatus: 'PENDING_FINAL_QUOTE',
+      });
+
+      expect(res.previousStatus).toBe('AWAITING_P1');
+      expect(res.currentStatus).toBe('PENDING_FINAL_QUOTE');
+      expect(mockRepository.updateOrderStatus).toHaveBeenCalledWith({
+        orderId: 'ord-1',
+        targetStatus: 'PENDING_FINAL_QUOTE',
+        reason: undefined,
+      });
     });
   });
 });

@@ -119,3 +119,57 @@ export function ApiGetRingItemDetailsDocs() {
     }),
   );
 }
+
+export function ApiListAdminOrdersDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-006] Admin: List all orders with filters',
+      description:
+        'Returns paginated list of system-wide orders with status, date range, and keyword search filters. Requires ORDER_READ_OPERATIONS permission.',
+    }),
+    ApiBearerAuth(),
+    ApiOkResponse({ description: 'Admin orders list returned successfully' }),
+    ApiForbiddenResponse({
+      description: 'Insufficient permissions (requires ORDER_READ_OPERATIONS)',
+    }),
+  );
+}
+
+export function ApiGetAdminOrderDetailsDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-ADMIN-01] Admin: Get full order details',
+      description:
+        'Retrieves comprehensive order details for staff/manager, including customer identity, ring items, quotes, and pre-P1 evidence.',
+    }),
+    ApiBearerAuth(),
+    ApiOkResponse({
+      description: 'Admin order details returned successfully',
+    }),
+    ApiForbiddenResponse({
+      description: 'Insufficient permissions (requires ORDER_READ_OPERATIONS)',
+    }),
+    ApiNotFoundResponse({ description: 'Order not found' }),
+  );
+}
+
+export function ApiUpdateOrderStatusDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-ADMIN-02] Admin: Update order status transition',
+      description:
+        'Transitions order to a valid next lifecycle status or CANCELLED with reason. Requires ORDER_READ_OPERATIONS permission.',
+    }),
+    ApiBearerAuth(),
+    ApiOkResponse({
+      description: 'Order status transitioned successfully',
+    }),
+    ApiBadRequestResponse({
+      description: 'Invalid status transition according to state machine rules',
+    }),
+    ApiForbiddenResponse({
+      description: 'Insufficient permissions (requires ORDER_READ_OPERATIONS)',
+    }),
+    ApiNotFoundResponse({ description: 'Order not found' }),
+  );
+}

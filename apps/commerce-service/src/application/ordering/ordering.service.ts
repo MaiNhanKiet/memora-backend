@@ -5,19 +5,26 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  AdminOrderSummaryItem,
   CreateOrderRequest,
   CreateOrderResponse,
+  GetAdminOrderDetailsRequest,
+  GetAdminOrderDetailsResponse,
   GetOrderByIdRequest,
   GetOrderByIdResponse,
   GetOrderTimelineRequest,
   GetOrderTimelineResponse,
   GetRingItemDetailsRequest,
   GetRingItemDetailsResponse,
+  ListAdminOrdersRequest,
+  ListAdminOrdersResponse,
   ListOrdersRequest,
   ListOrdersResponse,
   OrderActorIdentity,
   StageGateItem,
   TimelineEventItem,
+  UpdateOrderStatusRequest,
+  UpdateOrderStatusResponse,
 } from '@app/contracts';
 import { OrderingRepository } from '../../repositories/ordering.repository';
 import type { Prisma } from '../../../generated/prisma/client';
@@ -439,6 +446,181 @@ export class OrderingService {
         clarity: gem.gemstone_options.clarity_grade || '',
       })),
       createdAt: item.created_at.toISOString(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-006] List Admin Orders
+  // ---------------------------------------------------------------------------
+  async listAdminOrders(
+    request: ListAdminOrdersRequest,
+  ): Promise<ListAdminOrdersResponse> {
+    const { items, total, page, limit } = await this.repository.listAdminOrders(
+      {
+        page: request.page,
+        limit: request.limit,
+        status: request.status,
+        search: request.search,
+        dateFrom: request.dateFrom,
+        dateTo: request.dateTo,
+      },
+    );
+
+    const mappedItems: AdminOrderSummaryItem[] = items.map((o) => ({
+      id: o.id,
+      orderNo: o.order_no,
+      status: o.status,
+      sourcePlanMode: o.source_plan_mode,
+      ownerCustomerIdentityId: o.owner_customer_identity_id,
+      recipientName: o.recipient_name ?? undefined,
+      recipientPhone: o.recipient_phone ?? undefined,
+      recipientEmail: o.recipient_email ?? undefined,
+      itemsCount: o._count.ring_items,
+      totalAmount: Number(
+        o.quotes_orders_current_quote_idToquotes?.total_amount ?? 0,
+      ),
+      currency:
+        o.quotes_orders_current_quote_idToquotes?.currency?.trim() || 'VND',
+      createdAt: o.created_at.toISOString(),
+      updatedAt: o.updated_at.toISOString(),
+    }));
+
+    return {
+      items: mappedItems,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-ADMIN-01] Get Admin Order Details
+  // ---------------------------------------------------------------------------
+  async getAdminOrderDetails(
+    request: GetAdminOrderDetailsRequest,
+  ): Promise<GetAdminOrderDetailsResponse> {
+    const order = await this.repository.findAdminOrderById(request.orderId);
+
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const currentQuote = order.quotes_orders_current_quote_idToquotes;
+
+    return {
+      id: order.id,
+      orderNo: order.order_no,
+      status: order.status,
+      sourcePlanMode: order.source_plan_mode,
+      fulfillmentMode: order.fulfillment_mode ?? undefined,
+      customer: {
+        customerIdentityId: order.owner_customer_identity_id,
+        guestEmail: order.guest_email ?? undefined,
+        guestPhone: order.guest_phone ?? undefined,
+        guestEmailVerifiedAt: order.guest_email_verified_at
+          ? order.guest_email_verified_at.toISOString()
+          : undefined,
+      },
+      recipientName: order.recipient_name ?? undefined,
+      recipientPhone: order.recipient_phone ?? undefined,
+      recipientEmail: order.recipient_email ?? undefined,
+      deliveryAddressJson: order.delivery_address_json
+        ? JSON.stringify(order.delivery_address_json)
+        : undefined,
+      preP1EvidenceJson: order.pre_p1_evidence_json
+        ? JSON.stringify(order.pre_p1_evidence_json)
+        : undefined,
+      currentQuote: currentQuote
+        ? {
+            quoteId: currentQuote.id,
+            quoteNo: currentQuote.quote_no,
+            quoteType: currentQuote.quote_type,
+            subtotalAmount: Number(currentQuote.subtotal_amount),
+            deliveryAmount: Number(currentQuote.delivery_amount),
+            adjustmentAmount: Number(currentQuote.adjustment_amount),
+            totalAmount: Number(currentQuote.total_amount),
+            currency: currentQuote.currency.trim(),
+            status: currentQuote.status,
+          }
+        : undefined,
+      items: order.ring_items.map((item) => {
+        const ver =
+          item.ring_item_versions_ring_items_current_version_idToring_item_versions;
+        return {
+          id: item.id,
+          itemNo: item.item_no,
+          sourceRingDesignDraftId: item.source_ring_design_draft_id,
+          currentVersionId: item.current_version_id || '',
+          versionNo: ver?.version_no ?? 1,
+          templateVariantId: ver?.template_variants.id || '',
+          templateCode: ver?.template_variants.ring_templates.code || '',
+          templateName: ver?.template_variants.ring_templates.name || '',
+          materialName: ver?.template_variants.materials.name || '',
+          targetSize: Number(ver?.target_size ?? 0),
+          personalizationPackage: ver?.personalization_package || 'NONE',
+          memoryEnabled: ver?.memory_enabled ?? false,
+        };
+      }),
+      cancelledAt: order.cancelled_at
+        ? order.cancelled_at.toISOString()
+        : undefined,
+      cancellationReason: order.cancellation_reason ?? undefined,
+      createdAt: order.created_at.toISOString(),
+      updatedAt: order.updated_at.toISOString(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-ADMIN-02] Update Order Status
+  // ---------------------------------------------------------------------------
+  async updateOrderStatus(
+    request: UpdateOrderStatusRequest,
+  ): Promise<UpdateOrderStatusResponse> {
+    const order = await this.repository.findAdminOrderById(request.orderId);
+
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const previousStatus = order.status;
+    const targetStatus = request.targetStatus.trim().toUpperCase();
+
+    // Valid state transitions map
+    const VALID_TRANSITIONS: Record<string, string[]> = {
+      AWAITING_P1: ['PENDING_FINAL_QUOTE', 'CANCELLED'],
+      PENDING_FINAL_QUOTE: ['AWAITING_CUSTOMER_CONFIRMATION', 'CANCELLED'],
+      AWAITING_CUSTOMER_CONFIRMATION: ['AWAITING_P2', 'CANCELLED'],
+      AWAITING_P2: ['MANUFACTURING', 'CANCELLED'],
+      MANUFACTURING: [
+        'COMPLETED_MANUFACTURING',
+        'READY_FOR_DELIVERY',
+        'CANCELLED',
+      ],
+      COMPLETED_MANUFACTURING: ['READY_FOR_DELIVERY', 'CANCELLED'],
+      READY_FOR_DELIVERY: ['DELIVERED', 'CANCELLED'],
+      DELIVERED: [],
+      CANCELLED: [],
+    };
+
+    const allowed = VALID_TRANSITIONS[previousStatus] ?? [];
+    if (!allowed.includes(targetStatus)) {
+      throw new BadRequestException(
+        `Cannot transition order status from '${previousStatus}' to '${targetStatus}'. Allowed: [${allowed.join(', ')}]`,
+      );
+    }
+
+    const updated = await this.repository.updateOrderStatus({
+      orderId: request.orderId,
+      targetStatus,
+      reason: request.reason,
+    });
+
+    return {
+      orderId: updated.id,
+      orderNo: updated.order_no,
+      previousStatus,
+      currentStatus: updated.status,
+      updatedAt: updated.updated_at.toISOString(),
     };
   }
 

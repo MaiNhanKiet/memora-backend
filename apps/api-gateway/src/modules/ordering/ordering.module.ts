@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { domainGrpcClientOptions } from '../../common/grpc/domain-grpc';
+import { AdminOrdersController } from './controllers/admin-orders.controller';
 import { OrdersController } from './controllers/orders.controller';
 import {
   COMMERCE_ORDERING_GRPC_CLIENT,
@@ -18,7 +19,7 @@ import {
       }),
     ]),
   ],
-  controllers: [OrdersController],
+  controllers: [OrdersController, AdminOrdersController],
   providers: [OrderingGrpcClient],
   exports: [OrderingGrpcClient],
 })

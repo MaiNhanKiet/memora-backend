@@ -162,6 +162,84 @@ export interface RingItemGemstoneDetail {
   clarity: string;
 }
 
+export interface ListAdminOrdersRequest {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface AdminOrderSummaryItem {
+  id: string;
+  orderNo: string;
+  status: string;
+  sourcePlanMode: string;
+  ownerCustomerIdentityId: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  recipientEmail?: string;
+  itemsCount: number;
+  totalAmount: number;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListAdminOrdersResponse {
+  items: AdminOrderSummaryItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface GetAdminOrderDetailsRequest {
+  orderId: string;
+}
+
+export interface AdminCustomerInfo {
+  customerIdentityId: string;
+  guestEmail?: string;
+  guestPhone?: string;
+  guestEmailVerifiedAt?: string;
+}
+
+export interface GetAdminOrderDetailsResponse {
+  id: string;
+  orderNo: string;
+  status: string;
+  sourcePlanMode: string;
+  fulfillmentMode?: string;
+  customer: AdminCustomerInfo;
+  recipientName?: string;
+  recipientPhone?: string;
+  recipientEmail?: string;
+  deliveryAddressJson?: string;
+  preP1EvidenceJson?: string;
+  currentQuote?: OrderQuoteSummary;
+  items: RingItemSummary[];
+  cancelledAt?: string;
+  cancellationReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateOrderStatusRequest {
+  orderId: string;
+  targetStatus: string;
+  reason?: string;
+  staffUserId?: string;
+}
+
+export interface UpdateOrderStatusResponse {
+  orderId: string;
+  orderNo: string;
+  previousStatus: string;
+  currentStatus: string;
+  updatedAt: string;
+}
+
 export interface GetRingItemDetailsResponse {
   id: string;
   orderId: string;
@@ -190,6 +268,15 @@ export interface OrderingServiceHandler {
   getRingItemDetails(
     request: GetRingItemDetailsRequest,
   ): Promise<GetRingItemDetailsResponse>;
+  listAdminOrders(
+    request: ListAdminOrdersRequest,
+  ): Promise<ListAdminOrdersResponse>;
+  getAdminOrderDetails(
+    request: GetAdminOrderDetailsRequest,
+  ): Promise<GetAdminOrderDetailsResponse>;
+  updateOrderStatus(
+    request: UpdateOrderStatusRequest,
+  ): Promise<UpdateOrderStatusResponse>;
 }
 
 export interface CommerceOrderingServiceClient {
@@ -213,4 +300,16 @@ export interface CommerceOrderingServiceClient {
     request: GetRingItemDetailsRequest,
     metadata?: Metadata,
   ): Observable<GetRingItemDetailsResponse>;
+  listAdminOrders(
+    request: ListAdminOrdersRequest,
+    metadata?: Metadata,
+  ): Observable<ListAdminOrdersResponse>;
+  getAdminOrderDetails(
+    request: GetAdminOrderDetailsRequest,
+    metadata?: Metadata,
+  ): Observable<GetAdminOrderDetailsResponse>;
+  updateOrderStatus(
+    request: UpdateOrderStatusRequest,
+    metadata?: Metadata,
+  ): Observable<UpdateOrderStatusResponse>;
 }

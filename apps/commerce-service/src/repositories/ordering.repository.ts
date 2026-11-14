@@ -372,4 +372,107 @@ export class OrderingRepository {
       },
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // Admin Operations
+  // ---------------------------------------------------------------------------
+
+  async listAdminOrders(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    const page = params.page && params.page > 0 ? params.page : 1;
+    const limit = params.limit && params.limit > 0 ? params.limit : 20;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ordersWhereInput = {};
+
+    if (params.status) {
+      where.status = params.status;
+    }
+
+    if (params.search) {
+      const search = params.search.trim();
+      where.OR = [
+        { order_no: { contains: search, mode: 'insensitive' } },
+        { recipient_name: { contains: search, mode: 'insensitive' } },
+        { recipient_phone: { contains: search } },
+      ];
+    }
+
+    if (params.dateFrom || params.dateTo) {
+      where.created_at = {
+        ...(params.dateFrom ? { gte: new Date(params.dateFrom) } : {}),
+        ...(params.dateTo ? { lte: new Date(params.dateTo) } : {}),
+      };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.orders.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+        include: {
+          quotes_orders_current_quote_idToquotes: true,
+          _count: { select: { ring_items: true } },
+        },
+      }),
+      this.prisma.orders.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
+  }
+
+  async findAdminOrderById(
+    orderId: string,
+  ): Promise<OrderWithRelations | null> {
+    return this.prisma.orders.findUnique({
+      where: { id: orderId },
+      include: {
+        quotes_orders_current_quote_idToquotes: true,
+        ring_items: {
+          orderBy: { item_no: 'asc' },
+          include: {
+            ring_item_versions_ring_items_current_version_idToring_item_versions:
+              {
+                include: {
+                  template_variants: {
+                    include: {
+                      materials: { select: { name: true } },
+                      ring_templates: { select: { code: true, name: true } },
+                    },
+                  },
+                },
+              },
+          },
+        },
+      },
+    });
+  }
+
+  async updateOrderStatus(params: {
+    orderId: string;
+    targetStatus: string;
+    reason?: string;
+  }) {
+    const data: Prisma.ordersUpdateInput = {
+      status: params.targetStatus,
+      updated_at: new Date(),
+    };
+
+    if (params.targetStatus === 'CANCELLED') {
+      data.cancelled_at = new Date();
+      data.cancellation_reason = params.reason || 'Admin cancelled';
+    }
+
+    return this.prisma.orders.update({
+      where: { id: params.orderId },
+      data,
+    });
+  }
 }

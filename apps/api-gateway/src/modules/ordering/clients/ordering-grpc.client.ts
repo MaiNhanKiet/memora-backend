@@ -5,14 +5,20 @@ import type {
   CommerceOrderingServiceClient,
   CreateOrderRequest,
   CreateOrderResponse,
+  GetAdminOrderDetailsRequest,
+  GetAdminOrderDetailsResponse,
   GetOrderByIdRequest,
   GetOrderByIdResponse,
   GetOrderTimelineRequest,
   GetOrderTimelineResponse,
   GetRingItemDetailsRequest,
   GetRingItemDetailsResponse,
+  ListAdminOrdersRequest,
+  ListAdminOrdersResponse,
   ListOrdersRequest,
   ListOrdersResponse,
+  UpdateOrderStatusRequest,
+  UpdateOrderStatusResponse,
 } from '@app/contracts';
 import { DomainGrpcClient } from '../../../common/grpc/domain-grpc';
 
@@ -71,6 +77,30 @@ export class OrderingGrpcClient
   ): Promise<GetRingItemDetailsResponse> {
     return this.unary((metadata) =>
       this.orderingService.getRingItemDetails(request, metadata),
+    );
+  }
+
+  listAdminOrders(
+    request: ListAdminOrdersRequest,
+  ): Promise<ListAdminOrdersResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.listAdminOrders(request, metadata),
+    );
+  }
+
+  getAdminOrderDetails(
+    request: GetAdminOrderDetailsRequest,
+  ): Promise<GetAdminOrderDetailsResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.getAdminOrderDetails(request, metadata),
+    );
+  }
+
+  updateOrderStatus(
+    request: UpdateOrderStatusRequest,
+  ): Promise<UpdateOrderStatusResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.updateOrderStatus(request, metadata),
     );
   }
 }
