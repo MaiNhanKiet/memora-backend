@@ -13,9 +13,15 @@ import type {
   GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
+  ListOrderQuotesRequest,
+  ListOrderQuotesResponse,
   ListOrdersRequest,
   ListOrdersResponse,
+  ListRingItemVersionsRequest,
+  ListRingItemVersionsResponse,
   OrderingServiceHandler,
+  UpdateCurrentRingItemVersionRequest,
+  UpdateCurrentRingItemVersionResponse,
   UpdateOrderStatusRequest,
   UpdateOrderStatusResponse,
 } from '@app/contracts';
@@ -75,5 +81,26 @@ export class OrderingGrpcController implements OrderingServiceHandler {
     request: UpdateOrderStatusRequest,
   ): Promise<UpdateOrderStatusResponse> {
     return this.orderingService.updateOrderStatus(request);
+  }
+
+  @GrpcMethod('OrderingService', 'ListRingItemVersions')
+  listRingItemVersions(
+    request: ListRingItemVersionsRequest,
+  ): Promise<ListRingItemVersionsResponse> {
+    return this.orderingService.listRingItemVersions(request);
+  }
+
+  @GrpcMethod('OrderingService', 'UpdateCurrentRingItemVersion')
+  updateCurrentRingItemVersion(
+    request: UpdateCurrentRingItemVersionRequest,
+  ): Promise<UpdateCurrentRingItemVersionResponse> {
+    return this.orderingService.updateCurrentRingItemVersion(request);
+  }
+
+  @GrpcMethod('OrderingService', 'ListOrderQuotes')
+  listOrderQuotes(
+    request: ListOrderQuotesRequest,
+  ): Promise<ListOrderQuotesResponse> {
+    return this.orderingService.listOrderQuotes(request);
   }
 }

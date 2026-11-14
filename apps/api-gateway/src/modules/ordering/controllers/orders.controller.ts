@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -16,13 +17,20 @@ import {
   ExtractOrderActor,
   type OrderActor,
 } from '../decorators/extract-order-actor.decorator';
-import { CreateOrderBodyDto, ListOrdersQueryDto } from '../dto/ordering.dto';
+import {
+  CreateOrderBodyDto,
+  ListOrdersQueryDto,
+  UpdateCurrentRingItemVersionBodyDto,
+} from '../dto/ordering.dto';
 import {
   ApiCreateOrderDocs,
   ApiGetOrderByIdDocs,
   ApiGetOrderTimelineDocs,
   ApiGetRingItemDetailsDocs,
+  ApiListOrderQuotesDocs,
   ApiListOrdersDocs,
+  ApiListRingItemVersionsDocs,
+  ApiUpdateCurrentRingItemVersionDocs,
 } from '../docs/ordering.swagger';
 
 @ApiTags('orders')
@@ -127,6 +135,64 @@ export class OrdersController {
       actor,
       orderId,
       ringItemId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-008] GET /api/v1/orders/:orderId/items/:ringItemId/versions
+  // ---------------------------------------------------------------------------
+  @Public()
+  @Get(':orderId/items/:ringItemId/versions')
+  @ApiListRingItemVersionsDocs()
+  async listRingItemVersions(
+    @ExtractOrderActor() actor: OrderActor,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Param('ringItemId', ParseUUIDPipe) ringItemId: string,
+  ) {
+    return this.orderingClient.listRingItemVersions({
+      actor,
+      orderId,
+      ringItemId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-009] PATCH /api/v1/orders/:orderId/items/:ringItemId/versions/current
+  // ---------------------------------------------------------------------------
+  @Public()
+  @Patch(':orderId/items/:ringItemId/versions/current')
+  @HttpCode(HttpStatus.OK)
+  @ApiUpdateCurrentRingItemVersionDocs()
+  async updateCurrentRingItemVersion(
+    @ExtractOrderActor() actor: OrderActor,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Param('ringItemId', ParseUUIDPipe) ringItemId: string,
+    @Body() body: UpdateCurrentRingItemVersionBodyDto,
+  ) {
+    return this.orderingClient.updateCurrentRingItemVersion({
+      actor,
+      orderId,
+      ringItemId,
+      targetSize: body.targetSize,
+      changeReason: body.changeReason,
+      memoryEnabled: body.memoryEnabled,
+      gemstoneSelections: body.gemstoneSelections,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-010] GET /api/v1/orders/:orderId/quotes
+  // ---------------------------------------------------------------------------
+  @Public()
+  @Get(':orderId/quotes')
+  @ApiListOrderQuotesDocs()
+  async listOrderQuotes(
+    @ExtractOrderActor() actor: OrderActor,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+  ) {
+    return this.orderingClient.listOrderQuotes({
+      actor,
+      orderId,
     });
   }
 }

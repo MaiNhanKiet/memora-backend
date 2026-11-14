@@ -15,8 +15,14 @@ import type {
   GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
+  ListOrderQuotesRequest,
+  ListOrderQuotesResponse,
   ListOrdersRequest,
   ListOrdersResponse,
+  ListRingItemVersionsRequest,
+  ListRingItemVersionsResponse,
+  UpdateCurrentRingItemVersionRequest,
+  UpdateCurrentRingItemVersionResponse,
   UpdateOrderStatusRequest,
   UpdateOrderStatusResponse,
 } from '@app/contracts';
@@ -101,6 +107,30 @@ export class OrderingGrpcClient
   ): Promise<UpdateOrderStatusResponse> {
     return this.unary((metadata) =>
       this.orderingService.updateOrderStatus(request, metadata),
+    );
+  }
+
+  listRingItemVersions(
+    request: ListRingItemVersionsRequest,
+  ): Promise<ListRingItemVersionsResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.listRingItemVersions(request, metadata),
+    );
+  }
+
+  updateCurrentRingItemVersion(
+    request: UpdateCurrentRingItemVersionRequest,
+  ): Promise<UpdateCurrentRingItemVersionResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.updateCurrentRingItemVersion(request, metadata),
+    );
+  }
+
+  listOrderQuotes(
+    request: ListOrderQuotesRequest,
+  ): Promise<ListOrderQuotesResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.listOrderQuotes(request, metadata),
     );
   }
 }

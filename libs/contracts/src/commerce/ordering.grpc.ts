@@ -258,6 +258,94 @@ export interface GetRingItemDetailsResponse {
   createdAt: string;
 }
 
+export interface ListRingItemVersionsRequest {
+  actor: OrderActorIdentity;
+  orderId: string;
+  ringItemId: string;
+}
+
+export interface RingItemVersionSummary {
+  id: string;
+  versionNo: number;
+  status: string;
+  targetSize: number;
+  personalizationPackage: string;
+  memoryEnabled: boolean;
+  changeReason?: string;
+  templateVariantId: string;
+  templateCode: string;
+  templateName: string;
+  materialName: string;
+  gemstones: RingItemGemstoneDetail[];
+  createdAt: string;
+}
+
+export interface ListRingItemVersionsResponse {
+  ringItemId: string;
+  orderId: string;
+  versions: RingItemVersionSummary[];
+}
+
+export interface RingItemGemstoneInput {
+  slotNumber: number;
+  gemstoneOptionId: string;
+}
+
+export interface UpdateCurrentRingItemVersionRequest {
+  actor: OrderActorIdentity;
+  orderId: string;
+  ringItemId: string;
+  targetSize?: number;
+  changeReason?: string;
+  memoryEnabled?: boolean;
+  gemstoneSelections?: RingItemGemstoneInput[];
+}
+
+export interface UpdateCurrentRingItemVersionResponse {
+  ringItemId: string;
+  versionId: string;
+  versionNo: number;
+  status: string;
+  targetSize: number;
+  changeReason?: string;
+  updatedAt: string;
+}
+
+export interface ListOrderQuotesRequest {
+  actor: OrderActorIdentity;
+  orderId: string;
+}
+
+export interface QuoteLineItem {
+  id: string;
+  componentType: string;
+  description?: string;
+  quantity: number;
+  unitAmount: number;
+  lineAmount: number;
+  priceSourceType: string;
+}
+
+export interface FullQuoteDetail {
+  id: string;
+  quoteNo: string;
+  quoteType: string;
+  versionNo: number;
+  status: string;
+  subtotalAmount: number;
+  deliveryAmount: number;
+  adjustmentAmount: number;
+  totalAmount: number;
+  currency: string;
+  items: QuoteLineItem[];
+  createdAt: string;
+}
+
+export interface ListOrderQuotesResponse {
+  orderId: string;
+  quotes: FullQuoteDetail[];
+}
+
 export interface OrderingServiceHandler {
   createOrder(request: CreateOrderRequest): Promise<CreateOrderResponse>;
   listOrders(request: ListOrdersRequest): Promise<ListOrdersResponse>;
@@ -277,6 +365,15 @@ export interface OrderingServiceHandler {
   updateOrderStatus(
     request: UpdateOrderStatusRequest,
   ): Promise<UpdateOrderStatusResponse>;
+  listRingItemVersions(
+    request: ListRingItemVersionsRequest,
+  ): Promise<ListRingItemVersionsResponse>;
+  updateCurrentRingItemVersion(
+    request: UpdateCurrentRingItemVersionRequest,
+  ): Promise<UpdateCurrentRingItemVersionResponse>;
+  listOrderQuotes(
+    request: ListOrderQuotesRequest,
+  ): Promise<ListOrderQuotesResponse>;
 }
 
 export interface CommerceOrderingServiceClient {
@@ -312,4 +409,16 @@ export interface CommerceOrderingServiceClient {
     request: UpdateOrderStatusRequest,
     metadata?: Metadata,
   ): Observable<UpdateOrderStatusResponse>;
+  listRingItemVersions(
+    request: ListRingItemVersionsRequest,
+    metadata?: Metadata,
+  ): Observable<ListRingItemVersionsResponse>;
+  updateCurrentRingItemVersion(
+    request: UpdateCurrentRingItemVersionRequest,
+    metadata?: Metadata,
+  ): Observable<UpdateCurrentRingItemVersionResponse>;
+  listOrderQuotes(
+    request: ListOrderQuotesRequest,
+    metadata?: Metadata,
+  ): Observable<ListOrderQuotesResponse>;
 }

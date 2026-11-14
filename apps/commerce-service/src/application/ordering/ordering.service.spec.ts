@@ -21,6 +21,10 @@ describe('OrderingService', () => {
     listAdminOrders: jest.fn(),
     findAdminOrderById: jest.fn(),
     updateOrderStatus: jest.fn(),
+    listRingItemVersions: jest.fn(),
+    findCurrentRingItemVersion: jest.fn(),
+    updateCurrentRingItemVersion: jest.fn(),
+    listOrderQuotes: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -432,6 +436,161 @@ describe('OrderingService', () => {
         targetStatus: 'PENDING_FINAL_QUOTE',
         reason: undefined,
       });
+    });
+  });
+
+  describe('listRingItemVersions', () => {
+    it('should throw NotFoundException if order or item not found', async () => {
+      mockRepository.listRingItemVersions.mockResolvedValue(null);
+
+      await expect(
+        service.listRingItemVersions({
+          actor: { userId: 'u1' },
+          orderId: 'ord-1',
+          ringItemId: 'item-1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return list of ring item versions', async () => {
+      mockRepository.listRingItemVersions.mockResolvedValue([
+        {
+          id: 'ver-1',
+          version_no: 1,
+          status: 'DRAFT',
+          target_size: new Prisma.Decimal(14),
+          personalization_package: 'SOUNDWAVE',
+          memory_enabled: true,
+          change_reason: 'Initial',
+          template_variants: {
+            id: 'tv-1',
+            materials: { name: 'Vàng 18K' },
+            ring_templates: { code: 'T01', name: 'Nhẫn Cưới' },
+          },
+          ring_item_version_gemstones: [],
+          created_at: new Date('2026-11-14T10:00:00.000Z'),
+        },
+      ]);
+
+      const res = await service.listRingItemVersions({
+        actor: { userId: 'u1' },
+        orderId: 'ord-1',
+        ringItemId: 'item-1',
+      });
+
+      expect(res.versions).toHaveLength(1);
+      expect(res.versions[0].versionNo).toBe(1);
+      expect(res.versions[0].targetSize).toBe(14);
+    });
+  });
+
+  describe('updateCurrentRingItemVersion', () => {
+    it('should throw NotFoundException if current version not found', async () => {
+      mockRepository.findCurrentRingItemVersion.mockResolvedValue(null);
+
+      await expect(
+        service.updateCurrentRingItemVersion({
+          actor: { userId: 'u1' },
+          orderId: 'ord-1',
+          ringItemId: 'item-1',
+          targetSize: 14.5,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if version is locked or approved', async () => {
+      mockRepository.findCurrentRingItemVersion.mockResolvedValue({
+        id: 'ver-1',
+        status: 'LOCKED',
+      });
+
+      await expect(
+        service.updateCurrentRingItemVersion({
+          actor: { userId: 'u1' },
+          orderId: 'ord-1',
+          ringItemId: 'item-1',
+          targetSize: 14.5,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should update current version successfully when in DRAFT', async () => {
+      mockRepository.findCurrentRingItemVersion.mockResolvedValue({
+        id: 'ver-1',
+        status: 'DRAFT',
+      });
+
+      mockRepository.updateCurrentRingItemVersion.mockResolvedValue({
+        id: 'ver-1',
+        version_no: 1,
+        status: 'DRAFT',
+        target_size: new Prisma.Decimal(14.5),
+        change_reason: 'Resize',
+        created_at: new Date('2026-11-14T10:00:00.000Z'),
+      });
+
+      const res = await service.updateCurrentRingItemVersion({
+        actor: { userId: 'u1' },
+        orderId: 'ord-1',
+        ringItemId: 'item-1',
+        targetSize: 14.5,
+        changeReason: 'Resize',
+      });
+
+      expect(res.targetSize).toBe(14.5);
+      expect(res.changeReason).toBe('Resize');
+    });
+  });
+
+  describe('listOrderQuotes', () => {
+    it('should throw NotFoundException if order not found', async () => {
+      mockRepository.listOrderQuotes.mockResolvedValue(null);
+
+      await expect(
+        service.listOrderQuotes({
+          actor: { userId: 'u1' },
+          orderId: 'ord-1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return list of quotes with quote items', async () => {
+      mockRepository.listOrderQuotes.mockResolvedValue([
+        {
+          id: 'quo-1',
+          quote_no: 'QUO-123',
+          quote_type: 'PROVISIONAL',
+          version_no: 1,
+          status: 'ISSUED',
+          subtotal_amount: new Prisma.Decimal(15000000),
+          delivery_amount: new Prisma.Decimal(0),
+          adjustment_amount: new Prisma.Decimal(0),
+          total_amount: new Prisma.Decimal(15000000),
+          currency: 'VND',
+          created_at: new Date('2026-11-14T10:00:00.000Z'),
+          quote_items: [
+            {
+              id: 'qi-1',
+              component_type: 'RING_BLANK',
+              description: 'Vàng 18K',
+              quantity: new Prisma.Decimal(1),
+              unit_amount: new Prisma.Decimal(15000000),
+              line_amount: new Prisma.Decimal(15000000),
+              price_source_type: 'CATALOG_BASE',
+            },
+          ],
+        },
+      ]);
+
+      const res = await service.listOrderQuotes({
+        actor: { userId: 'u1' },
+        orderId: 'ord-1',
+      });
+
+      expect(res.quotes).toHaveLength(1);
+      expect(res.quotes[0].quoteNo).toBe('QUO-123');
+      expect(res.quotes[0].items).toHaveLength(1);
+      expect(res.quotes[0].items[0].lineAmount).toBe(15000000);
     });
   });
 });

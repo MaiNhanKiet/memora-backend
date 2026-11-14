@@ -11,6 +11,9 @@ service OrderingService {
   rpc ListAdminOrders (ListAdminOrdersRequest) returns (ListAdminOrdersResponse);
   rpc GetAdminOrderDetails (GetAdminOrderDetailsRequest) returns (GetAdminOrderDetailsResponse);
   rpc UpdateOrderStatus (UpdateOrderStatusRequest) returns (UpdateOrderStatusResponse);
+  rpc ListRingItemVersions (ListRingItemVersionsRequest) returns (ListRingItemVersionsResponse);
+  rpc UpdateCurrentRingItemVersion (UpdateCurrentRingItemVersionRequest) returns (UpdateCurrentRingItemVersionResponse);
+  rpc ListOrderQuotes (ListOrderQuotesRequest) returns (ListOrderQuotesResponse);
 }
 
 message OrderActorIdentity {
@@ -269,4 +272,97 @@ message UpdateOrderStatusResponse {
   string current_status = 4;
   string updated_at = 5;
 }
+
+// -----------------------------------------------------------------------------
+// Ring Item Versions & Quotes Messages
+// -----------------------------------------------------------------------------
+
+message ListRingItemVersionsRequest {
+  OrderActorIdentity actor = 1;
+  string order_id = 2;
+  string ring_item_id = 3;
+}
+
+message RingItemVersionSummary {
+  string id = 1;
+  int32 version_no = 2;
+  string status = 3;
+  double target_size = 4;
+  string personalization_package = 5;
+  bool memory_enabled = 6;
+  string change_reason = 7;
+  string template_variant_id = 8;
+  string template_code = 9;
+  string template_name = 10;
+  string material_name = 11;
+  repeated RingItemGemstoneDetail gemstones = 12;
+  string created_at = 13;
+}
+
+message ListRingItemVersionsResponse {
+  string ring_item_id = 1;
+  string order_id = 2;
+  repeated RingItemVersionSummary versions = 3;
+}
+
+message RingItemGemstoneInput {
+  int32 slot_number = 1;
+  string gemstone_option_id = 2;
+}
+
+message UpdateCurrentRingItemVersionRequest {
+  OrderActorIdentity actor = 1;
+  string order_id = 2;
+  string ring_item_id = 3;
+  double target_size = 4;
+  string change_reason = 5;
+  bool memory_enabled = 6;
+  repeated RingItemGemstoneInput gemstone_selections = 7;
+}
+
+message UpdateCurrentRingItemVersionResponse {
+  string ring_item_id = 1;
+  string version_id = 2;
+  int32 version_no = 3;
+  string status = 4;
+  double target_size = 5;
+  string change_reason = 6;
+  string updated_at = 7;
+}
+
+message ListOrderQuotesRequest {
+  OrderActorIdentity actor = 1;
+  string order_id = 2;
+}
+
+message QuoteLineItem {
+  string id = 1;
+  string component_type = 2;
+  string description = 3;
+  double quantity = 4;
+  double unit_amount = 5;
+  double line_amount = 6;
+  string price_source_type = 7;
+}
+
+message FullQuoteDetail {
+  string id = 1;
+  string quote_no = 2;
+  string quote_type = 3;
+  int32 version_no = 4;
+  string status = 5;
+  double subtotal_amount = 6;
+  double delivery_amount = 7;
+  double adjustment_amount = 8;
+  double total_amount = 9;
+  string currency = 10;
+  repeated QuoteLineItem items = 11;
+  string created_at = 12;
+}
+
+message ListOrderQuotesResponse {
+  string order_id = 1;
+  repeated FullQuoteDetail quotes = 2;
+}
+
 

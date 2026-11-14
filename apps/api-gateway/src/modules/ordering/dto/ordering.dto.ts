@@ -381,3 +381,198 @@ export class UpdateOrderStatusResponseDto {
   @ApiProperty({ example: '2026-11-14T11:00:00.000Z' })
   updatedAt!: string;
 }
+
+// -----------------------------------------------------------------------------
+// Ring Item Versions & Quotes DTOs
+// -----------------------------------------------------------------------------
+
+export class RingItemGemstoneInputDto {
+  @ApiProperty({ description: 'Slot number on ring', example: 1 })
+  @IsInt()
+  @Min(1)
+  slotNumber!: number;
+
+  @ApiProperty({
+    description: 'Gemstone option UUID',
+    example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c',
+  })
+  @IsUUID('4')
+  gemstoneOptionId!: string;
+}
+
+export class UpdateCurrentRingItemVersionBodyDto {
+  @ApiPropertyOptional({
+    description: 'Adjusted target finger size',
+    example: 14.5,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  targetSize?: number;
+
+  @ApiPropertyOptional({
+    description: 'Reason for design adjustment',
+    example: 'Customer requested resize before production lock',
+  })
+  @IsOptional()
+  @IsString()
+  changeReason?: string;
+
+  @ApiPropertyOptional({
+    description: 'Toggle smart memory capsule feature',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  memoryEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Updated gemstone selections',
+    type: [RingItemGemstoneInputDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RingItemGemstoneInputDto)
+  gemstoneSelections?: RingItemGemstoneInputDto[];
+}
+
+export class RingItemVersionSummaryDto {
+  @ApiProperty({ example: 'v1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  id!: string;
+
+  @ApiProperty({ example: 1 })
+  versionNo!: number;
+
+  @ApiProperty({ example: 'DRAFT' })
+  status!: string;
+
+  @ApiProperty({ example: 14.0 })
+  targetSize!: number;
+
+  @ApiProperty({ example: 'SOUNDWAVE' })
+  personalizationPackage!: string;
+
+  @ApiProperty({ example: true })
+  memoryEnabled!: boolean;
+
+  @ApiPropertyOptional({ example: 'Initial draft' })
+  changeReason?: string;
+
+  @ApiProperty({ example: 'tv1-uuid' })
+  templateVariantId!: string;
+
+  @ApiProperty({ example: 'T01' })
+  templateCode!: string;
+
+  @ApiProperty({ example: 'Classic Ring' })
+  templateName!: string;
+
+  @ApiProperty({ example: 'Yellow Gold 18K' })
+  materialName!: string;
+
+  @ApiProperty({ example: '2026-11-14T10:00:00.000Z' })
+  createdAt!: string;
+}
+
+export class ListRingItemVersionsResponseDto {
+  @ApiProperty({ example: 'item-uuid' })
+  ringItemId!: string;
+
+  @ApiProperty({ example: 'ord-uuid' })
+  orderId!: string;
+
+  @ApiProperty({ type: [RingItemVersionSummaryDto] })
+  versions!: RingItemVersionSummaryDto[];
+}
+
+export class UpdateCurrentRingItemVersionResponseDto {
+  @ApiProperty({ example: 'item-uuid' })
+  ringItemId!: string;
+
+  @ApiProperty({ example: 'ver-uuid' })
+  versionId!: string;
+
+  @ApiProperty({ example: 1 })
+  versionNo!: number;
+
+  @ApiProperty({ example: 'DRAFT' })
+  status!: string;
+
+  @ApiProperty({ example: 14.5 })
+  targetSize!: number;
+
+  @ApiPropertyOptional({ example: 'Customer resize request' })
+  changeReason?: string;
+
+  @ApiProperty({ example: '2026-11-14T11:00:00.000Z' })
+  updatedAt!: string;
+}
+
+export class QuoteLineItemDto {
+  @ApiProperty({ example: 'item-uuid' })
+  id!: string;
+
+  @ApiProperty({ example: 'RING_BLANK' })
+  componentType!: string;
+
+  @ApiPropertyOptional({ example: '18K Gold Setting' })
+  description?: string;
+
+  @ApiProperty({ example: 1 })
+  quantity!: number;
+
+  @ApiProperty({ example: 12000000 })
+  unitAmount!: number;
+
+  @ApiProperty({ example: 12000000 })
+  lineAmount!: number;
+
+  @ApiProperty({ example: 'CATALOG_BASE' })
+  priceSourceType!: string;
+}
+
+export class FullQuoteDetailDto {
+  @ApiProperty({ example: 'quo-uuid' })
+  id!: string;
+
+  @ApiProperty({ example: 'QUO-1731580000000-ABCD' })
+  quoteNo!: string;
+
+  @ApiProperty({ example: 'PROVISIONAL' })
+  quoteType!: string;
+
+  @ApiProperty({ example: 1 })
+  versionNo!: number;
+
+  @ApiProperty({ example: 'ISSUED' })
+  status!: string;
+
+  @ApiProperty({ example: 15500000 })
+  subtotalAmount!: number;
+
+  @ApiProperty({ example: 0 })
+  deliveryAmount!: number;
+
+  @ApiProperty({ example: 0 })
+  adjustmentAmount!: number;
+
+  @ApiProperty({ example: 15500000 })
+  totalAmount!: number;
+
+  @ApiProperty({ example: 'VND' })
+  currency!: string;
+
+  @ApiProperty({ type: [QuoteLineItemDto] })
+  items!: QuoteLineItemDto[];
+
+  @ApiProperty({ example: '2026-11-14T10:00:00.000Z' })
+  createdAt!: string;
+}
+
+export class ListOrderQuotesResponseDto {
+  @ApiProperty({ example: 'ord-uuid' })
+  orderId!: string;
+
+  @ApiProperty({ type: [FullQuoteDetailDto] })
+  quotes!: FullQuoteDetailDto[];
+}

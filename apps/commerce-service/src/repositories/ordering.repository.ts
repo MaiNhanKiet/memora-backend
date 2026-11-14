@@ -475,4 +475,157 @@ export class OrderingRepository {
       data,
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // Ring Item Versions & Quotes
+  // ---------------------------------------------------------------------------
+
+  async listRingItemVersions(
+    orderId: string,
+    ringItemId: string,
+    actorId: string,
+    guestEmail?: string,
+  ) {
+    const order = await this.prisma.orders.findFirst({
+      where: {
+        id: orderId,
+        OR: [
+          { owner_customer_identity_id: actorId },
+          ...(guestEmail ? [{ guest_email: guestEmail }] : []),
+        ],
+      },
+    });
+
+    if (!order) {
+      return null;
+    }
+
+    const ringItem = await this.prisma.ring_items.findFirst({
+      where: { id: ringItemId, order_id: orderId },
+    });
+
+    if (!ringItem) {
+      return null;
+    }
+
+    return this.prisma.ring_item_versions.findMany({
+      where: { ring_item_id: ringItemId },
+      orderBy: { version_no: 'asc' },
+      include: {
+        template_variants: {
+          include: {
+            materials: { select: { name: true } },
+            ring_templates: { select: { code: true, name: true } },
+          },
+        },
+        ring_item_version_gemstones: {
+          include: {
+            gemstone_slots: true,
+            gemstone_options: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findCurrentRingItemVersion(
+    orderId: string,
+    ringItemId: string,
+    actorId: string,
+    guestEmail?: string,
+  ) {
+    const order = await this.prisma.orders.findFirst({
+      where: {
+        id: orderId,
+        OR: [
+          { owner_customer_identity_id: actorId },
+          ...(guestEmail ? [{ guest_email: guestEmail }] : []),
+        ],
+      },
+    });
+
+    if (!order) {
+      return null;
+    }
+
+    const ringItem = await this.prisma.ring_items.findFirst({
+      where: { id: ringItemId, order_id: orderId },
+      include: {
+        ring_item_versions_ring_items_current_version_idToring_item_versions: {
+          include: {
+            template_variants: {
+              include: {
+                materials: { select: { name: true } },
+                ring_templates: { select: { code: true, name: true } },
+              },
+            },
+            ring_item_version_gemstones: {
+              include: {
+                gemstone_slots: true,
+                gemstone_options: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!ringItem || !ringItem.current_version_id) {
+      return null;
+    }
+
+    return ringItem.ring_item_versions_ring_items_current_version_idToring_item_versions;
+  }
+
+  async updateCurrentRingItemVersion(
+    versionId: string,
+    data: {
+      targetSize?: number;
+      changeReason?: string;
+      memoryEnabled?: boolean;
+    },
+  ) {
+    const updateData: Prisma.ring_item_versionsUpdateInput = {};
+
+    if (data.targetSize !== undefined) {
+      updateData.target_size = new Prisma.Decimal(data.targetSize);
+    }
+    if (data.changeReason !== undefined) {
+      updateData.change_reason = data.changeReason;
+    }
+    if (data.memoryEnabled !== undefined) {
+      updateData.memory_enabled = data.memoryEnabled;
+    }
+
+    return this.prisma.ring_item_versions.update({
+      where: { id: versionId },
+      data: updateData,
+    });
+  }
+
+  async listOrderQuotes(orderId: string, actorId: string, guestEmail?: string) {
+    const order = await this.prisma.orders.findFirst({
+      where: {
+        id: orderId,
+        OR: [
+          { owner_customer_identity_id: actorId },
+          ...(guestEmail ? [{ guest_email: guestEmail }] : []),
+        ],
+      },
+    });
+
+    if (!order) {
+      return null;
+    }
+
+    return this.prisma.quotes.findMany({
+      where: { order_id: orderId },
+      orderBy: { version_no: 'desc' },
+      include: {
+        quote_items: {
+          orderBy: { created_at: 'asc' },
+        },
+      },
+    });
+  }
 }

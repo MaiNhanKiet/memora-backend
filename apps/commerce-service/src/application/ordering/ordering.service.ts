@@ -8,6 +8,7 @@ import type {
   AdminOrderSummaryItem,
   CreateOrderRequest,
   CreateOrderResponse,
+  FullQuoteDetail,
   GetAdminOrderDetailsRequest,
   GetAdminOrderDetailsResponse,
   GetOrderByIdRequest,
@@ -18,11 +19,18 @@ import type {
   GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
+  ListOrderQuotesRequest,
+  ListOrderQuotesResponse,
   ListOrdersRequest,
   ListOrdersResponse,
+  ListRingItemVersionsRequest,
+  ListRingItemVersionsResponse,
   OrderActorIdentity,
+  RingItemVersionSummary,
   StageGateItem,
   TimelineEventItem,
+  UpdateCurrentRingItemVersionRequest,
+  UpdateCurrentRingItemVersionResponse,
   UpdateOrderStatusRequest,
   UpdateOrderStatusResponse,
 } from '@app/contracts';
@@ -621,6 +629,160 @@ export class OrderingService {
       previousStatus,
       currentStatus: updated.status,
       updatedAt: updated.updated_at.toISOString(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-008] List Ring Item Versions
+  // ---------------------------------------------------------------------------
+  async listRingItemVersions(
+    request: ListRingItemVersionsRequest,
+  ): Promise<ListRingItemVersionsResponse> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const versions = await this.repository.listRingItemVersions(
+      request.orderId,
+      request.ringItemId,
+      actorId,
+      actor.userId ? undefined : actor.guestSessionId,
+    );
+
+    if (!versions) {
+      throw new NotFoundException(
+        'Order or ring item not found or access denied',
+      );
+    }
+
+    const mappedVersions: RingItemVersionSummary[] = versions.map((ver) => ({
+      id: ver.id,
+      versionNo: ver.version_no,
+      status: ver.status,
+      targetSize: Number(ver.target_size),
+      personalizationPackage: ver.personalization_package,
+      memoryEnabled: ver.memory_enabled,
+      changeReason: ver.change_reason ?? undefined,
+      templateVariantId: ver.template_variants.id,
+      templateCode: ver.template_variants.ring_templates.code,
+      templateName: ver.template_variants.ring_templates.name,
+      materialName: ver.template_variants.materials.name,
+      gemstones: ver.ring_item_version_gemstones.map((gem) => ({
+        slotNumber: gem.gemstone_slots.slot_index,
+        gemstoneSlotId: gem.gemstone_slot_id,
+        gemstoneOptionId: gem.gemstone_option_id,
+        gemstoneType: gem.gemstone_options.stone_type,
+        gemstoneName: gem.gemstone_options.name,
+        shape: gem.gemstone_options.shape,
+        caratWeight: Number(gem.gemstone_options.length_mm),
+        color: gem.gemstone_options.color_grade || '',
+        clarity: gem.gemstone_options.clarity_grade || '',
+      })),
+      createdAt: ver.created_at.toISOString(),
+    }));
+
+    return {
+      ringItemId: request.ringItemId,
+      orderId: request.orderId,
+      versions: mappedVersions,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-009] Update Current Ring Item Version
+  // ---------------------------------------------------------------------------
+  async updateCurrentRingItemVersion(
+    request: UpdateCurrentRingItemVersionRequest,
+  ): Promise<UpdateCurrentRingItemVersionResponse> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const currentVersion = await this.repository.findCurrentRingItemVersion(
+      request.orderId,
+      request.ringItemId,
+      actorId,
+      actor.userId ? undefined : actor.guestSessionId,
+    );
+
+    if (!currentVersion) {
+      throw new NotFoundException(
+        'Ring item current version not found or access denied',
+      );
+    }
+
+    if (
+      currentVersion.status !== 'DRAFT' &&
+      currentVersion.status !== 'SUBMITTED'
+    ) {
+      throw new BadRequestException(
+        `Cannot modify ring item version in status '${currentVersion.status}'. Only DRAFT or SUBMITTED versions can be updated.`,
+      );
+    }
+
+    const updated = await this.repository.updateCurrentRingItemVersion(
+      currentVersion.id,
+      {
+        targetSize: request.targetSize,
+        changeReason: request.changeReason,
+        memoryEnabled: request.memoryEnabled,
+      },
+    );
+
+    return {
+      ringItemId: request.ringItemId,
+      versionId: updated.id,
+      versionNo: updated.version_no,
+      status: updated.status,
+      targetSize: Number(updated.target_size),
+      changeReason: updated.change_reason ?? undefined,
+      updatedAt: updated.created_at.toISOString(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-010] List Order Quotes
+  // ---------------------------------------------------------------------------
+  async listOrderQuotes(
+    request: ListOrderQuotesRequest,
+  ): Promise<ListOrderQuotesResponse> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const quotes = await this.repository.listOrderQuotes(
+      request.orderId,
+      actorId,
+      actor.userId ? undefined : actor.guestSessionId,
+    );
+
+    if (!quotes) {
+      throw new NotFoundException('Order not found or access denied');
+    }
+
+    const mappedQuotes: FullQuoteDetail[] = quotes.map((q) => ({
+      id: q.id,
+      quoteNo: q.quote_no,
+      quoteType: q.quote_type,
+      versionNo: q.version_no,
+      status: q.status,
+      subtotalAmount: Number(q.subtotal_amount),
+      deliveryAmount: Number(q.delivery_amount),
+      adjustmentAmount: Number(q.adjustment_amount),
+      totalAmount: Number(q.total_amount),
+      currency: q.currency.trim(),
+      items: q.quote_items.map((qi) => ({
+        id: qi.id,
+        componentType: qi.component_type,
+        description: qi.description ?? undefined,
+        quantity: Number(qi.quantity),
+        unitAmount: Number(qi.unit_amount),
+        lineAmount: Number(qi.line_amount),
+        priceSourceType: qi.price_source_type,
+      })),
+      createdAt: q.created_at.toISOString(),
+    }));
+
+    return {
+      orderId: request.orderId,
+      quotes: mappedQuotes,
     };
   }
 

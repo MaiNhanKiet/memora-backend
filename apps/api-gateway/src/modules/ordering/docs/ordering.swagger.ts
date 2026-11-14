@@ -173,3 +173,72 @@ export function ApiUpdateOrderStatusDocs() {
     ApiNotFoundResponse({ description: 'Order not found' }),
   );
 }
+
+export function ApiListRingItemVersionsDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-008] List all versions of a ring item in order',
+      description:
+        'Retrieves the chronological history of configuration versions for a ring item. Available to the order owner.',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'Ring item versions returned successfully',
+    }),
+    ApiNotFoundResponse({
+      description: 'Order or ring item not found or not owned by actor',
+    }),
+  );
+}
+
+export function ApiUpdateCurrentRingItemVersionDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-009] Update current draft design version of ring item',
+      description:
+        'Allows adjusting size, reason, or memory flag while the ring item version is in DRAFT or SUBMITTED status.',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'Current ring item version updated successfully',
+    }),
+    ApiBadRequestResponse({
+      description: 'Cannot update locked or manufacturing version',
+    }),
+    ApiNotFoundResponse({
+      description: 'Ring item or current version not found',
+    }),
+  );
+}
+
+export function ApiListOrderQuotesDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-010] List all quotes of an order',
+      description:
+        'Retrieves list of provisional and final quotes with detailed itemized cost breakdowns.',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'Order quotes returned successfully',
+    }),
+    ApiNotFoundResponse({
+      description: 'Order not found or not owned by actor',
+    }),
+  );
+}
