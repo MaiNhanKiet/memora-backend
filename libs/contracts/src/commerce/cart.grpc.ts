@@ -114,6 +114,29 @@ export interface AbandonCartResponse {
   status: string;
 }
 
+// DESIG-007: Get Design Draft
+export interface GetDesignDraftRequest {
+  actor: CartActorIdentity;
+  draftId: string;
+}
+
+export interface GetDesignDraftResponse {
+  draft: CartItemDraft;
+}
+
+// DESIG-008: Duplicate Design Draft
+export interface DuplicateDesignDraftRequest {
+  actor: CartActorIdentity;
+  draftId: string;
+}
+
+export interface DuplicateDesignDraftResponse {
+  draft: CartItemDraft;
+  itemsCount: number;
+  totalEstimatedPrice: number;
+  currency: string;
+}
+
 export interface CartServiceClient {
   getCart(
     request: GetCartRequest,
@@ -139,6 +162,14 @@ export interface CartServiceClient {
     request: AbandonCartRequest,
     metadata?: Metadata,
   ): Observable<AbandonCartResponse>;
+  getDesignDraft(
+    request: GetDesignDraftRequest,
+    metadata?: Metadata,
+  ): Observable<GetDesignDraftResponse>;
+  duplicateDesignDraft(
+    request: DuplicateDesignDraftRequest,
+    metadata?: Metadata,
+  ): Observable<DuplicateDesignDraftResponse>;
 }
 
 export interface CartServiceHandler {
@@ -154,4 +185,10 @@ export interface CartServiceHandler {
     request: ValidateCheckoutRequest,
   ): Promise<ValidateCheckoutResponse>;
   abandonCart(request: AbandonCartRequest): Promise<AbandonCartResponse>;
+  getDesignDraft(
+    request: GetDesignDraftRequest,
+  ): Promise<GetDesignDraftResponse>;
+  duplicateDesignDraft(
+    request: DuplicateDesignDraftRequest,
+  ): Promise<DuplicateDesignDraftResponse>;
 }

@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CartService } from './cart.service';
 import { CartRepository } from '../../repositories/cart.repository';
 import { PricingService } from '../pricing/pricing.service';
@@ -178,6 +182,169 @@ describe('CartService', () => {
         'ABANDONED',
       );
       expect(res.status).toBe('ABANDONED');
+    });
+  });
+
+  describe('getDesignDraft', () => {
+    it('should throw NotFoundException if draft does not exist', async () => {
+      mockRepository.findDraftById.mockResolvedValue(null);
+
+      await expect(
+        service.getDesignDraft({
+          draftId: 'missing-draft',
+          actor: { userId: 'user-1' },
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException if actor is not the owner', async () => {
+      mockRepository.findDraftById.mockResolvedValue({
+        id: 'draft-1',
+        carts: {
+          user_id: 'user-2',
+          guest_session_id: null,
+        },
+      });
+
+      await expect(
+        service.getDesignDraft({
+          draftId: 'draft-1',
+          actor: { userId: 'user-1' },
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should return draft details successfully for owner', async () => {
+      mockRepository.findDraftById.mockResolvedValue({
+        id: 'draft-1',
+        cart_id: 'cart-1',
+        template_variant_id: 'variant-1',
+        target_size: '14.0',
+        personalization_package: 'SOUNDWAVE',
+        memory_enabled: true,
+        gemstone_config_json: [{ slotNumber: 1, gemstoneOptionId: 'gem-1' }],
+        estimated_price: '16000000',
+        currency: 'VND',
+        estimated_price_at: new Date('2026-11-14'),
+        status: 'IN_CART',
+        created_at: new Date('2026-11-14'),
+        updated_at: new Date('2026-11-14'),
+        carts: {
+          user_id: 'user-1',
+          guest_session_id: null,
+        },
+        template_variants: {
+          standard_size: '12.0',
+          materials: { name: 'Yellow Gold 18K' },
+          ring_templates: { code: 'RT-01', name: 'Classic' },
+        },
+      });
+
+      const res = await service.getDesignDraft({
+        draftId: 'draft-1',
+        actor: { userId: 'user-1' },
+      });
+
+      expect(res.draft.draftId).toBe('draft-1');
+      expect(res.draft.estimatedPrice).toBe(16000000);
+      expect(res.draft.templateVariantId).toBe('variant-1');
+      expect(res.draft.targetSize).toBe(14.0);
+    });
+  });
+
+  describe('duplicateDesignDraft', () => {
+    it('should throw NotFoundException if source draft does not exist', async () => {
+      mockRepository.findDraftById.mockResolvedValue(null);
+
+      await expect(
+        service.duplicateDesignDraft({
+          draftId: 'missing-draft',
+          actor: { userId: 'user-1' },
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException if actor is not the owner of source draft', async () => {
+      mockRepository.findDraftById.mockResolvedValue({
+        id: 'draft-1',
+        carts: {
+          user_id: 'user-2',
+          guest_session_id: null,
+        },
+      });
+
+      await expect(
+        service.duplicateDesignDraft({
+          draftId: 'draft-1',
+          actor: { userId: 'user-1' },
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should duplicate draft with recalculated price into active cart', async () => {
+      mockRepository.findDraftById.mockResolvedValue({
+        id: 'draft-1',
+        template_variant_id: 'variant-1',
+        target_size: '14.0',
+        personalization_package: 'SOUNDWAVE',
+        memory_enabled: true,
+        gemstone_config_json: [{ slotNumber: 1, gemstoneOptionId: 'gem-1' }],
+        carts: {
+          user_id: 'user-1',
+          guest_session_id: null,
+        },
+      });
+
+      mockRepository.findActiveCartByActor.mockResolvedValue({
+        id: 'cart-1',
+        status: 'ACTIVE',
+        ring_design_drafts: [],
+      });
+
+      mockPricingService.estimatePrice.mockResolvedValue({
+        estimatedTotal: 16500000,
+        currency: 'VND',
+      });
+
+      mockRepository.createDraft.mockResolvedValue({
+        id: 'draft-new',
+        template_variant_id: 'variant-1',
+        target_size: '14.0',
+        personalization_package: 'SOUNDWAVE',
+        memory_enabled: true,
+        gemstone_config_json: [{ slotNumber: 1, gemstoneOptionId: 'gem-1' }],
+        estimated_price: '16500000',
+        currency: 'VND',
+        estimated_price_at: new Date('2026-11-14'),
+        status: 'IN_CART',
+        created_at: new Date('2026-11-14'),
+        template_variants: {
+          standard_size: '12.0',
+          materials: { name: 'Yellow Gold 18K' },
+          ring_templates: { code: 'RT-01', name: 'Classic' },
+        },
+      });
+
+      const res = await service.duplicateDesignDraft({
+        draftId: 'draft-1',
+        actor: { userId: 'user-1' },
+      });
+
+      expect(mockPricingService.estimatePrice).toHaveBeenCalledWith({
+        templateVariantId: 'variant-1',
+        targetSize: 14.0,
+        gemstoneOptionIds: ['gem-1'],
+        personalizationPackage: 'SOUNDWAVE',
+      });
+      expect(mockRepository.createDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cartId: 'cart-1',
+          templateVariantId: 'variant-1',
+          estimatedPrice: 16500000,
+        }),
+      );
+      expect(res.draft.draftId).toBe('draft-new');
+      expect(res.itemsCount).toBe(0);
     });
   });
 });

@@ -7,8 +7,12 @@ import type {
   AddCartItemRequest,
   AddCartItemResponse,
   CartServiceClient,
+  DuplicateDesignDraftRequest,
+  DuplicateDesignDraftResponse,
   GetCartRequest,
   GetCartResponse,
+  GetDesignDraftRequest,
+  GetDesignDraftResponse,
   RemoveCartItemRequest,
   RemoveCartItemResponse,
   UpdateCartItemRequest,
@@ -76,6 +80,22 @@ export class DesignGrpcClient extends DomainGrpcClient implements OnModuleInit {
   abandonCart(request: AbandonCartRequest): Promise<AbandonCartResponse> {
     return this.unary((metadata) =>
       this.cartService.abandonCart(request, metadata),
+    );
+  }
+
+  getDesignDraft(
+    request: GetDesignDraftRequest,
+  ): Promise<GetDesignDraftResponse> {
+    return this.unary((metadata) =>
+      this.cartService.getDesignDraft(request, metadata),
+    );
+  }
+
+  duplicateDesignDraft(
+    request: DuplicateDesignDraftRequest,
+  ): Promise<DuplicateDesignDraftResponse> {
+    return this.unary((metadata) =>
+      this.cartService.duplicateDesignDraft(request, metadata),
     );
   }
 }

@@ -11,9 +11,13 @@ import type {
   AddCartItemResponse,
   CartActorIdentity,
   CartItemDraft,
+  DuplicateDesignDraftRequest,
+  DuplicateDesignDraftResponse,
   GemstoneSelectionItem,
   GetCartRequest,
   GetCartResponse,
+  GetDesignDraftRequest,
+  GetDesignDraftResponse,
   RemoveCartItemRequest,
   RemoveCartItemResponse,
   UpdateCartItemRequest,
@@ -277,6 +281,91 @@ export class CartService {
     return {
       cartId: cart.id,
       status: 'ABANDONED',
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [DESIG-007] Get Design Draft
+  // ---------------------------------------------------------------------------
+  async getDesignDraft(
+    request: GetDesignDraftRequest,
+  ): Promise<GetDesignDraftResponse> {
+    const actor = this.validateActor(request.actor);
+    const draft = await this.repository.findDraftById(request.draftId);
+
+    if (!draft) {
+      throw new NotFoundException(`Design draft ${request.draftId} not found`);
+    }
+
+    this.assertOwnership(draft, actor);
+
+    return {
+      draft: this.mapDraftItem(draft),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [DESIG-008] Duplicate Design Draft
+  // ---------------------------------------------------------------------------
+  async duplicateDesignDraft(
+    request: DuplicateDesignDraftRequest,
+  ): Promise<DuplicateDesignDraftResponse> {
+    const actor = this.validateActor(request.actor);
+    const sourceDraft = await this.repository.findDraftById(request.draftId);
+
+    if (!sourceDraft) {
+      throw new NotFoundException(`Design draft ${request.draftId} not found`);
+    }
+
+    this.assertOwnership(sourceDraft, actor);
+
+    let cart = await this.repository.findActiveCartByActor(actor);
+    if (!cart) {
+      const expiresAt = actor.guestSessionId
+        ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        : undefined;
+
+      await this.repository.createActiveCart({
+        userId: actor.userId,
+        guestSessionId: actor.guestSessionId,
+        expiresAt,
+      });
+
+      cart = await this.repository.findActiveCartByActor(actor);
+    }
+
+    const gemstoneSelections =
+      (sourceDraft.gemstone_config_json as unknown as GemstoneSelectionItem[]) ||
+      [];
+    const gemstoneOptionIds = gemstoneSelections.map((g) => g.gemstoneOptionId);
+    const pricing = await this.pricingService.estimatePrice({
+      templateVariantId: sourceDraft.template_variant_id,
+      targetSize: Number(sourceDraft.target_size),
+      gemstoneOptionIds,
+      personalizationPackage: sourceDraft.personalization_package || 'NONE',
+    });
+
+    const newDraft = await this.repository.createDraft({
+      cartId: cart!.id,
+      ownerUserId: actor.userId,
+      guestSessionId: actor.guestSessionId,
+      templateVariantId: sourceDraft.template_variant_id,
+      targetSize: Number(sourceDraft.target_size),
+      gemstoneConfigJson: gemstoneSelections,
+      personalizationPackage: sourceDraft.personalization_package,
+      memoryEnabled: sourceDraft.memory_enabled,
+      estimatedPrice: pricing.estimatedTotal,
+      currency: pricing.currency,
+    });
+
+    const updatedCart = await this.repository.findActiveCartByActor(actor);
+    const mappedCart = this.mapCartResponse(updatedCart!);
+
+    return {
+      draft: this.mapDraftItem(newDraft),
+      itemsCount: mappedCart.itemsCount,
+      totalEstimatedPrice: mappedCart.totalEstimatedPrice,
+      currency: mappedCart.currency,
     };
   }
 

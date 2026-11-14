@@ -9,6 +9,8 @@ service CartService {
   rpc RemoveCartItem (RemoveCartItemRequest) returns (RemoveCartItemResponse);
   rpc ValidateCheckout (ValidateCheckoutRequest) returns (ValidateCheckoutResponse);
   rpc AbandonCart (AbandonCartRequest) returns (AbandonCartResponse);
+  rpc GetDesignDraft (GetDesignDraftRequest) returns (GetDesignDraftResponse);
+  rpc DuplicateDesignDraft (DuplicateDesignDraftRequest) returns (DuplicateDesignDraftResponse);
 }
 
 message CartActorIdentity {
@@ -121,3 +123,27 @@ message AbandonCartResponse {
   string cart_id = 1;
   string status = 2;
 }
+
+// DESIG-007: Get Design Draft
+message GetDesignDraftRequest {
+  CartActorIdentity actor = 1;
+  string draft_id = 2;
+}
+
+message GetDesignDraftResponse {
+  CartItemDraft draft = 1;
+}
+
+// DESIG-008: Duplicate Design Draft
+message DuplicateDesignDraftRequest {
+  CartActorIdentity actor = 1;
+  string draft_id = 2;
+}
+
+message DuplicateDesignDraftResponse {
+  CartItemDraft draft = 1;
+  int32 items_count = 2;
+  double total_estimated_price = 3;
+  string currency = 4;
+}
+

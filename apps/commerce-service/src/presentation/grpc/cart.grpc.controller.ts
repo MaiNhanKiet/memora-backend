@@ -6,8 +6,12 @@ import type {
   AddCartItemRequest,
   AddCartItemResponse,
   CartServiceHandler,
+  DuplicateDesignDraftRequest,
+  DuplicateDesignDraftResponse,
   GetCartRequest,
   GetCartResponse,
+  GetDesignDraftRequest,
+  GetDesignDraftResponse,
   RemoveCartItemRequest,
   RemoveCartItemResponse,
   UpdateCartItemRequest,
@@ -57,5 +61,19 @@ export class CartGrpcController implements CartServiceHandler {
   @GrpcMethod('CartService', 'AbandonCart')
   abandonCart(request: AbandonCartRequest): Promise<AbandonCartResponse> {
     return this.cartService.abandonCart(request);
+  }
+
+  @GrpcMethod('CartService', 'GetDesignDraft')
+  getDesignDraft(
+    request: GetDesignDraftRequest,
+  ): Promise<GetDesignDraftResponse> {
+    return this.cartService.getDesignDraft(request);
+  }
+
+  @GrpcMethod('CartService', 'DuplicateDesignDraft')
+  duplicateDesignDraft(
+    request: DuplicateDesignDraftRequest,
+  ): Promise<DuplicateDesignDraftResponse> {
+    return this.cartService.duplicateDesignDraft(request);
   }
 }

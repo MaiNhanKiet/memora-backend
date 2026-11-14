@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { domainGrpcClientOptions } from '../../common/grpc/domain-grpc';
 import { CartController } from './controllers/cart.controller';
+import { DesignDraftController } from './controllers/design-draft.controller';
 import {
   COMMERCE_CART_GRPC_CLIENT,
   DesignGrpcClient,
@@ -18,7 +19,7 @@ import {
       }),
     ]),
   ],
-  controllers: [CartController],
+  controllers: [CartController, DesignDraftController],
   providers: [DesignGrpcClient],
   exports: [DesignGrpcClient],
 })
