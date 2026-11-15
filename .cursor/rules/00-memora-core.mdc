@@ -16,3 +16,4 @@ alwaysApply: true
 - After the test command for the current task finishes, delete only the test files that task added. Leave test files that already existed in the repository.
 - Create every new Git branch from the latest `dev`. Do not branch from `main` or another task branch unless the user explicitly names a different base.
 - Summarize in concise Vietnamese: changed files, important decisions, commands/results and unverified items.
+- Interactive questions: Khi đặt câu hỏi hoặc cần người dùng xác nhận/làm rõ, luôn đưa ra các lựa chọn rõ ràng theo dạng [A, B, C...] để người dùng có thể chọn nhanh hoặc tự ghi nếu có ý kiến khác.

@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package memora.commerce.v1;
+
+import "common/v1/actor.proto";
+
+service CartService {
+  rpc GetCart (GetCartRequest) returns (GetCartResponse);
+  rpc AddCartItem (AddCartItemRequest) returns (AddCartItemResponse);
+  rpc UpdateCartItem (UpdateCartItemRequest) returns (UpdateCartItemResponse);
+  rpc RemoveCartItem (RemoveCartItemRequest) returns (RemoveCartItemResponse);
+  rpc ValidateCheckout (ValidateCheckoutRequest) returns (ValidateCheckoutResponse);
+  rpc AbandonCart (AbandonCartRequest) returns (AbandonCartResponse);
+  rpc GetDesignDraft (GetDesignDraftRequest) returns (GetDesignDraftResponse);
+  rpc DuplicateDesignDraft (DuplicateDesignDraftRequest) returns (DuplicateDesignDraftResponse);
+}
+
+message GemstoneSelectionItem {
+  int32 slot_number = 1;
+  string gemstone_option_id = 2;
+}
+
+message CartItemDraft {
+  string draft_id = 1;
+  string template_variant_id = 2;
+  string template_code = 3;
+  string template_name = 4;
+  string material_name = 5;
+  double standard_size = 6;
+  double target_size = 7;
+  string personalization_package = 8;
+  bool memory_enabled = 9;
+  repeated GemstoneSelectionItem gemstone_selections = 10;
+  double estimated_price = 11;
+  string currency = 12;
+  string estimated_price_at = 13;
+  string status = 14;
+  string created_at = 15;
+}
+
+message GetCartRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+}
+
+message GetCartResponse {
+  string id = 1;
+  string status = 2;
+  int32 items_count = 3;
+  double total_estimated_price = 4;
+  string currency = 5;
+  string expires_at = 6;
+  repeated CartItemDraft items = 7;
+}
+
+message AddCartItemRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string template_variant_id = 2;
+  double target_size = 3;
+  repeated GemstoneSelectionItem gemstone_selections = 4;
+  string personalization_package = 5;
+  bool memory_enabled = 6;
+}
+
+message AddCartItemResponse {
+  CartItemDraft item = 1;
+  int32 items_count = 2;
+  double total_estimated_price = 3;
+  string currency = 4;
+}
+
+message UpdateCartItemRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string draft_id = 2;
+  optional double target_size = 3;
+  optional string personalization_package = 4;
+  optional bool memory_enabled = 5;
+}
+
+message UpdateCartItemResponse {
+  CartItemDraft item = 1;
+  double total_estimated_price = 2;
+  string currency = 3;
+}
+
+message RemoveCartItemRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string draft_id = 2;
+}
+
+message RemoveCartItemResponse {
+  string removed_draft_id = 1;
+  int32 items_count = 2;
+  double total_estimated_price = 3;
+  string currency = 4;
+}
+
+message ValidateCheckoutRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  repeated string selected_draft_ids = 2;
+}
+
+message CheckoutValidationIssue {
+  string draft_id = 1;
+  string code = 2;
+  string message = 3;
+}
+
+message ValidateCheckoutResponse {
+  bool is_valid = 1;
+  double total_estimated_price = 2;
+  string currency = 3;
+  repeated CheckoutValidationIssue issues = 4;
+}
+
+message AbandonCartRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+}
+
+message AbandonCartResponse {
+  string cart_id = 1;
+  string status = 2;
+}
+
+// DESIG-007: Get Design Draft
+message GetDesignDraftRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string draft_id = 2;
+}
+
+message GetDesignDraftResponse {
+  CartItemDraft draft = 1;
+}
+
+// DESIG-008: Duplicate Design Draft
+message DuplicateDesignDraftRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string draft_id = 2;
+}
+
+message DuplicateDesignDraftResponse {
+  CartItemDraft draft = 1;
+  int32 items_count = 2;
+  double total_estimated_price = 3;
+  string currency = 4;
+}
+

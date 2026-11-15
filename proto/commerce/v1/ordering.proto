@@ -1,0 +1,392 @@
+syntax = "proto3";
+
+package memora.commerce.v1;
+
+import "common/v1/actor.proto";
+
+service OrderingService {
+  rpc CreateOrder (CreateOrderRequest) returns (CreateOrderResponse);
+  rpc ListOrders (ListOrdersRequest) returns (ListOrdersResponse);
+  rpc GetOrderById (GetOrderByIdRequest) returns (GetOrderByIdResponse);
+  rpc GetOrderTimeline (GetOrderTimelineRequest) returns (GetOrderTimelineResponse);
+  rpc GetRingItemDetails (GetRingItemDetailsRequest) returns (GetRingItemDetailsResponse);
+  rpc ListAdminOrders (ListAdminOrdersRequest) returns (ListAdminOrdersResponse);
+  rpc GetAdminOrderDetails (GetAdminOrderDetailsRequest) returns (GetAdminOrderDetailsResponse);
+  rpc UpdateOrderStatus (UpdateOrderStatusRequest) returns (UpdateOrderStatusResponse);
+  rpc ListRingItemVersions (ListRingItemVersionsRequest) returns (ListRingItemVersionsResponse);
+  rpc UpdateCurrentRingItemVersion (UpdateCurrentRingItemVersionRequest) returns (UpdateCurrentRingItemVersionResponse);
+  rpc ListOrderQuotes (ListOrderQuotesRequest) returns (ListOrderQuotesResponse);
+  rpc GetOrderPersonalizationContext (GetOrderPersonalizationContextRequest) returns (GetOrderPersonalizationContextResponse);
+}
+
+message OrderPreP1Acknowledgement {
+  string notice_version = 1;
+  bool privacy_notice_acknowledged = 2;
+  bool p1_nonrefund_acknowledged = 3;
+}
+
+message CreateOrderRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  repeated string selected_draft_ids = 2;
+  string fulfillment_mode = 3;
+  string recipient_name = 4;
+  string recipient_phone = 5;
+  string recipient_email = 6;
+  string delivery_address_json = 7;
+  string source_plan_mode = 8;
+  OrderPreP1Acknowledgement pre_p1_acknowledgement = 9;
+}
+
+message CreateOrderResponse {
+  string order_id = 1;
+  string order_no = 2;
+  string status = 3;
+  string source_plan_mode = 4;
+  int32 items_count = 5;
+  double total_amount = 6;
+  double deposit_amount = 7;
+  string currency = 8;
+  string created_at = 9;
+}
+
+message ListOrdersRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  string status = 4;
+}
+
+message OrderSummaryItem {
+  string id = 1;
+  string order_no = 2;
+  string status = 3;
+  string source_plan_mode = 4;
+  int32 items_count = 5;
+  double total_amount = 6;
+  string currency = 7;
+  string recipient_name = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+message ListOrdersResponse {
+  repeated OrderSummaryItem items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 limit = 4;
+}
+
+message GetOrderByIdRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+}
+
+message OrderQuoteSummary {
+  string quote_id = 1;
+  string quote_no = 2;
+  string quote_type = 3;
+  double subtotal_amount = 4;
+  double delivery_amount = 5;
+  double adjustment_amount = 6;
+  double total_amount = 7;
+  string currency = 8;
+  string status = 9;
+}
+
+message RingItemSummary {
+  string id = 1;
+  int32 item_no = 2;
+  string source_ring_design_draft_id = 3;
+  string current_version_id = 4;
+  int32 version_no = 5;
+  string template_variant_id = 6;
+  string template_code = 7;
+  string template_name = 8;
+  string material_name = 9;
+  double target_size = 10;
+  string personalization_package = 11;
+  bool memory_enabled = 12;
+}
+
+message GetOrderByIdResponse {
+  string id = 1;
+  string order_no = 2;
+  string status = 3;
+  string source_plan_mode = 4;
+  string fulfillment_mode = 5;
+  string recipient_name = 6;
+  string recipient_phone = 7;
+  string recipient_email = 8;
+  string delivery_address_json = 9;
+  OrderQuoteSummary current_quote = 10;
+  repeated RingItemSummary items = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}
+
+message GetOrderTimelineRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+}
+
+message TimelineEventItem {
+  string event_type = 1;
+  string title = 2;
+  string description = 3;
+  string occurred_at = 4;
+  string status = 5;
+}
+
+message StageGateItem {
+  string stage_code = 1;
+  string stage_name = 2;
+  string status = 3; // PENDING, ACTIVE, COMPLETED, SKIPPED
+  bool is_current = 4;
+  string completed_at = 5;
+}
+
+message GetOrderTimelineResponse {
+  string order_id = 1;
+  string order_no = 2;
+  string current_status = 3;
+  repeated TimelineEventItem events = 4;
+  repeated StageGateItem stage_gates = 5;
+}
+
+message GetRingItemDetailsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string ring_item_id = 3;
+}
+
+message RingItemGemstoneDetail {
+  int32 slot_number = 1;
+  string gemstone_slot_id = 2;
+  string gemstone_option_id = 3;
+  string gemstone_type = 4;
+  string gemstone_name = 5;
+  string shape = 6;
+  double carat_weight = 7;
+  string color = 8;
+  string clarity = 9;
+}
+
+message GetRingItemDetailsResponse {
+  string id = 1;
+  string order_id = 2;
+  int32 item_no = 3;
+  string source_ring_design_draft_id = 4;
+  string current_version_id = 5;
+  int32 version_no = 6;
+  string template_variant_id = 7;
+  string template_code = 8;
+  string template_name = 9;
+  string material_name = 10;
+  double target_size = 11;
+  string personalization_package = 12;
+  bool memory_enabled = 13;
+  repeated RingItemGemstoneDetail gemstones = 14;
+  string created_at = 15;
+}
+
+// -----------------------------------------------------------------------------
+// Admin Order Messages
+// -----------------------------------------------------------------------------
+
+message ListAdminOrdersRequest {
+  int32 page = 1;
+  int32 limit = 2;
+  string status = 3;
+  string search = 4;
+  string date_from = 5;
+  string date_to = 6;
+}
+
+message AdminOrderSummaryItem {
+  string id = 1;
+  string order_no = 2;
+  string status = 3;
+  string source_plan_mode = 4;
+  string owner_customer_identity_id = 5;
+  string recipient_name = 6;
+  string recipient_phone = 7;
+  string recipient_email = 8;
+  int32 items_count = 9;
+  double total_amount = 10;
+  string currency = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}
+
+message ListAdminOrdersResponse {
+  repeated AdminOrderSummaryItem items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 limit = 4;
+}
+
+message GetAdminOrderDetailsRequest {
+  string order_id = 1;
+}
+
+message AdminCustomerInfo {
+  string customer_identity_id = 1;
+  string guest_email = 2;
+  string guest_phone = 3;
+  string guest_email_verified_at = 4;
+}
+
+message GetAdminOrderDetailsResponse {
+  string id = 1;
+  string order_no = 2;
+  string status = 3;
+  string source_plan_mode = 4;
+  string fulfillment_mode = 5;
+  AdminCustomerInfo customer = 6;
+  string recipient_name = 7;
+  string recipient_phone = 8;
+  string recipient_email = 9;
+  string delivery_address_json = 10;
+  string pre_p1_evidence_json = 11;
+  OrderQuoteSummary current_quote = 12;
+  repeated RingItemSummary items = 13;
+  string cancelled_at = 14;
+  string cancellation_reason = 15;
+  string created_at = 16;
+  string updated_at = 17;
+}
+
+message UpdateOrderStatusRequest {
+  string order_id = 1;
+  string target_status = 2;
+  string reason = 3;
+  string staff_user_id = 4;
+}
+
+message UpdateOrderStatusResponse {
+  string order_id = 1;
+  string order_no = 2;
+  string previous_status = 3;
+  string current_status = 4;
+  string updated_at = 5;
+}
+
+// -----------------------------------------------------------------------------
+// Ring Item Versions & Quotes Messages
+// -----------------------------------------------------------------------------
+
+message ListRingItemVersionsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string ring_item_id = 3;
+}
+
+message RingItemVersionSummary {
+  string id = 1;
+  int32 version_no = 2;
+  string status = 3;
+  double target_size = 4;
+  string personalization_package = 5;
+  bool memory_enabled = 6;
+  string change_reason = 7;
+  string template_variant_id = 8;
+  string template_code = 9;
+  string template_name = 10;
+  string material_name = 11;
+  repeated RingItemGemstoneDetail gemstones = 12;
+  string created_at = 13;
+}
+
+message ListRingItemVersionsResponse {
+  string ring_item_id = 1;
+  string order_id = 2;
+  repeated RingItemVersionSummary versions = 3;
+}
+
+message RingItemGemstoneInput {
+  int32 slot_number = 1;
+  string gemstone_option_id = 2;
+}
+
+message UpdateCurrentRingItemVersionRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string ring_item_id = 3;
+  double target_size = 4;
+  string change_reason = 5;
+  bool memory_enabled = 6;
+  repeated RingItemGemstoneInput gemstone_selections = 7;
+}
+
+message UpdateCurrentRingItemVersionResponse {
+  string ring_item_id = 1;
+  string version_id = 2;
+  int32 version_no = 3;
+  string status = 4;
+  double target_size = 5;
+  string change_reason = 6;
+  string updated_at = 7;
+}
+
+message ListOrderQuotesRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+}
+
+message QuoteLineItem {
+  string id = 1;
+  string component_type = 2;
+  string description = 3;
+  double quantity = 4;
+  double unit_amount = 5;
+  double line_amount = 6;
+  string price_source_type = 7;
+}
+
+message FullQuoteDetail {
+  string id = 1;
+  string quote_no = 2;
+  string quote_type = 3;
+  int32 version_no = 4;
+  string status = 5;
+  double subtotal_amount = 6;
+  double delivery_amount = 7;
+  double adjustment_amount = 8;
+  double total_amount = 9;
+  string currency = 10;
+  repeated QuoteLineItem items = 11;
+  string created_at = 12;
+}
+
+message ListOrderQuotesResponse {
+  string order_id = 1;
+  repeated FullQuoteDetail quotes = 2;
+}
+
+// -----------------------------------------------------------------------------
+// Cross-Service Operations Messages
+// -----------------------------------------------------------------------------
+
+message GetOrderPersonalizationContextRequest {
+  string order_id = 1;
+}
+
+message PersonalizationRingItem {
+  string ring_item_id = 1;
+  int32 item_no = 2;
+  string current_version_id = 3;
+  string personalization_package = 4;
+  string version_status = 5;
+}
+
+message GetOrderPersonalizationContextResponse {
+  string order_id = 1;
+  string owner_customer_identity_id = 2;
+  string status = 3;
+  bool p1_paid = 4;
+  string source_plan_mode = 5;
+  repeated PersonalizationRingItem ring_items = 6;
+}
+
+
+

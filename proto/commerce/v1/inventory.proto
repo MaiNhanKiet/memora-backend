@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+package memora.commerce.v1;
+
+service InventoryService {
+  rpc ListRingBlankStocks (ListRingBlankStocksRequest) returns (ListRingBlankStocksResponse);
+  rpc ReceiveRingBlankStock (ReceiveRingBlankStockRequest) returns (StockLotResponse);
+  rpc ListGemstoneBatches (ListGemstoneBatchesRequest) returns (ListGemstoneBatchesResponse);
+  rpc ReceiveGemstoneBatch (ReceiveGemstoneBatchRequest) returns (StockLotResponse);
+  rpc ListCertifiedGemstoneAvailability (ListCertifiedGemstoneAvailabilityRequest) returns (ListCertifiedGemstoneAvailabilityResponse);
+  rpc CreateCertifiedGemstone (CreateCertifiedGemstoneRequest) returns (CertifiedGemstoneResponse);
+  rpc ListInventoryMovements (ListInventoryMovementsRequest) returns (ListInventoryMovementsResponse);
+  rpc AdjustInventory (AdjustInventoryRequest) returns (StockLotResponse);
+}
+
+// Common Stock Lot Response
+message StockLotResponse {
+  string id = 1;
+  string stock_code = 2;
+  string stock_type = 3;
+  string template_variant_id = 4;
+  string gemstone_option_id = 5;
+  string lot_code = 6;
+  string supplier_ref = 7;
+  int32 quantity_on_hand = 8;
+  int32 quantity_reserved = 9;
+  double unit_cost = 10;
+  string location_code = 11;
+  string status = 12;
+  string received_at = 13;
+  string updated_at = 14;
+}
+
+// INVEN-001: List Ring Blank Stocks
+message ListRingBlankStocksRequest {
+  string template_variant_id = 1;
+  string status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ListRingBlankStocksResponse {
+  repeated StockLotResponse items = 1;
+  int32 total = 2;
+}
+
+// INVEN-002: Receive Ring Blank Stock
+message ReceiveRingBlankStockRequest {
+  string template_variant_id = 1;
+  string lot_code = 2;
+  string supplier_ref = 3;
+  int32 quantity = 4;
+  double unit_cost = 5;
+  string location_code = 6;
+  string received_at = 7;
+  string performed_by_user_id = 8;
+}
+
+// INVEN-003: List Gemstone Batches
+message ListGemstoneBatchesRequest {
+  string gemstone_option_id = 1;
+  string status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ListGemstoneBatchesResponse {
+  repeated StockLotResponse items = 1;
+  int32 total = 2;
+}
+
+// INVEN-004: Receive Gemstone Batch
+message ReceiveGemstoneBatchRequest {
+  string gemstone_option_id = 1;
+  string lot_code = 2;
+  string supplier_ref = 3;
+  int32 quantity = 4;
+  double unit_cost = 5;
+  string location_code = 6;
+  string received_at = 7;
+  string performed_by_user_id = 8;
+}
+
+// INVEN-005 & INVEN-006: Certified Gemstone Messages
+message CertifiedGemstoneResponse {
+  string id = 1;
+  string internal_code = 2;
+  string gemstone_option_id = 3;
+  string certificate_provider = 4;
+  string certificate_number = 5;
+  string certificate_url = 6;
+  string certificate_metadata_json = 7;
+  double purchase_cost = 8;
+  string status = 9;
+  string location_code = 10;
+  string received_at = 11;
+  string updated_at = 12;
+}
+
+message ListCertifiedGemstoneAvailabilityRequest {
+  string gemstone_option_id = 1;
+  string status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ListCertifiedGemstoneAvailabilityResponse {
+  repeated CertifiedGemstoneResponse items = 1;
+  int32 total = 2;
+}
+
+message CreateCertifiedGemstoneRequest {
+  string internal_code = 1;
+  string gemstone_option_id = 2;
+  string certificate_provider = 3;
+  string certificate_number = 4;
+  string certificate_url = 5;
+  string certificate_metadata_json = 6;
+  double purchase_cost = 7;
+  string location_code = 8;
+  string performed_by_user_id = 9;
+}
+
+// INVEN-012: Inventory Movements (Audit Ledger)
+message InventoryMovementResponse {
+  string id = 1;
+  string movement_type = 2;
+  string stock_lot_id = 3;
+  string certified_gemstone_id = 4;
+  string allocation_id = 5;
+  string ring_item_id = 6;
+  string production_attempt_id = 7;
+  int32 quantity = 8;
+  double unit_cost_snapshot = 9;
+  string reason = 10;
+  string performed_by_user_id = 11;
+  string occurred_at = 12;
+  string metadata_json = 13;
+}
+
+message ListInventoryMovementsRequest {
+  string stock_lot_id = 1;
+  string certified_gemstone_id = 2;
+  string movement_type = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message ListInventoryMovementsResponse {
+  repeated InventoryMovementResponse items = 1;
+  int32 total = 2;
+}
+
+// INVEN-013: Adjust Inventory
+message AdjustInventoryRequest {
+  string stock_lot_id = 1;
+  int32 adjusted_quantity = 2;
+  string reason = 3;
+  string metadata_json = 4;
+  string performed_by_user_id = 5;
+}
