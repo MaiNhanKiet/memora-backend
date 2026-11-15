@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package memora.common.v1;
 
-// Danh tính người dùng do API Gateway đã xác thực (quyết định D-P-03).
-// Gateway điền từ principal sau JwtAuthGuard, không lấy từ body/query/header của client.
+// Danh tính người gọi do API Gateway đã xác thực (D-P-03; khách vãng lai: D-P-17).
+// Gateway điền sau khi kiểm tra credential, không lấy từ body/query/header của client.
 // Commerce, Operations, Experience nhúng vào request của RPC có người dùng:
 //
 //   import "common/v1/actor.proto";
@@ -15,10 +15,17 @@ package memora.common.v1;
 //
 // Chỉ tin được vì caller đã qua internal gRPC secret. Không chứa role/permission:
 // Gateway kiểm tra permission, service kiểm tra quyền trên resource.
+// Các kết hợp hợp lệ (service đọc bằng parseVerifiedActor):
+//   user_id [+ customer_identity_id]   người đã đăng nhập
+//   customer_identity_id               khách đã xác minh email qua IAM
+//   guest_session_id                   khách ẩn danh, phiên do IAM cấp
 // Chi tiết: docs/architecture/business-service-api-recipe.md mục 5.
 message VerifiedActor {
-  // IAM user id (UUID). Luôn có.
+  // IAM user id (UUID). Rỗng với khách vãng lai.
   string user_id = 1;
-  // Customer identity id (UUID). Rỗng khi user chưa có customer identity.
+  // Customer identity id (UUID). Rỗng khi chưa có (user mới, khách ẩn danh).
   string customer_identity_id = 2;
+  // Guest session id (UUID) do IAM cấp, Gateway đã kiểm tra. Chỉ có với khách ẩn danh.
+  // Không phải token: token thật không bao giờ được gửi sang service.
+  string guest_session_id = 3;
 }
