@@ -315,6 +315,7 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
   - It returns the owner customer identity, order status, `p1_paid`, `source_plan_mode`, and ring items (`id`, `current_version_id`, personalization type, version status).
   - Operations calls it through an application port with a test fake until Duy delivers it.
   - Version transition RPCs come later.
+  - 2026-11-15: Duy already has `OrderingService` in `proto/commerce/v1/ordering.proto` (branch `DuyPQ`), so the RPC is added there, not in a new proto. Spec: `docs/api/commerce/ordering-personalization-context.md`. Operations port and fake: `apps/operations-service/src/modules/personalization/shared/order-context/`. Open points: P1 `payment_stage` value, order and version status enums.
 - [x] D-P-05 DECIDED: Commerce owns the Source Plan (`ordering.orders.source_plan_mode`). PERSO-004 moves to Commerce. Operations reads the value through D-P-04 and snapshots it into `capture_sessions.source_plan_mode`.
 - [ ] D-P-06 OPEN (hardware): Phase 1 proof that AS608 exports an engraving-quality image (D-OPS-01). Code and tests can use fakes. PERSO-007 stays BLOCKED for production until proven.
 - [x] D-P-07 DECIDED: ESP32 calls HTTPS directly. Each device has its own HMAC secret, keyed by `device_code` and held in a secret env (no DDL).
