@@ -23,6 +23,26 @@ export function setupSwagger(
       },
       'bearer',
     )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Guest-Session',
+        description:
+          'Anonymous guest session token from POST /api/v1/identities/guest/sessions. Only on routes marked @AllowGuest({ session: true }).',
+      },
+      'guest-session',
+    )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Guest-Access',
+        description:
+          'Verified guest access token (guestAccessToken from guest/verify/confirm). Only on routes marked @AllowGuest({ verified: true }).',
+      },
+      'guest-access',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

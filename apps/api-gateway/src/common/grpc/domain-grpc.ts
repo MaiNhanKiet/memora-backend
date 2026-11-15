@@ -1,3 +1,4 @@
+import { HttpException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsProviderAsyncOptions, Transport } from '@nestjs/microservices';
 import {
@@ -20,7 +21,15 @@ export interface DomainGrpcClientDefinition {
   readonly protoPackage: string;
   /** Proto file relative to proto/, for example catalog/v1/catalog.proto. */
   readonly protoFile: string;
+  /**
+   * When true, an unset URL does not fail boot: the client gets an unroutable
+   * placeholder target and the matching DomainGrpcClient answers 503 on use.
+   */
+  readonly optional?: boolean;
 }
+
+/** Placeholder target for an optional service that is not configured. */
+export const UNCONFIGURED_GRPC_URL = 'unconfigured.invalid:1';
 
 /**
  * `ClientsModule.registerAsync([domainGrpcClientOptions({...})])` for one domain
@@ -37,7 +46,11 @@ export function domainGrpcClientOptions(
     useFactory: (configService: ConfigService) => ({
       transport: Transport.GRPC,
       options: {
-        url: configService.getOrThrow<string>(definition.urlConfigKey),
+        url:
+          definition.optional === true
+            ? (configService.get<string>(definition.urlConfigKey) ??
+              UNCONFIGURED_GRPC_URL)
+            : configService.getOrThrow<string>(definition.urlConfigKey),
         package: definition.protoPackage,
         protoPath: join(process.cwd(), 'proto', definition.protoFile),
         loader: {
@@ -57,15 +70,30 @@ export function domainGrpcClientOptions(
  * applies the timeout and maps gRPC failures to HTTP exceptions.
  */
 export abstract class DomainGrpcClient {
-  protected constructor(configService: ConfigService, secretConfigKey: string) {
-    this.internalSecret = configService.getOrThrow<string>(secretConfigKey);
+  protected constructor(
+    configService: ConfigService,
+    secretConfigKey: string,
+    options?: { readonly optional?: boolean },
+  ) {
+    this.internalSecret =
+      options?.optional === true
+        ? configService.get<string>(secretConfigKey)
+        : configService.getOrThrow<string>(secretConfigKey);
   }
 
-  private readonly internalSecret: string;
+  private readonly internalSecret: string | undefined;
+
+  /** Override to adapt gRPC failures of one domain; default is the shared mapper. */
+  protected mapError(error: unknown): HttpException {
+    return mapGrpcErrorToHttpException(error);
+  }
 
   protected async unary<T>(
     call: (metadata: Metadata) => Observable<T>,
   ): Promise<T> {
+    if (this.internalSecret === undefined) {
+      throw new ServiceUnavailableException();
+    }
     const metadata = createOutgoingGrpcMetadata();
     metadata.set(INTERNAL_GRPC_AUTH_METADATA_KEY, this.internalSecret);
     try {
@@ -73,7 +101,7 @@ export abstract class DomainGrpcClient {
         call(metadata).pipe(timeout(DOMAIN_RPC_TIMEOUT_MS)),
       );
     } catch (error: unknown) {
-      throw mapGrpcErrorToHttpException(error);
+      throw this.mapError(error);
     }
   }
 }
