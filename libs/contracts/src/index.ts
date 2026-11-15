@@ -8,3 +8,4 @@ export * from './commerce/cart.grpc';
 export * from './commerce/ordering.grpc';
 export * from './commerce/inventory.grpc';
 export * from './personalization/consent.grpc';
+export * from './personalization/fingerprint-capture.grpc';

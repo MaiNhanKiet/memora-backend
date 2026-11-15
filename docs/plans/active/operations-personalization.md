@@ -90,10 +90,12 @@ No approved code for: accepting/listing/revoking Consent, setting the source pla
 | PERSO-002 | GET | /api/v1/orders/{orderId}/consents | WF-01 F-02 | CONSENT_MANAGE_OWN | ListConsents | APPROVED |
 | PERSO-003 | POST | /api/v1/orders/{orderId}/consents/{consentId}/revoke | WF-01 F-13 | CONSENT_MANAGE_OWN | RevokeConsent | APPROVED |
 | PERSO-004 | PUT | /api/v1/orders/{orderId}/source-plan | WF-01 F-13 | NEEDS_REVIEW | SetSourcePlan | NEEDS_REVIEW |
-| PERSO-005 | POST | /api/v1/orders/{orderId}/fingerprint/capture-sessions | WF-01 F-02 | SOURCE_CAPTURE | CreateCaptureSession | PROPOSED |
-| PERSO-006 | GET | /api/v1/fingerprint/capture-sessions/{sessionId} | WF-01 F-02 | SOURCE_CAPTURE | GetCaptureSession | PROPOSED |
-| PERSO-007 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/attempts | WF-01 F-02 | device credential (NEEDS_REVIEW) | RecordCaptureAttempt | NEEDS_REVIEW |
-| PERSO-008 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/complete | WF-01 F-02 | SOURCE_CAPTURE | CompleteCaptureSession | PROPOSED |
+| PERSO-005 | POST | /api/v1/orders/{orderId}/fingerprint/capture-sessions | WF-01 F-02 | SOURCE_CAPTURE | CreateCaptureSession | APPROVED |
+| PERSO-006 | GET | /api/v1/fingerprint/capture-sessions/{sessionId} | WF-01 F-02 | SOURCE_CAPTURE | GetCaptureSession | APPROVED |
+| PERSO-007 | MQTT | MQTT `memora/capture/{deviceCode}/attempts` | WF-01 F-02 | device broker user + ACL (D-P-07) | none (MQTT) | APPROVED |
+| PERSO-008 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/complete | WF-01 F-02 | SOURCE_CAPTURE | CompleteCaptureSession | APPROVED |
+| PERSO-026 | GET | /api/v1/fingerprint/capture-sessions/{sessionId}/attempts/{attemptNo}/image | WF-01 F-02 | SOURCE_CAPTURE | GetCaptureAttemptImage | APPROVED |
+| PERSO-027 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/attempts/{attemptNo}/reject | WF-01 F-02 | SOURCE_CAPTURE | RejectCaptureAttempt | APPROVED |
 | PERSO-009 | POST | /api/v1/orders/{orderId}/soundwave/uploads/initiate | WF-01 F-02 | SOURCE_AUDIO_UPLOAD_OWN | InitiateSoundwaveUpload | PROPOSED |
 | PERSO-010 | POST | /api/v1/orders/{orderId}/soundwave/uploads/complete | WF-01 F-02 | SOURCE_AUDIO_UPLOAD_OWN | CompleteSoundwaveUpload | PROPOSED |
 | PERSO-011 | GET | /api/v1/orders/{orderId}/personalization-sources | WF-01 F-02 | NEEDS_REVIEW | ListSources | NEEDS_REVIEW |
@@ -112,7 +114,7 @@ No approved code for: accepting/listing/revoking Consent, setting the source pla
 | PERSO-024 | GET | /api/v1/admin/design/change-requests | WF-02 F-12 | DESIGN_CHANGE_APPROVE | ListChangeRequests | PROPOSED |
 | PERSO-025 | POST | /api/v1/admin/design/change-requests/{changeRequestId}/decide | WF-02 F-12 | DESIGN_CHANGE_APPROVE | DecideChangeRequest | PROPOSED |
 
-Count: 0 EXISTING, 3 APPROVED, 11 PROPOSED, 11 NEEDS_REVIEW. gRPC names are candidates, not an approved proto.
+Count: 0 EXISTING, 9 APPROVED, 8 PROPOSED, 10 NEEDS_REVIEW. gRPC names are candidates, not an approved proto.
 
 ## 5. Dependencies and order
 
@@ -214,101 +216,132 @@ Implementation notes (2026-11-15):
 - The Gateway Operations target is optional (`domainGrpcClientOptions({ optional: true })`): unset → 503, boot does not fail.
 - Operations now requires `COMMERCE_GRPC_URL`, `COMMERCE_INTERNAL_GRPC_SECRET`, and `OPERATIONS_CONSENT_POLICY_VERSION` (outside development). The server `deploy/secrets/operations.env` must have them before the next `main` deploy.
 
+### Fingerprint capture slice foundation (shared by PERSO-005..008)
+
+- Proto: extend `proto/personalization/v1/personalization.proto` with service `FingerprintCaptureService` (`CreateCaptureSession`, `GetCaptureSession`, `CompleteCaptureSession`), each with `VerifiedActor actor = 1`. The device path (PERSO-007) is MQTT into Operations, not gRPC (D-P-07 revised).
+- Operations feature: `apps/operations-service/src/modules/personalization/fingerprint-capture/`. Staff use cases call `requireUserActor`; `staff_user_id` = actor `userId`.
+- No store table exists (D-P-11): any user with `SOURCE_CAPTURE` may operate any session. Store scoping is out of scope.
+- Config (Operations): `OPERATIONS_CAPTURE_SESSION_TTL_SECONDS` (default 900), `OPERATIONS_CAPTURE_QUALITY_THRESHOLD` (number; required outside development, D-P-10), `OPERATIONS_CAPTURE_DEVICE_CODES` (comma list of registered devices), `OPERATIONS_MQTT_URL`, `OPERATIONS_MQTT_USERNAME`, `OPERATIONS_MQTT_PASSWORD`, and the existing `OPERATIONS_OBJECT_STORAGE_*` (Garage, D-P-08). Object storage uses `@aws-sdk/client-s3` (user-approved 2026-11-15).
+- Expiry is `created_at + TTL`, applied lazily: a CREATED/IN_PROGRESS session past expiry is marked `EXPIRED` when read or written.
+- Session states: `CREATED` → `IN_PROGRESS` (first attempt, `started_at`) → `COMPLETED` (008) | `FAILED` (3 attempts, none accepted) | `EXPIRED`.
+- Response shape `CaptureSession`: `{ sessionId, orderId, consentId, deviceCode, status, attemptCount, maxAttempts: 3, expiresAt, createdAt, acceptedSourceId|null, attempts: [{ attemptNo, result, qualityScore, attemptedAt }] }`. Never returns images, asset keys, checksums, nonces or device secrets.
+- Error mapping as Consent (400/403/404/409/503), reason code in the message.
+
 ### PERSO-005 — POST /api/v1/orders/{orderId}/fingerprint/capture-sessions
 
-- Status: PROPOSED
-- Domain / Feature / Service: personalization / fingerprint-capture / operations-service
-- Main Flow: WF-01 F-02 AC2
-- Purpose: open an in-store capture session for an FP Ring Item scope.
-- Actor: Store Staff.
-- Permission: `SOURCE_CAPTURE`.
-- Request: Params `orderId`. Body (draft) `consentId`, `deviceCode`. Idempotency key.
-- Response: Success `201 { sessionId, status: CREATED, expiresAt, attemptCount: 0 }`. Errors 401, 403, 404 order/consent, 409 no P1 / consent not ACCEPTED / revoked / wrong scope / active session exists.
-- Validation and business rules: P1 SUCCEEDED (trusted); Consent ACCEPTED for the FP scope of this Order; Staff and device authorized; one active session per scope/device (policy D-P-10); `orderId` from route, never `ownerId`/`paid` from client.
+- Status: APPROVED (user, 2026-11-15)
+- Main Flow: MF01-S07 (WF-01 F-02 AC2)
+- Actor / Permission: Store Staff, `SOURCE_CAPTURE`.
+- Request: Params `orderId`. Body `consentId` (uuid), `deviceCode` (string ≤80).
+- Response: `201 CaptureSession` (`status=CREATED`). Errors 400 `UNKNOWN_DEVICE`, 401, 403, 404 `ORDER_NOT_FOUND`/`CONSENT_NOT_FOUND`, 409 `P1_NOT_PAID`, `CONSENT_NOT_ACCEPTED`, `CONSENT_TYPE_MISMATCH`, `PACKAGE_MISMATCH`, `SESSION_ALREADY_OPEN`, `SOURCE_ALREADY_CAPTURED`, 503.
+- Rules:
+  - Operations rejects a `deviceCode` not in `OPERATIONS_CAPTURE_DEVICE_CODES` (400 `UNKNOWN_DEVICE`).
+  - After commit, Operations publishes a `start` command to the device (MQTT, see PERSO-007). A publish failure is logged; the session still exists and the command can be re-sent by re-reading (PERSO-006 does not re-send; the device may also request it, see PERSO-007).
+  - Consent belongs to the order, is `ACCEPTED`, type `FINGERPRINT_PROCESSING`.
+  - Commerce: order exists, `p1Paid`, every consented item is still `FINGERPRINT`. `source_plan_mode` is snapshotted from Commerce.
+  - At most one open (non-expired CREATED/IN_PROGRESS) session per consent and per device; a consent with a COMPLETED session → `SOURCE_ALREADY_CAPTURED`. Checked inside one transaction with an advisory lock.
 - Tables: `capture_sessions` (reads `consents`, `consent_ring_items`).
-- gRPC method: CreateCaptureSession (candidate).
-- Existing code: none.
-- Dependencies: PERSO-001, Commerce P1, D-P-06 (device registry), D-P-10 (expiry), schema gap `expires_at` (D-P-11).
-
-#### implement-api checklist
-
-- [ ] Approved method, path, request, response, and permission confirmed
-- [ ] No duplicate route, RPC, DTO, or migration
-- [ ] Owning service enforces rules and data ownership
-- [ ] Gateway DTO, auth, error mapping, and Swagger match the contract
-- [ ] Checks recorded with PASS/FAIL/NOT RUN
 
 ### PERSO-006 — GET /api/v1/fingerprint/capture-sessions/{sessionId}
 
-- Status: PROPOSED
-- Domain / Feature / Service: personalization / fingerprint-capture / operations-service
-- Main Flow: WF-01 F-02
-- Purpose: read session status for the authorized Staff.
-- Actor: Store Staff.
-- Permission: `SOURCE_CAPTURE`.
-- Request: Params `sessionId`.
-- Response: Success `200 { sessionId, status, attemptCount, maxAttempts: 3, expiresAt }`. Errors 401, 403, 404.
-- Validation and business rules: never return biometric bytes, asset keys or device secrets.
+- Status: APPROVED (user, 2026-11-15)
+- Actor / Permission: Store Staff, `SOURCE_CAPTURE`.
+- Response: `200 CaptureSession`. Errors 400, 401, 403, 404 `SESSION_NOT_FOUND`.
+- Rules: the store tablet polls this while the device captures. Applies lazy expiry. No biometric data.
 - Tables: `capture_sessions`, `capture_attempts`.
-- gRPC method: GetCaptureSession (candidate).
-- Existing code: none.
-- Dependencies: PERSO-005.
 
-#### implement-api checklist
+### PERSO-007 — MQTT capture attempt (device → Operations)
 
-- [ ] Approved method, path, request, response, and permission confirmed
-- [ ] No duplicate route, RPC, DTO, or migration
-- [ ] Owning service enforces rules and data ownership
-- [ ] Gateway DTO, auth, error mapping, and Swagger match the contract
-- [ ] Checks recorded with PASS/FAIL/NOT RUN
-
-### PERSO-007 — POST /api/v1/fingerprint/capture-sessions/{sessionId}/attempts
-
-- Status: NEEDS_REVIEW
-- Domain / Feature / Service: personalization / fingerprint-capture / operations-service
-- Main Flow: WF-01 F-02 AC2
-- Purpose: append one device capture attempt (max 3).
-- Actor: authenticated device bridge (not a Staff JWT).
-- Permission: device credential model undecided (D-P-06, D-P-07).
-- Request: Params `sessionId`. Body (draft) device proof, nonce, quality metadata, asset upload reference if accepted.
-- Response: Success `201 { attemptId, attemptNo, result }`. Errors 401 device, 409 4th attempt / session not open / replayed nonce.
-- Validation and business rules: server allocates `attempt_no`; at most one ACCEPTED; rejected raw samples never stored; score from device is evidence, not authority.
+- Status: APPROVED (user, 2026-11-15). Production use stays BLOCKED until D-P-06 hardware proof.
+- Transport (D-P-07 revised 2026-11-15): MQTT, broker Eclipse Mosquitto 2 in `deploy/infra`, port 1883 on the Tailscale IP only (local 127.0.0.1:1883). No HTTP route.
+- Device auth: one broker user per device (username = `deviceCode`), password file + ACL. A device may only use `memora/capture/<own deviceCode>/#`; Operations uses its own broker user with access to `memora/capture/#`. Operations trusts the `deviceCode` taken from the topic.
+- Topics (QoS 1, not retained, JSON UTF-8):
+  - `memora/capture/{deviceCode}/commands` (Operations → device): `{ "type": "start", "sessionId", "expiresAt", "maxAttempts": 3 }`.
+  - `memora/capture/{deviceCode}/attempts` (device → Operations): `{ "sessionId", "nonce" (16–64 chars), "qualityScore" (0–1000), "imageBase64" (raw AS608 image, required when the device considers the capture usable), "firmwareVersion"? }`. Max message 256 KB (broker limit).
+  - `memora/capture/{deviceCode}/results` (Operations → device): `{ "sessionId", "nonce", "ok": true, "attemptNo", "result", "remainingAttempts", "sessionStatus" }` or `{ "sessionId", "nonce", "ok": false, "error": "<REASON>" }`.
+  - `memora/capture/{deviceCode}/hello` (device → Operations, optional): on connect; Operations answers with a `start` command if the device has an open session.
+- Errors (in `results`): `INVALID_MESSAGE`, `SESSION_NOT_FOUND`, `DEVICE_MISMATCH`, `SESSION_NOT_OPEN`, `SESSION_EXPIRED`, `MAX_ATTEMPTS_REACHED`, `ATTEMPT_ALREADY_ACCEPTED`, `IMAGE_REQUIRED`, `IMAGE_TOO_LARGE`, `DUPLICATE_NONCE` (replays answer with the original result when it is known), `INTERNAL_ERROR`.
+- Rules:
+  - The session must be bound to the topic's `deviceCode`.
+  - Nonce dedupe: a nonce already recorded on the session (`capture_attempts.metadata_json.nonce`) is not inserted again (QoS 1 redelivery is normal).
+  - Server allocates `attempt_no` (1..3) and decides the result: `ACCEPTED` iff `qualityScore` ≥ `OPERATIONS_CAPTURE_QUALITY_THRESHOLD`, else `REJECTED`; threshold snapshotted per attempt.
+  - Only an ACCEPTED attempt's image is stored: Garage key `personalization/fingerprint/raw/{sessionId}/{attemptId}`, SHA-256 checksum, both in `capture_attempts.metadata_json` (D-P-11). Rejected images are discarded.
+  - First attempt sets `IN_PROGRESS` + `started_at`; the 3rd non-accepted attempt sets `FAILED` + `ended_at`.
+  - Upload before the DB insert; if the insert fails, delete the object (best effort).
+- Message contract for firmware: `docs/api/personalization/fingerprint-capture-mqtt.md`.
 - Tables: `capture_attempts`, `capture_sessions`.
-- gRPC method: RecordCaptureAttempt (candidate).
-- Existing code: none.
-- Dependencies: Phase 1 AS608 image evidence (D-P-06), transport (D-P-07), object storage (D-P-08), schema gap for nonce/asset ref (D-P-11), Prisma relation fix (D-P-12).
-
-#### implement-api checklist
-
-- [ ] Approved method, path, request, response, and permission confirmed
-- [ ] No duplicate route, RPC, DTO, or migration
-- [ ] Owning service enforces rules and data ownership
-- [ ] Gateway DTO, auth, error mapping, and Swagger match the contract
-- [ ] Checks recorded with PASS/FAIL/NOT RUN
 
 ### PERSO-008 — POST /api/v1/fingerprint/capture-sessions/{sessionId}/complete
 
-- Status: PROPOSED
-- Domain / Feature / Service: personalization / fingerprint-capture / operations-service
-- Main Flow: WF-01 F-02
-- Purpose: finalize the session and create one protected FP source.
-- Actor: Store Staff.
-- Permission: `SOURCE_CAPTURE`.
-- Request: Params `sessionId`. Body (draft) `acceptedAttemptId`.
-- Response: Success `200 { sourceId, status }`. Errors 401, 403, 404, 409 no accepted attempt / session closed.
-- Validation and business rules: exactly one ACCEPTED attempt; one source per session (`accepted_source_id` unique); idempotent repeat returns the same source; session status and source creation in one transaction.
-- Tables: `capture_sessions`, `capture_attempts`, `personalization_sources`.
-- gRPC method: CompleteCaptureSession (candidate).
-- Existing code: none.
-- Dependencies: PERSO-007, object storage (D-P-08).
+- Status: APPROVED (user, 2026-11-15)
+- Actor / Permission: Store Staff, `SOURCE_CAPTURE`.
+- Request: Params `sessionId`. No body (the server uses the single ACCEPTED attempt).
+- Response: `200 CaptureSession` (`status=COMPLETED`, `acceptedSourceId`). Errors 400, 401, 403, 404, 409 `NO_ACCEPTED_ATTEMPT`, `SESSION_NOT_OPEN`, `SESSION_EXPIRED`, `CONSENT_NOT_ACCEPTED`.
+- Rules:
+  - Already COMPLETED → 200 with the same source (idempotent).
+  - Consent must still be ACCEPTED (revoked meanwhile → 409).
+  - One transaction: create `personalization_sources` (`owner_customer_identity_id` from the consent, `source_type=FINGERPRINT`, `status=ACCEPTED`, `raw_asset_key`, `raw_checksum`, `captured_or_uploaded_by_user_id` = staff, `captured_at` = attempt time, `accepted_at` = now); set session `COMPLETED`, `accepted_source_id`, `ended_at`; set `consents.personalization_source_id`. Conditional update on session status so parallel completes create one source.
+  - Processing (PERSO-013) and binding (PERSO-014) are not triggered here.
+- Tables: `capture_sessions`, `capture_attempts`, `personalization_sources`, `consents`.
 
-#### implement-api checklist
+### PERSO-026 — GET /api/v1/fingerprint/capture-sessions/{sessionId}/accepted-image
 
-- [ ] Approved method, path, request, response, and permission confirmed
-- [ ] No duplicate route, RPC, DTO, or migration
-- [ ] Owning service enforces rules and data ownership
-- [ ] Gateway DTO, auth, error mapping, and Swagger match the contract
-- [ ] Checks recorded with PASS/FAIL/NOT RUN
+- Status: APPROVED (user, 2026-11-15)
+- Purpose: staff confirmation step (user decision 2026-11-15: automatic threshold + staff confirms). The tablet shows the ACCEPTED image before the staff completes (PERSO-008) or rejects (PERSO-027).
+- Actor / Permission: Store Staff, `SOURCE_CAPTURE`.
+- Response: `200 { attemptNo, imageUrl, expiresAt, contentType: "image/bmp" }`. `imageUrl` is a Garage presigned GET valid 60 s (`@aws-sdk/s3-request-presigner`, user-approved). Errors 400, 401, 403, 404 `SESSION_NOT_FOUND`, 409 `NO_ACCEPTED_ATTEMPT`, `SESSION_NOT_OPEN` (only `IN_PROGRESS`, not expired), 503.
+- Rules: NFR-S-01 exception, narrowed: only the ACCEPTED image of an open session, only via a 60 s URL, never in list/read responses. Each call is logged (session id, attempt no, staff user id; never the URL).
+- gRPC: `FingerprintCaptureService.GetAcceptedCaptureImage`.
+
+### PERSO-027 — POST /api/v1/fingerprint/capture-sessions/{sessionId}/accepted-attempt/reject
+
+- Status: APPROVED (user, 2026-11-15)
+- Purpose: the staff rejects an automatically ACCEPTED image after looking at it.
+- Actor / Permission: Store Staff, `SOURCE_CAPTURE`. No body.
+- Response: `200 CaptureSession`. Errors 400, 401, 403, 404, 409 `NO_ACCEPTED_ATTEMPT`, `SESSION_NOT_OPEN`, `SESSION_EXPIRED`, 503.
+- Rules (one transaction under the `capture-session:{id}` lock):
+  - The session is `IN_PROGRESS`, not expired, and has an ACCEPTED attempt (COMPLETED sessions cannot be rejected).
+  - The attempt becomes `REJECTED`, `failure_reason='STAFF_REJECTED'`; `metadata_json` drops the image key/checksum and records `rejectedByUserId` and `rejectedAt`. The attempt still counts as used.
+  - If 3 attempts are used, the session becomes `FAILED` (`ended_at`, `failure_reason='MAX_ATTEMPTS_REACHED'`); otherwise it stays `IN_PROGRESS`.
+  - After commit: delete the object (best effort, log on failure) and publish a `results` message to the device with the original nonce, `result: "REJECTED"`, `reason: "STAFF_REJECTED"`, `remainingAttempts`, `sessionStatus`, so the device returns to waiting for a finger (or stops if FAILED).
+- gRPC: `FingerprintCaptureService.RejectAcceptedCaptureAttempt`.
+
+### Device image format and quality score (decided 2026-11-15)
+
+- `imageBase64` is an uncompressed 8-bit grayscale BMP (256×288 from the AS608 `UpImage`, 256-entry palette). Operations checks the `BM` magic and the declared file size, stores it with `Content-Type: image/bmp`.
+- `qualityScore` (0–1000) is computed by the firmware: the AS608 `Img2Tz` must succeed, then score = ridge-area coverage × contrast, scaled to 0–1000. `OPERATIONS_CAPTURE_QUALITY_THRESHOLD` is tuned from real captures.
+
+### Revision 2026-11-15: the capture staff decides (user-approved)
+
+This section overrides the earlier PERSO-007, PERSO-008, PERSO-026 and PERSO-027 rules where they differ.
+
+- The quality threshold is only a **suggestion**. The Store Staff who captures decides which image is accepted.
+- **Schema (D-P-11 amended):** first Operations migration `capture_attempt_pending_review`:
+  - `capture_attempts.result` allows `PENDING_REVIEW` (values `PENDING_REVIEW`, `ACCEPTED`, `REJECTED`, `ERROR`).
+  - The result CHECK becomes: `ACCEPTED` → `quality_score IS NOT NULL AND failure_reason IS NULL`; `PENDING_REVIEW` → `failure_reason IS NULL`; `REJECTED`/`ERROR` → `failure_reason IS NOT NULL`. The `quality_score >= quality_threshold_snapshot` rule is removed (staff may accept below the threshold).
+  - The partial unique "one ACCEPTED per session" stays.
+  - Applied on the server 2026-11-15 (user-authorized, owner `memora`, tables were empty).
+- **PERSO-007 (MQTT):** every attempt whose image passes the BMP check is stored in Garage and recorded as `PENDING_REVIEW` with `quality_threshold_snapshot` = current threshold. `suggestion` = `PASS` when `qualityScore >= threshold`, else `LOW_QUALITY` (derived, not stored). An attempt without an image (AS608 `Img2Tz` failed) is recorded as `REJECTED`, `failure_reason='CAPTURE_FAILED'`. Results: `{ sessionId, nonce, ok: true, attemptNo, result: "PENDING_REVIEW" | "REJECTED", suggestion?, remainingAttempts, sessionStatus }`. While an attempt is `PENDING_REVIEW` the device waits for the staff (a new attempt is refused with `REVIEW_PENDING`). Three used attempts with none accepted and none pending → `FAILED`.
+- **PERSO-006:** each attempt shows `attemptNo, result, qualityScore, suggestion, attemptedAt`.
+- **PERSO-026:** `GET /api/v1/fingerprint/capture-sessions/{sessionId}/attempts/{attemptNo}/image` → presigned URL 60 s for a `PENDING_REVIEW` attempt's image. Errors `ATTEMPT_NOT_FOUND`, `ATTEMPT_NOT_REVIEWABLE`, `SESSION_NOT_OPEN`, `SESSION_EXPIRED`.
+- **PERSO-027:** `POST /api/v1/fingerprint/capture-sessions/{sessionId}/attempts/{attemptNo}/reject` → the attempt becomes `REJECTED`, `failure_reason='STAFF_REJECTED'`, image deleted, device gets `results` (`result: "REJECTED"`, `reason: "STAFF_REJECTED"`, `remainingAttempts`, `sessionStatus`). No attempts left → `FAILED`, device gets `commands` `{ type: "end", sessionId, status: "FAILED" }`.
+- **PERSO-008:** `POST /api/v1/fingerprint/capture-sessions/{sessionId}/complete` with body `{ attemptNo }`. The chosen `PENDING_REVIEW` attempt becomes `ACCEPTED` (metadata `acceptedByUserId`, `acceptedAt`); any other `PENDING_REVIEW` attempt becomes `REJECTED` / `STAFF_REJECTED` and its image is deleted after commit. Source creation, session `COMPLETED`, consent link as before. Idempotent repeat with the same `attemptNo` returns the session; a different `attemptNo` after completion → 409 `SESSION_NOT_OPEN`. After commit the device gets `commands` `{ type: "end", sessionId, status: "COMPLETED" }`.
+- New device command `end` (also sent when a session expires is not required; the device uses `expiresAt`).
+
+#### implement-api checklist (each of PERSO-005..008)
+
+- [x] Approved method, path, request, response, and permission confirmed
+- [x] No duplicate route, RPC, DTO, or migration
+- [x] Owning service enforces rules and data ownership
+- [x] Gateway DTO, auth, error mapping, and Swagger match the contract
+- [x] Checks recorded with PASS/FAIL/NOT RUN
+
+Implementation notes (2026-11-15):
+- Locks: `pg_advisory_xact_lock` on `capture-consent:{id}` then `capture-device:{code}` (create), `capture-session:{id}` (attempt, complete).
+- MQTT client id is fixed (`memora-operations`, clean session false): run one Operations instance per broker, or two clients will keep disconnecting each other.
+- Extra limits: nonce `[A-Za-z0-9_-]{16,64}`, decoded image ≤ 180000 bytes. Image SHA-256 is stored as S3 object metadata `sha256` (not `x-amz-checksum-*`).
+- A consent revoked during an open session does not stop attempts; `complete` then fails with `CONSENT_NOT_ACCEPTED` and the stored image stays orphaned until retention rules (D-OPS-08) exist.
+- Server steps before the next `main` deploy: Mosquitto in the Arcane `memora-infra` project (`MQTT_OPERATIONS_PASSWORD`, `MQTT_DEVICE_USERS` in its `.env`), and `operations.env` gets `OPERATIONS_MQTT_*`, `OPERATIONS_CAPTURE_*`, `OPERATIONS_OBJECT_STORAGE_*`.
 
 ### Remaining IDs (summary checklists; expand when the user approves them)
 
@@ -376,10 +409,7 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
   - 2026-11-15: Duy already has `OrderingService` in `proto/commerce/v1/ordering.proto` (branch `DuyPQ`), so the RPC is added there, not in a new proto. Spec: `docs/api/commerce/ordering-personalization-context.md`. Operations port and fake: `apps/operations-service/src/modules/personalization/shared/order-context/`. Open points: P1 `payment_stage` value, order and version status enums.
 - [x] D-P-05 DECIDED: Commerce owns the Source Plan (`ordering.orders.source_plan_mode`). PERSO-004 moves to Commerce. Operations reads the value through D-P-04 and snapshots it into `capture_sessions.source_plan_mode`.
 - [ ] D-P-06 OPEN (hardware): Phase 1 proof that AS608 exports an engraving-quality image (D-OPS-01). Code and tests can use fakes. PERSO-007 stays BLOCKED for production until proven.
-- [x] D-P-07 DECIDED: ESP32 calls HTTPS directly. Each device has its own HMAC secret, keyed by `device_code` and held in a secret env (no DDL).
-  - The device signs method, path, timestamp, nonce and body hash. The Gateway verifies the signature, a timestamp window and nonce reuse (Redis).
-  - The Gateway then passes the verified `device_code` to Operations. Operations checks that the target capture session is open and bound to that `device_code`.
-  - Devices never use `VerifiedActor`. Provisioning and rotation steps are written at implementation time.
+- [x] D-P-07 REVISED 2026-11-15 (user): the device talks MQTT to an Eclipse Mosquitto 2 broker in `deploy/infra` (port 1883 on the Tailscale IP only). Operations subscribes and publishes directly; the Gateway is not on the device path. Each device has its own broker user (username = `deviceCode`) and an ACL limited to `memora/capture/<deviceCode>/#`. Payload nonces dedupe QoS 1 redelivery. Replaces the earlier HTTPS + HMAC decision. Contract: PERSO-007 and `docs/api/personalization/fingerprint-capture-mqtt.md`. Public TLS exposure is deferred.
 - [x] D-P-08 DECIDED: self-hosted S3-compatible storage on the Mini PC behind an S3-compatible infrastructure port. Changed 2026-11-13 from MinIO to **Garage v2.5.0** (`dxflrs/garage`), because MinIO no longer publishes community images (Docker Hub repo removed, Quay requires login). Same port/adapter design. Added to `deploy/infra/compose.yaml` as `memora-garage` (no host port; laptop 127.0.0.1:3900).
   - Private bucket, short-lived signed URLs, checksum on every object.
   - Adding the container to `deploy/infra` is an approved direction, but the infra change and deploy still need their own authorization (rule 25).
@@ -393,6 +423,7 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
   - The nonce and device evidence go in `capture_attempts.metadata_json`.
   - Only an accepted capture writes `personalization_sources.raw_asset_key`.
   - Processing state uses `personalization_sources.status`. The order link goes through `source_bindings` and `capture_sessions.accepted_source_id`.
+  - AMENDED 2026-11-15 (user): one DDL change is allowed, the Operations migration `capture_attempt_pending_review` (see "Revision 2026-11-15: the capture staff decides").
 - [x] D-P-12 DECIDED: change `capture_sessions.capture_attempts` to a list in `schema.prisma`. Keep the partial unique index in the DB. Prisma-only change, checked with `prisma validate`. Done on `feat/business-prisma-baseline`: `prisma validate` passes, `migrate diff` against the baseline is empty.
 - [ ] D-P-13 DECIDED (retention open): revoking Consent is allowed only while no linked Ring Item Version is SUBMITTED or locked. Otherwise return `FAILED_PRECONDITION`. Data retention after the order (D-OPS-08) stays NEEDS_REVIEW.
 - [x] D-P-14 DECIDED: Soundwave accepts WAV, MP3 and M4A/AAC, up to 10 MB. Both file upload and in-app recording are limited to 30 s. The selected segment is exactly 3000 ms.
@@ -409,3 +440,6 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
 | --- | --- | --- | --- |
 | 2026-11-13 | Phase 0 audit | PLAN ONLY | Files read listed in §2; no code, schema, RBAC or server change |
 | 2026-11-15 | PERSO-001..003 | IMPLEMENTED (not deployed) | Builds gateway/operations/commerce PASS; jest 161 PASS (task-added specs then removed per rule); eslint, proto:check, boundaries, guardrails PASS. Local smoke: 401 without token, Swagger paths, gRPC UNAUTHENTICATED without secret, INVALID_ARGUMENT, list empty, Operations→Commerce NOT_FOUND→404, Commerce down→503. NOT RUN: accept/revoke against a real paid order (would write server DB), Postgres race path |
+| 2026-11-15 | PERSO-005..008 | IMPLEMENTED (not deployed) | Builds gateway/operations/commerce/iam PASS; jest 220 PASS with task specs (then removed per rule), 112 PASS after; eslint, proto:check, prisma validate, boundaries, guardrails, ci:deploy-layout PASS. Local smoke: throwaway Mosquitto 2.0.21 + Operations: connect/subscribe, unknown session → SESSION_NOT_FOUND result, bad score → INVALID_MESSAGE, bad nonce dropped, other-device topic blocked by ACL; Gateway 3 routes 401 without token, Swagger paths. NOT RUN: session create/attempt/complete against real DB and Garage, Postgres lock paths, ESP32 hardware (D-P-06) |
+| 2026-11-15 | PERSO-026/027 + BMP rule + D-P-07 broker users via Arcane env | IMPLEMENTED (not deployed) | Builds gateway/operations/commerce/iam/experience PASS; jest 134 PASS with task specs (then removed per rule); eslint, tsc, proto:check, prisma validate, boundaries, guardrails, ci:deploy-layout PASS. Server broker (Arcane, user-deployed): anonymous/wrong password refused, both users connect, ACL blocks other-device and own-commands publish, start command delivered (also seen in MQTT Explorer). NOT RUN: presigned URL via public endpoint, reject flow against real DB/Garage |
+| 2026-11-15 | Revision: capture staff decides (PERSO-007/008/026/027) + migration `20261115120000_capture_attempt_pending_review` | IMPLEMENTED (code not deployed; migration APPLIED on server 2026-11-15) | Builds 5 services PASS; jest 152 PASS with task specs (then removed per rule); eslint, tsc, proto:check, prisma validate, boundaries, guardrails, ci:deploy-layout PASS. Migration: user-authorized, applied with `prisma migrate deploy` as owner `memora` on the server DB after a pre-check (capture_attempts and capture_sessions empty, old CHECK definitions saved); `migrate status` up to date; new CHECKs verified; operations_app grants unchanged. NOT RUN: flow against real DB/Garage/broker |
