@@ -2,6 +2,8 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { ClientGrpc } from '@nestjs/microservices';
 import type {
+  AcceptServiceQuoteRequest,
+  AcceptServiceQuoteResponse,
   CancelOrderRequest,
   CancelOrderResponse,
   CommerceOrderingServiceClient,
@@ -29,6 +31,8 @@ import type {
   GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
+  ListClaimQuotesRequest,
+  ListClaimQuotesResponse,
   ListOrderPaymentsRequest,
   ListOrderPaymentsResponse,
   ListOrderQuotesRequest,
@@ -256,6 +260,22 @@ export class OrderingGrpcClient
   ): Promise<CreateRefundResponse> {
     return this.unary((metadata) =>
       this.orderingService.createRefundRequest(request, metadata),
+    );
+  }
+
+  listClaimQuotes(
+    request: ListClaimQuotesRequest,
+  ): Promise<ListClaimQuotesResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.listClaimQuotes(request, metadata),
+    );
+  }
+
+  acceptServiceQuote(
+    request: AcceptServiceQuoteRequest,
+  ): Promise<AcceptServiceQuoteResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.acceptServiceQuote(request, metadata),
     );
   }
 }

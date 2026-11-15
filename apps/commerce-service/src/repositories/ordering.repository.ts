@@ -1158,4 +1158,53 @@ export class OrderingRepository {
       });
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-024] Find Claim Quotes (quote_type = 'SERVICE')
+  // ---------------------------------------------------------------------------
+  async findClaimQuotes(claimId: string) {
+    return this.prisma.quotes.findMany({
+      where: {
+        claim_id: claimId,
+        quote_type: 'SERVICE',
+      },
+      include: {
+        quote_items: {
+          orderBy: { created_at: 'asc' },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-025] Accept Service Quote
+  // ---------------------------------------------------------------------------
+  async findClaimQuoteById(claimId: string, quoteId: string) {
+    return this.prisma.quotes.findFirst({
+      where: {
+        id: quoteId,
+        claim_id: claimId,
+      },
+      include: {
+        quote_items: {
+          orderBy: { created_at: 'asc' },
+        },
+      },
+    });
+  }
+
+  async acceptClaimQuote(params: {
+    quoteId: string;
+    customerIdentityId: string;
+  }) {
+    return this.prisma.quotes.update({
+      where: { id: params.quoteId },
+      data: {
+        status: 'ACCEPTED',
+        accepted_by_customer_identity_id: params.customerIdentityId,
+        accepted_at: new Date(),
+      },
+    });
+  }
 }

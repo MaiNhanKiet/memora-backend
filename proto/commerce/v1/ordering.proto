@@ -30,6 +30,8 @@ service OrderingService {
   rpc GetPaymentReceipt (GetPaymentReceiptRequest) returns (PaymentReceiptDetail);
   rpc GetOrderInvoice (GetOrderInvoiceRequest) returns (OrderInvoiceDetail);
   rpc CreateRefundRequest (CreateRefundRequestMessage) returns (CreateRefundResponse);
+  rpc ListClaimQuotes (ListClaimQuotesRequest) returns (ListClaimQuotesResponse);
+  rpc AcceptServiceQuote (AcceptServiceQuoteRequest) returns (AcceptServiceQuoteResponse);
 }
 
 message OrderPreP1Acknowledgement {
@@ -681,6 +683,29 @@ message CreateRefundResponse {
   string requested_at = 7;
   string reason = 8;
 }
+
+message ListClaimQuotesRequest {
+  string claim_id = 1;
+  memora.common.v1.VerifiedActor actor = 2;
+}
+
+message ListClaimQuotesResponse {
+  repeated FullQuoteDetail quotes = 1;
+}
+
+message AcceptServiceQuoteRequest {
+  string claim_id = 1;
+  string quote_id = 2;
+  memora.common.v1.VerifiedActor actor = 3;
+}
+
+message AcceptServiceQuoteResponse {
+  bool success = 1;
+  string quote_id = 2;
+  string status = 3;
+  string accepted_at = 4;
+}
+
 
 
 

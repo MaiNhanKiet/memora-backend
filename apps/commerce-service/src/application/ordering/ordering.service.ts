@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { parseVerifiedActor, type ParsedVerifiedActor } from '@app/common';
 import type {
+  AcceptServiceQuoteRequest,
+  AcceptServiceQuoteResponse,
   AdminOrderSummaryItem,
   CancelOrderRequest,
   CancelOrderResponse,
@@ -35,6 +37,8 @@ import type {
   GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
+  ListClaimQuotesRequest,
+  ListClaimQuotesResponse,
   ListOrderPaymentsRequest,
   ListOrderPaymentsResponse,
   ListOrderQuotesRequest,
@@ -1492,6 +1496,82 @@ export class OrderingService {
       status: refund.status,
       requestedAt: refund.requested_at.toISOString(),
       reason: request.reason,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-024] List Claim Quotes
+  // ---------------------------------------------------------------------------
+  async listClaimQuotes(
+    request: ListClaimQuotesRequest,
+  ): Promise<ListClaimQuotesResponse> {
+    if (!request.claimId) {
+      throw new BadRequestException('Claim ID is required');
+    }
+    this.validateActor(request.actor);
+
+    const quotes = await this.repository.findClaimQuotes(request.claimId);
+    return {
+      quotes: quotes.map((q) => this.mapQuoteToDetail(q)),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-025] Accept Service Quote
+  // ---------------------------------------------------------------------------
+  async acceptServiceQuote(
+    request: AcceptServiceQuoteRequest,
+  ): Promise<AcceptServiceQuoteResponse> {
+    if (!request.claimId || !request.quoteId) {
+      throw new BadRequestException('Claim ID and Quote ID are required');
+    }
+
+    const actor = this.validateActor(request.actor);
+    const customerIdentityId = actor.userId ?? actor.guestSessionId;
+    if (!customerIdentityId) {
+      throw new ForbiddenException('A valid customer identity is required to accept a service quote');
+    }
+
+    const quote = await this.repository.findClaimQuoteById(request.claimId, request.quoteId);
+    if (!quote) {
+      throw new NotFoundException(`Service quote ${request.quoteId} for claim ${request.claimId} not found`);
+    }
+
+    if (quote.quote_type !== 'SERVICE') {
+      throw new BadRequestException(`Quote is not a SERVICE quote (type: '${quote.quote_type}')`);
+    }
+
+    if (quote.status === 'ACCEPTED') {
+      return {
+        success: true,
+        quoteId: quote.id,
+        status: quote.status,
+        acceptedAt: quote.accepted_at ? quote.accepted_at.toISOString() : new Date().toISOString(),
+      };
+    }
+
+    if (quote.status !== 'ISSUED') {
+      throw new BadRequestException(
+        `Only ISSUED service quotes can be accepted. Current status: '${quote.status}'`,
+      );
+    }
+
+    if (quote.valid_until && new Date(quote.valid_until) < new Date()) {
+      throw new BadRequestException(
+        `Service quote expired on ${quote.valid_until.toISOString()}`,
+      );
+    }
+
+    const updated = await this.repository.acceptClaimQuote({
+      quoteId: quote.id,
+      customerIdentityId,
+    });
+
+    return {
+      success: true,
+      quoteId: updated.id,
+      status: updated.status,
+      acceptedAt: updated.accepted_at ? updated.accepted_at.toISOString() : new Date().toISOString(),
     };
   }
 

@@ -41,6 +41,9 @@ describe('OrderingService', () => {
     findPaymentReceipt: jest.fn(),
     findOrderInvoice: jest.fn(),
     createRefundRequest: jest.fn(),
+    findClaimQuotes: jest.fn(),
+    findClaimQuoteById: jest.fn(),
+    acceptClaimQuote: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -1333,6 +1336,194 @@ describe('OrderingService', () => {
       expect(res.originalTransactionId).toBe('tx-1');
       expect(res.refundAmount).toBe(4500000);
       expect(res.status).toBe('PENDING');
+    });
+  });
+
+  describe('listClaimQuotes (ORDER-024)', () => {
+    it('should throw BadRequestException if claimId is missing', async () => {
+      await expect(
+        service.listClaimQuotes({
+          claimId: '',
+          actor: { userId: validUserId },
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should return list of quotes for a claim', async () => {
+      mockRepository.findClaimQuotes.mockResolvedValue([
+        {
+          id: 'quo-claim-1',
+          quote_no: 'QUO-CLM-001',
+          claim_id: 'clm-1',
+          order_id: 'ord-1',
+          quote_type: 'SERVICE',
+          version_no: 1,
+          status: 'ISSUED',
+          subtotal_amount: new Prisma.Decimal(500000),
+          delivery_amount: new Prisma.Decimal(30000),
+          adjustment_amount: new Prisma.Decimal(0),
+          total_amount: new Prisma.Decimal(530000),
+          currency: 'VND',
+          valid_until: new Date('2026-12-01T00:00:00.000Z'),
+          created_by_user_id: 'staff-1',
+          issued_at: new Date('2026-11-15T00:00:00.000Z'),
+          accepted_by_customer_identity_id: null,
+          accepted_at: null,
+          created_at: new Date('2026-11-15T00:00:00.000Z'),
+          quote_items: [
+            {
+              id: 'qi-1',
+              component_type: 'POLISHING',
+              description: 'Ring surface polishing',
+              quantity: new Prisma.Decimal(1),
+              unit_amount: new Prisma.Decimal(500000),
+              line_amount: new Prisma.Decimal(500000),
+              price_source_type: 'MANUAL',
+              ring_item_id: null,
+            },
+          ],
+        },
+      ]);
+
+      const res = await service.listClaimQuotes({
+        claimId: 'clm-1',
+        actor: { userId: validUserId },
+      });
+
+      expect(res.quotes).toHaveLength(1);
+      expect(res.quotes[0].id).toBe('quo-claim-1');
+      expect(res.quotes[0].quoteType).toBe('SERVICE');
+      expect(res.quotes[0].totalAmount).toBe(530000);
+      expect(res.quotes[0].items).toHaveLength(1);
+      expect(res.quotes[0].items[0].componentType).toBe('POLISHING');
+    });
+  });
+
+  describe('acceptServiceQuote (ORDER-025)', () => {
+    it('should throw BadRequestException if claimId or quoteId is missing', async () => {
+      await expect(
+        service.acceptServiceQuote({
+          claimId: '',
+          quoteId: 'quo-1',
+          actor: { userId: validUserId },
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.acceptServiceQuote({
+          claimId: 'clm-1',
+          quoteId: '',
+          actor: { userId: validUserId },
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException if quote is not found', async () => {
+      mockRepository.findClaimQuoteById.mockResolvedValue(null);
+
+      await expect(
+        service.acceptServiceQuote({
+          claimId: 'clm-1',
+          quoteId: 'quo-1',
+          actor: { userId: validUserId },
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if quote is not SERVICE type', async () => {
+      mockRepository.findClaimQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        quote_type: 'FINAL_SALES',
+        status: 'ISSUED',
+      });
+
+      await expect(
+        service.acceptServiceQuote({
+          claimId: 'clm-1',
+          quoteId: 'quo-1',
+          actor: { userId: validUserId },
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should return success if quote is already ACCEPTED (idempotent)', async () => {
+      mockRepository.findClaimQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        quote_type: 'SERVICE',
+        status: 'ACCEPTED',
+        accepted_at: new Date('2026-11-15T09:00:00.000Z'),
+      });
+
+      const res = await service.acceptServiceQuote({
+        claimId: 'clm-1',
+        quoteId: 'quo-1',
+        actor: { userId: validUserId },
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.status).toBe('ACCEPTED');
+    });
+
+    it('should throw BadRequestException if quote status is not ISSUED', async () => {
+      mockRepository.findClaimQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        quote_type: 'SERVICE',
+        status: 'DRAFT',
+      });
+
+      await expect(
+        service.acceptServiceQuote({
+          claimId: 'clm-1',
+          quoteId: 'quo-1',
+          actor: { userId: validUserId },
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if quote has expired', async () => {
+      mockRepository.findClaimQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        quote_type: 'SERVICE',
+        status: 'ISSUED',
+        valid_until: new Date('2020-01-01T00:00:00.000Z'),
+      });
+
+      await expect(
+        service.acceptServiceQuote({
+          claimId: 'clm-1',
+          quoteId: 'quo-1',
+          actor: { userId: validUserId },
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should accept service quote successfully', async () => {
+      mockRepository.findClaimQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        claim_id: 'clm-1',
+        quote_type: 'SERVICE',
+        status: 'ISSUED',
+        valid_until: new Date('2099-01-01T00:00:00.000Z'),
+      });
+
+      mockRepository.acceptClaimQuote.mockResolvedValue({
+        id: 'quo-1',
+        status: 'ACCEPTED',
+        accepted_at: new Date('2026-11-15T10:00:00.000Z'),
+      });
+
+      const res = await service.acceptServiceQuote({
+        claimId: 'clm-1',
+        quoteId: 'quo-1',
+        actor: { userId: validUserId },
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.status).toBe('ACCEPTED');
+      expect(mockRepository.acceptClaimQuote).toHaveBeenCalledWith({
+        quoteId: 'quo-1',
+        customerIdentityId: validUserId,
+      });
     });
   });
 });

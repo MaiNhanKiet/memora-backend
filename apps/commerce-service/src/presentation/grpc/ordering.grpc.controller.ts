@@ -1,6 +1,8 @@
 import { Controller, UseGuards } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import type {
+  AcceptServiceQuoteRequest,
+  AcceptServiceQuoteResponse,
   CancelOrderRequest,
   CancelOrderResponse,
   ConfirmFinalQuoteRequest,
@@ -29,6 +31,8 @@ import type {
   GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
+  ListClaimQuotesRequest,
+  ListClaimQuotesResponse,
   ListOrderPaymentsRequest,
   ListOrderPaymentsResponse,
   ListOrderQuotesRequest,
@@ -223,5 +227,19 @@ export class OrderingGrpcController implements OrderingServiceHandler {
     request: CreateRefundRequestMessage,
   ): Promise<CreateRefundResponse> {
     return this.orderingService.createRefundRequest(request);
+  }
+
+  @GrpcMethod('OrderingService', 'ListClaimQuotes')
+  listClaimQuotes(
+    request: ListClaimQuotesRequest,
+  ): Promise<ListClaimQuotesResponse> {
+    return this.orderingService.listClaimQuotes(request);
+  }
+
+  @GrpcMethod('OrderingService', 'AcceptServiceQuote')
+  acceptServiceQuote(
+    request: AcceptServiceQuoteRequest,
+  ): Promise<AcceptServiceQuoteResponse> {
+    return this.orderingService.acceptServiceQuote(request);
   }
 }

@@ -611,6 +611,28 @@ export interface CreateRefundResponse {
   reason: string;
 }
 
+export interface ListClaimQuotesRequest {
+  claimId: string;
+  actor: VerifiedActor;
+}
+
+export interface ListClaimQuotesResponse {
+  quotes: FullQuoteDetail[];
+}
+
+export interface AcceptServiceQuoteRequest {
+  claimId: string;
+  quoteId: string;
+  actor: VerifiedActor;
+}
+
+export interface AcceptServiceQuoteResponse {
+  success: boolean;
+  quoteId: string;
+  status: string;
+  acceptedAt: string;
+}
+
 export interface GetOrderPersonalizationContextRequest {
   orderId: string;
 }
@@ -799,4 +821,12 @@ export interface CommerceOrderingServiceClient {
     request: CreateRefundRequestMessage,
     metadata?: Metadata,
   ): Observable<CreateRefundResponse>;
+  listClaimQuotes(
+    request: ListClaimQuotesRequest,
+    metadata?: Metadata,
+  ): Observable<ListClaimQuotesResponse>;
+  acceptServiceQuote(
+    request: AcceptServiceQuoteRequest,
+    metadata?: Metadata,
+  ): Observable<AcceptServiceQuoteResponse>;
 }

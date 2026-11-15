@@ -3,6 +3,7 @@ import { ClientsModule } from '@nestjs/microservices';
 import { domainGrpcClientOptions } from '../../common/grpc/domain-grpc';
 import { AdminOrdersController } from './controllers/admin-orders.controller';
 import { AdminPaymentsController } from './controllers/admin-payments.controller';
+import { ClaimQuotesController } from './controllers/claim-quotes.controller';
 import { OrdersController } from './controllers/orders.controller';
 import {
   COMMERCE_ORDERING_GRPC_CLIENT,
@@ -24,6 +25,7 @@ import {
     OrdersController,
     AdminOrdersController,
     AdminPaymentsController,
+    ClaimQuotesController,
   ],
   providers: [OrderingGrpcClient],
   exports: [OrderingGrpcClient],
