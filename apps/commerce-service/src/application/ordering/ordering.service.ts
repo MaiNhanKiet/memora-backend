@@ -28,7 +28,7 @@ import type {
   ListRingItemVersionsRequest,
   ListRingItemVersionsResponse,
   OrderActorIdentity,
-  RingItemPersonalizationSummary,
+  PersonalizationRingItem,
   RingItemVersionSummary,
   StageGateItem,
   TimelineEventItem,
@@ -814,7 +814,7 @@ export class OrderingService {
 
     const p1Paid = order.payment_transactions.length > 0;
 
-    const ringItems: RingItemPersonalizationSummary[] = order.ring_items.map(
+    const ringItems: PersonalizationRingItem[] = order.ring_items.map(
       (item) => {
         const ver =
           item.ring_item_versions_ring_items_current_version_idToring_item_versions;

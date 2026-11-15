@@ -641,7 +641,7 @@ export class OrderingRepository {
         payment_transactions: {
           where: {
             payment_stage: 'P1',
-            status: 'COMPLETED',
+            status: { in: ['SUCCEEDED', 'COMPLETED'] },
           },
           select: { id: true },
         },

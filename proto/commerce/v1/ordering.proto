@@ -374,7 +374,7 @@ message GetOrderPersonalizationContextRequest {
   string order_id = 1;
 }
 
-message RingItemPersonalizationSummary {
+message PersonalizationRingItem {
   string ring_item_id = 1;
   int32 item_no = 2;
   string current_version_id = 3;
@@ -388,7 +388,7 @@ message GetOrderPersonalizationContextResponse {
   string status = 3;
   bool p1_paid = 4;
   string source_plan_mode = 5;
-  repeated RingItemPersonalizationSummary ring_items = 6;
+  repeated PersonalizationRingItem ring_items = 6;
 }
 
 

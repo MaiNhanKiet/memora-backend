@@ -350,7 +350,7 @@ export interface GetOrderPersonalizationContextRequest {
   orderId: string;
 }
 
-export interface RingItemPersonalizationSummary {
+export interface PersonalizationRingItem {
   ringItemId: string;
   itemNo: number;
   currentVersionId: string;
@@ -364,7 +364,7 @@ export interface GetOrderPersonalizationContextResponse {
   status: string;
   p1Paid: boolean;
   sourcePlanMode: string;
-  ringItems: RingItemPersonalizationSummary[];
+  ringItems: PersonalizationRingItem[];
 }
 
 export interface OrderingServiceHandler {
