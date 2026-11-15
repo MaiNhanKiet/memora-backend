@@ -55,3 +55,20 @@ export function toGuestVerifiedActor(
   }
   return { guestSessionId: guest.guestSessionId };
 }
+
+/**
+ * Trích xuất `VerifiedActor` cho route chấp nhận cả User đã đăng nhập và Khách vãng lai
+ * (ví dụ Cart, Design Drafts).
+ */
+export function toActorFromUserOrGuest(
+  user: AuthenticatedPrincipal | undefined,
+  guest: GatewayGuest | undefined,
+): VerifiedActor {
+  if (user !== undefined && user.userId.trim() !== '') {
+    return toVerifiedActor(user);
+  }
+  if (guest !== undefined) {
+    return toGuestVerifiedActor(guest);
+  }
+  throw new UnauthorizedException();
+}

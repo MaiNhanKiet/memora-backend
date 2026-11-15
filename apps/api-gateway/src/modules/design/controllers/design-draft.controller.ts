@@ -8,12 +8,13 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Public } from '@app/common';
+import { AllowGuest } from '@app/common';
+import type { AuthenticatedPrincipal } from '@app/auth';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { CurrentGuest } from '../../../common/decorators/current-guest.decorator';
+import type { GatewayGuest } from '../../../common/grpc/gateway-guest';
+import { toActorFromUserOrGuest } from '../../../common/grpc/verified-actor';
 import { DesignGrpcClient } from '../clients/design-grpc.client';
-import {
-  ExtractCartActor,
-  type CartActor,
-} from '../decorators/extract-cart-actor.decorator';
 import {
   ApiDuplicateDesignDraftDocs,
   ApiGetDesignDraftDocs,
@@ -27,13 +28,15 @@ export class DesignDraftController {
   // ---------------------------------------------------------------------------
   // [DESIG-007] GET /api/v1/design/drafts/:draftId
   // ---------------------------------------------------------------------------
-  @Public()
+  @AllowGuest({ session: true })
   @Get(':draftId')
   @ApiGetDesignDraftDocs()
   async getDesignDraft(
     @Param('draftId', ParseUUIDPipe) draftId: string,
-    @ExtractCartActor() actor: CartActor,
+    @CurrentUser() user?: AuthenticatedPrincipal,
+    @CurrentGuest() guest?: GatewayGuest,
   ) {
+    const actor = toActorFromUserOrGuest(user, guest);
     return this.designClient.getDesignDraft({
       draftId,
       actor,
@@ -43,14 +46,16 @@ export class DesignDraftController {
   // ---------------------------------------------------------------------------
   // [DESIG-008] POST /api/v1/design/drafts/:draftId/duplicate
   // ---------------------------------------------------------------------------
-  @Public()
+  @AllowGuest({ session: true })
   @Post(':draftId/duplicate')
   @HttpCode(HttpStatus.CREATED)
   @ApiDuplicateDesignDraftDocs()
   async duplicateDesignDraft(
     @Param('draftId', ParseUUIDPipe) draftId: string,
-    @ExtractCartActor() actor: CartActor,
+    @CurrentUser() user?: AuthenticatedPrincipal,
+    @CurrentGuest() guest?: GatewayGuest,
   ) {
+    const actor = toActorFromUserOrGuest(user, guest);
     return this.designClient.duplicateDesignDraft({
       draftId,
       actor,

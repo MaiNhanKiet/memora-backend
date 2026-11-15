@@ -11,12 +11,13 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Public } from '@app/common';
+import { AllowGuest } from '@app/common';
+import type { AuthenticatedPrincipal } from '@app/auth';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { CurrentGuest } from '../../../common/decorators/current-guest.decorator';
+import type { GatewayGuest } from '../../../common/grpc/gateway-guest';
+import { toActorFromUserOrGuest } from '../../../common/grpc/verified-actor';
 import { DesignGrpcClient } from '../clients/design-grpc.client';
-import {
-  ExtractCartActor,
-  type CartActor,
-} from '../decorators/extract-cart-actor.decorator';
 import {
   AddCartItemBodyDto,
   UpdateCartItemBodyDto,
@@ -39,24 +40,30 @@ export class CartController {
   // ---------------------------------------------------------------------------
   // [DESIG-001] GET /api/v1/cart
   // ---------------------------------------------------------------------------
-  @Public()
+  @AllowGuest({ session: true })
   @Get()
   @ApiGetCartDocs()
-  async getCart(@ExtractCartActor() actor: CartActor) {
+  async getCart(
+    @CurrentUser() user?: AuthenticatedPrincipal,
+    @CurrentGuest() guest?: GatewayGuest,
+  ) {
+    const actor = toActorFromUserOrGuest(user, guest);
     return this.designClient.getCart({ actor });
   }
 
   // ---------------------------------------------------------------------------
   // [DESIG-002] POST /api/v1/cart/items
   // ---------------------------------------------------------------------------
-  @Public()
+  @AllowGuest({ session: true })
   @Post('items')
   @HttpCode(HttpStatus.CREATED)
   @ApiAddCartItemDocs()
   async addCartItem(
-    @ExtractCartActor() actor: CartActor,
+    @CurrentUser() user: AuthenticatedPrincipal | undefined,
+    @CurrentGuest() guest: GatewayGuest | undefined,
     @Body() body: AddCartItemBodyDto,
   ) {
+    const actor = toActorFromUserOrGuest(user, guest);
     return this.designClient.addCartItem({
       actor,
       templateVariantId: body.templateVariantId,
@@ -73,14 +80,16 @@ export class CartController {
   // ---------------------------------------------------------------------------
   // [DESIG-003] PATCH /api/v1/cart/items/:draftId
   // ---------------------------------------------------------------------------
-  @Public()
+  @AllowGuest({ session: true })
   @Patch('items/:draftId')
   @ApiUpdateCartItemDocs()
   async updateCartItem(
-    @ExtractCartActor() actor: CartActor,
+    @CurrentUser() user: AuthenticatedPrincipal | undefined,
+    @CurrentGuest() guest: GatewayGuest | undefined,
     @Param('draftId', ParseUUIDPipe) draftId: string,
     @Body() body: UpdateCartItemBodyDto,
   ) {
+    const actor = toActorFromUserOrGuest(user, guest);
     return this.designClient.updateCartItem({
       actor,
       draftId,
@@ -93,13 +102,15 @@ export class CartController {
   // ---------------------------------------------------------------------------
   // [DESIG-004] DELETE /api/v1/cart/items/:draftId
   // ---------------------------------------------------------------------------
-  @Public()
+  @AllowGuest({ session: true })
   @Delete('items/:draftId')
   @ApiRemoveCartItemDocs()
   async removeCartItem(
-    @ExtractCartActor() actor: CartActor,
+    @CurrentUser() user: AuthenticatedPrincipal | undefined,
+    @CurrentGuest() guest: GatewayGuest | undefined,
     @Param('draftId', ParseUUIDPipe) draftId: string,
   ) {
+    const actor = toActorFromUserOrGuest(user, guest);
     return this.designClient.removeCartItem({
       actor,
       draftId,
@@ -109,14 +120,16 @@ export class CartController {
   // ---------------------------------------------------------------------------
   // [DESIG-005] POST /api/v1/cart/validate-checkout
   // ---------------------------------------------------------------------------
-  @Public()
+  @AllowGuest({ session: true })
   @Post('validate-checkout')
   @HttpCode(HttpStatus.OK)
   @ApiValidateCheckoutDocs()
   async validateCheckout(
-    @ExtractCartActor() actor: CartActor,
+    @CurrentUser() user: AuthenticatedPrincipal | undefined,
+    @CurrentGuest() guest: GatewayGuest | undefined,
     @Body() body: ValidateCheckoutBodyDto,
   ) {
+    const actor = toActorFromUserOrGuest(user, guest);
     return this.designClient.validateCheckout({
       actor,
       selectedDraftIds: body.selectedDraftIds,
@@ -126,11 +139,15 @@ export class CartController {
   // ---------------------------------------------------------------------------
   // [DESIG-006] POST /api/v1/cart/abandon
   // ---------------------------------------------------------------------------
-  @Public()
+  @AllowGuest({ session: true })
   @Post('abandon')
   @HttpCode(HttpStatus.OK)
   @ApiAbandonCartDocs()
-  async abandonCart(@ExtractCartActor() actor: CartActor) {
+  async abandonCart(
+    @CurrentUser() user?: AuthenticatedPrincipal,
+    @CurrentGuest() guest?: GatewayGuest,
+  ) {
+    const actor = toActorFromUserOrGuest(user, guest);
     return this.designClient.abandonCart({ actor });
   }
 }
