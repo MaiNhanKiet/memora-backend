@@ -213,6 +213,9 @@ jobs:
               -e "${health_var}=0.0.0.0" \
               -e "${database_var}=postgresql://service_smoke:unused@127.0.0.1:1/memora" \
               -e "${secret_var}=0123456789abcdef0123456789abcdef" \
+              -e COMMERCE_GRPC_URL=commerce-service:50052 \
+              -e COMMERCE_INTERNAL_GRPC_SECRET=0123456789abcdef0123456789abcdef \
+              -e OPERATIONS_CONSENT_POLICY_VERSION=ci-smoke \
               -p "127.0.0.1:${port}:${port}" \
               "$image")"
             cids+=("$cid")

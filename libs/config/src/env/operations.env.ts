@@ -1,10 +1,14 @@
-import { Expose } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
+import { Validate } from 'class-validator';
 import { registerAs } from '@nestjs/config';
 import {
   EnvHostname,
+  EnvNonEmptyText,
   EnvPort,
   EnvPostgresUrl,
   EnvSecret,
+  GrpcUrlConstraint,
+  parseEnvText,
 } from '../validation/env-constraints';
 import { validateEnv } from '../validation/validate-env';
 import { loadEnvFile } from './load-env-file';
@@ -58,6 +62,22 @@ export class OperationsEnvironment extends NodeEnvironment {
   @Expose()
   @EnvSecret(32)
   OPERATIONS_INTERNAL_GRPC_SECRET!: string;
+
+  // Operations -> Commerce target (host:port) and the secret Commerce's guard checks.
+  // Consent reads order facts from Commerce, so both are required.
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => parseEnvText(value))
+  @Validate(GrpcUrlConstraint)
+  COMMERCE_GRPC_URL!: string;
+
+  @Expose()
+  @EnvSecret(32)
+  COMMERCE_INTERNAL_GRPC_SECRET!: string;
+
+  // Consent policy version the FE must echo (PERSO-001). Default `dev-1` in development only.
+  @Expose()
+  @EnvNonEmptyText(50)
+  OPERATIONS_CONSENT_POLICY_VERSION!: string;
 }
 
 export interface OperationsEnv {
@@ -68,6 +88,9 @@ export interface OperationsEnv {
   OPERATIONS_HEALTH_PORT: number;
   OPERATIONS_DATABASE_URL: string;
   OPERATIONS_INTERNAL_GRPC_SECRET: string;
+  COMMERCE_GRPC_URL: string;
+  COMMERCE_INTERNAL_GRPC_SECRET: string;
+  OPERATIONS_CONSENT_POLICY_VERSION: string;
 }
 
 export function validateOperationsEnv(
@@ -82,6 +105,10 @@ export function validateOperationsEnv(
       '127.0.0.1',
     ),
     OPERATIONS_HEALTH_PORT: defaultText(source.OPERATIONS_HEALTH_PORT, '5053'),
+    OPERATIONS_CONSENT_POLICY_VERSION:
+      source.NODE_ENV === 'development'
+        ? defaultText(source.OPERATIONS_CONSENT_POLICY_VERSION, 'dev-1')
+        : source.OPERATIONS_CONSENT_POLICY_VERSION,
   });
   assertOperationsDatabaseUrl(
     validated.OPERATIONS_DATABASE_URL,
@@ -95,6 +122,10 @@ export function validateOperationsEnv(
     OPERATIONS_HEALTH_PORT: validated.OPERATIONS_HEALTH_PORT,
     OPERATIONS_DATABASE_URL: validated.OPERATIONS_DATABASE_URL,
     OPERATIONS_INTERNAL_GRPC_SECRET: validated.OPERATIONS_INTERNAL_GRPC_SECRET,
+    COMMERCE_GRPC_URL: validated.COMMERCE_GRPC_URL,
+    COMMERCE_INTERNAL_GRPC_SECRET: validated.COMMERCE_INTERNAL_GRPC_SECRET,
+    OPERATIONS_CONSENT_POLICY_VERSION:
+      validated.OPERATIONS_CONSENT_POLICY_VERSION,
   };
 }
 
@@ -113,6 +144,9 @@ export const operationsConfig = registerAs('operations', () => {
     healthPort: env.OPERATIONS_HEALTH_PORT,
     databaseUrl: env.OPERATIONS_DATABASE_URL,
     internalGrpcSecret: env.OPERATIONS_INTERNAL_GRPC_SECRET,
+    commerceGrpcUrl: env.COMMERCE_GRPC_URL,
+    commerceInternalGrpcSecret: env.COMMERCE_INTERNAL_GRPC_SECRET,
+    consentPolicyVersion: env.OPERATIONS_CONSENT_POLICY_VERSION,
   };
 });
 

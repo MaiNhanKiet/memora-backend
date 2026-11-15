@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package memora.personalization.v1;
+
+import "common/v1/actor.proto";
+
+// Hosted by operations-service. Plan: docs/plans/active/operations-personalization.md
+// (PERSO-001..003, approved 2026-11-15). The Gateway checks CONSENT_MANAGE_OWN and
+// fills `actor`; Operations checks resource ownership.
+service ConsentService {
+  rpc AcceptConsent (AcceptConsentRequest) returns (Consent);
+  rpc ListConsents (ListConsentsRequest) returns (ListConsentsResponse);
+  rpc RevokeConsent (RevokeConsentRequest) returns (Consent);
+}
+
+message Consent {
+  string consent_id = 1;
+  string order_id = 2;
+  // FINGERPRINT_PROCESSING | SOUNDWAVE_PROCESSING
+  string consent_type = 3;
+  string policy_version = 4;
+  // ACCEPTED | REVOKED
+  string status = 5;
+  // ISO-8601 UTC.
+  string accepted_at = 6;
+  // ISO-8601 UTC; unset while ACCEPTED.
+  optional string revoked_at = 7;
+  repeated string ring_item_ids = 8;
+}
+
+message AcceptConsentRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string consent_type = 3;
+  string policy_version = 4;
+  repeated string ring_item_ids = 5;
+}
+
+message ListConsentsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+}
+
+message ListConsentsResponse {
+  repeated Consent items = 1;
+}
+
+message RevokeConsentRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string consent_id = 3;
+}
