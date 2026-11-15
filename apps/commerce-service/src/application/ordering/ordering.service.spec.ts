@@ -7,11 +7,30 @@ import {
 import { Prisma } from '../../../generated/prisma/client';
 import { OrderingService } from './ordering.service';
 import { OrderingRepository } from '../../repositories/ordering.repository';
+import { PayosProvider } from '../../infrastructure/payment/payos.provider';
 
 describe('OrderingService', () => {
   let service: OrderingService;
   const validUserId = '11111111-1111-4111-8111-111111111111';
   const validGuestSessionId = '22222222-2222-4222-8222-222222222222';
+
+  const mockPayosProvider = {
+    generateOrderCode: jest.fn().mockReturnValue(1715001234),
+    createPaymentLink: jest.fn().mockResolvedValue({
+      orderCode: 1715001234,
+      amount: 4500000,
+      checkoutUrl: 'https://pay.payos.vn/web/pl_123',
+      qrCode: 'qr-sample',
+      paymentLinkId: 'pl_123',
+      status: 'PENDING',
+    }),
+    verifyWebhookSignature: jest.fn().mockReturnValue(true),
+    getPaymentInformation: jest.fn().mockResolvedValue({
+      orderCode: 1715001234,
+      amount: 4500000,
+      status: 'PAID',
+    }),
+  };
 
   const mockRepository = {
     findDraftsByIds: jest.fn(),
@@ -44,6 +63,10 @@ describe('OrderingService', () => {
     findClaimQuotes: jest.fn(),
     findClaimQuoteById: jest.fn(),
     acceptClaimQuote: jest.fn(),
+    createPaymentTransaction: jest.fn(),
+    findTransactionByOrderCode: jest.fn(),
+    markPaymentTransactionSucceeded: jest.fn(),
+    findPaymentTransactionById: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -53,6 +76,10 @@ describe('OrderingService', () => {
         {
           provide: OrderingRepository,
           useValue: mockRepository,
+        },
+        {
+          provide: PayosProvider,
+          useValue: mockPayosProvider,
         },
       ],
     }).compile();
@@ -1524,6 +1551,180 @@ describe('OrderingService', () => {
         quoteId: 'quo-1',
         customerIdentityId: validUserId,
       });
+    });
+  });
+
+  describe('createOrderPaymentLink (ORDER-016)', () => {
+    it('should throw NotFoundException if order does not exist', async () => {
+      mockRepository.findOrderById.mockResolvedValue(null);
+
+      await expect(
+        service.createOrderPaymentLink({
+          orderId: 'ord-1',
+          actor: { userId: validUserId },
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should create payment link successfully for DEPOSIT_P1', async () => {
+      mockRepository.findOrderById.mockResolvedValue({
+        id: 'ord-1',
+        order_no: 'ORD-202611-0001',
+        status: 'AWAITING_P1',
+        quotes_orders_current_quote_idToquotes: {
+          total_amount: new Prisma.Decimal(15000000),
+          currency: 'VND',
+        },
+      });
+
+      mockRepository.createPaymentTransaction.mockResolvedValue({
+        id: 'tx-p1',
+        status: 'PENDING',
+        currency: 'VND',
+        amount: new Prisma.Decimal(4500000),
+        expires_at: new Date('2026-11-16T10:00:00.000Z'),
+      });
+
+      const res = await service.createOrderPaymentLink({
+        orderId: 'ord-1',
+        actor: { userId: validUserId },
+      });
+
+      expect(res.transactionId).toBe('tx-p1');
+      expect(res.amount).toBe(4500000); // 30% of 15,000,000
+      expect(res.paymentStage).toBe('DEPOSIT_P1');
+      expect(res.checkoutUrl).toBe('https://pay.payos.vn/web/pl_123');
+    });
+  });
+
+  describe('processPayosWebhook (ORDER-019)', () => {
+    it('should throw ForbiddenException if webhook signature is invalid', async () => {
+      mockPayosProvider.verifyWebhookSignature.mockReturnValueOnce(false);
+
+      await expect(
+        service.processPayosWebhook({
+          code: '00',
+          desc: 'success',
+          success: true,
+          dataJson: JSON.stringify({ orderCode: 1715001234 }),
+          signature: 'invalid-sig',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should mark transaction succeeded and transition order status', async () => {
+      mockPayosProvider.verifyWebhookSignature.mockReturnValueOnce(true);
+      mockRepository.findTransactionByOrderCode.mockResolvedValue({
+        id: 'tx-p1',
+        status: 'PENDING',
+        payment_stage: 'DEPOSIT_P1',
+        orders: { id: 'ord-1', status: 'AWAITING_P1' },
+      });
+
+      mockRepository.markPaymentTransactionSucceeded.mockResolvedValue({
+        id: 'tx-p1',
+        status: 'SUCCEEDED',
+      });
+
+      const res = await service.processPayosWebhook({
+        code: '00',
+        desc: 'success',
+        success: true,
+        dataJson: JSON.stringify({
+          orderCode: 1715001234,
+          amount: 4500000,
+          reference: 'PAYOS-REF-001',
+          transactionDateTime: '2026-11-15T10:00:00Z',
+        }),
+        signature: 'valid-sig',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.status).toBe('SUCCEEDED');
+      expect(mockRepository.markPaymentTransactionSucceeded).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 'tx-p1',
+          nextOrderStatus: 'PENDING_FINAL_QUOTE',
+        }),
+      );
+    });
+  });
+
+  describe('reconcilePaymentTransaction (ORDER-020)', () => {
+    it('should reconcile transaction with PayOS API and mark succeeded', async () => {
+      mockRepository.findPaymentTransactionById.mockResolvedValue({
+        id: 'tx-p1',
+        status: 'PENDING',
+        provider_order_code: BigInt(1715001234),
+        payment_stage: 'DEPOSIT_P1',
+        amount: new Prisma.Decimal(4500000),
+        currency: 'VND',
+        requested_at: new Date('2026-11-15T09:00:00.000Z'),
+        orders: { id: 'ord-1', status: 'AWAITING_P1' },
+      });
+
+      mockRepository.markPaymentTransactionSucceeded.mockResolvedValue({
+        id: 'tx-p1',
+        status: 'SUCCEEDED',
+        payment_stage: 'DEPOSIT_P1',
+        transaction_type: 'PAYMENT',
+        amount: new Prisma.Decimal(4500000),
+        currency: 'VND',
+        requested_at: new Date('2026-11-15T09:00:00.000Z'),
+        completed_at: new Date('2026-11-15T10:00:00.000Z'),
+      });
+
+      const res = await service.reconcilePaymentTransaction({
+        transactionId: 'tx-p1',
+        actor: { userId: validUserId },
+      });
+
+      expect(res.id).toBe('tx-p1');
+      expect(res.status).toBe('SUCCEEDED');
+    });
+  });
+
+  describe('createClaimPaymentLink (ORDER-026)', () => {
+    it('should throw BadRequestException if no ACCEPTED quote found', async () => {
+      mockRepository.findClaimQuotes.mockResolvedValue([
+        { id: 'quo-1', status: 'ISSUED', total_amount: new Prisma.Decimal(500000) },
+      ]);
+
+      await expect(
+        service.createClaimPaymentLink({
+          claimId: 'clm-1',
+          actor: { userId: validUserId },
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create payment link for claim service quote successfully', async () => {
+      mockRepository.findClaimQuotes.mockResolvedValue([
+        {
+          id: 'quo-1',
+          quote_no: 'QUO-CLM-001',
+          status: 'ACCEPTED',
+          total_amount: new Prisma.Decimal(500000),
+          currency: 'VND',
+        },
+      ]);
+
+      mockRepository.createPaymentTransaction.mockResolvedValue({
+        id: 'tx-claim',
+        status: 'PENDING',
+        currency: 'VND',
+        amount: new Prisma.Decimal(500000),
+        expires_at: new Date('2026-11-16T10:00:00.000Z'),
+      });
+
+      const res = await service.createClaimPaymentLink({
+        claimId: 'clm-1',
+        actor: { userId: validUserId },
+      });
+
+      expect(res.transactionId).toBe('tx-claim');
+      expect(res.paymentStage).toBe('SERVICE_FEE');
+      expect(res.checkoutUrl).toBe('https://pay.payos.vn/web/pl_123');
     });
   });
 });

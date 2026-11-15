@@ -1,6 +1,9 @@
 import {
+  Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -13,10 +16,15 @@ import {
   ApiAcceptServiceQuote,
   ApiListClaimQuotes,
 } from '../docs/claim-quotes.swagger';
+import { ApiCreateClaimPaymentLink } from '../docs/payos-payments.swagger';
 import type {
   AcceptServiceQuoteResponseDto,
   ListClaimQuotesResponseDto,
 } from '../dto/claim-quotes.dto';
+import {
+  CreateClaimPaymentLinkBodyDto,
+  PaymentLinkResponseDto,
+} from '../dto/payos-payments.dto';
 
 @Controller('claims')
 export class ClaimQuotesController {
@@ -53,6 +61,27 @@ export class ClaimQuotesController {
     const result = await this.orderingGrpcClient.acceptServiceQuote({
       claimId,
       quoteId,
+      actor,
+    });
+    return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-026] Customer creates payment link for service quote
+  // ---------------------------------------------------------------------------
+  @Post(':claimId/payments')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiCreateClaimPaymentLink()
+  async createClaimPaymentLink(
+    @Param('claimId', ParseUUIDPipe) claimId: string,
+    @Body() body: CreateClaimPaymentLinkBodyDto,
+    @CurrentUser() principal: AuthenticatedPrincipal,
+  ): Promise<PaymentLinkResponseDto> {
+    const actor = toVerifiedActor(principal);
+    const result = await this.orderingGrpcClient.createClaimPaymentLink({
+      claimId,
+      returnUrl: body.returnUrl,
+      cancelUrl: body.cancelUrl,
       actor,
     });
     return result;

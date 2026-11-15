@@ -9,7 +9,9 @@ import type {
   CommerceOrderingServiceClient,
   ConfirmFinalQuoteRequest,
   ConfirmFinalQuoteResponse,
+  CreateClaimPaymentLinkRequest,
   CreateFinalQuoteRequest,
+  CreateOrderPaymentLinkRequest,
   CreateOrderRequest,
   CreateOrderResponse,
   CreateRefundRequestMessage,
@@ -42,9 +44,13 @@ import type {
   ListRingItemVersionsRequest,
   ListRingItemVersionsResponse,
   OrderInvoiceDetail,
+  PaymentLinkResponse,
   PaymentReceiptDetail,
   PaymentTransactionDetail,
+  PayosWebhookRequest,
+  PayosWebhookResponse,
   PublishFinalQuoteRequest,
+  ReconcilePaymentTransactionRequest,
   RejectFinalQuoteRequest,
   RejectFinalQuoteResponse,
   UpdateCurrentRingItemVersionRequest,
@@ -276,6 +282,38 @@ export class OrderingGrpcClient
   ): Promise<AcceptServiceQuoteResponse> {
     return this.unary((metadata) =>
       this.orderingService.acceptServiceQuote(request, metadata),
+    );
+  }
+
+  createOrderPaymentLink(
+    request: CreateOrderPaymentLinkRequest,
+  ): Promise<PaymentLinkResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.createOrderPaymentLink(request, metadata),
+    );
+  }
+
+  processPayosWebhook(
+    request: PayosWebhookRequest,
+  ): Promise<PayosWebhookResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.processPayosWebhook(request, metadata),
+    );
+  }
+
+  reconcilePaymentTransaction(
+    request: ReconcilePaymentTransactionRequest,
+  ): Promise<PaymentTransactionDetail> {
+    return this.unary((metadata) =>
+      this.orderingService.reconcilePaymentTransaction(request, metadata),
+    );
+  }
+
+  createClaimPaymentLink(
+    request: CreateClaimPaymentLinkRequest,
+  ): Promise<PaymentLinkResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.createClaimPaymentLink(request, metadata),
     );
   }
 }

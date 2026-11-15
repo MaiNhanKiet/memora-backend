@@ -23,6 +23,8 @@ import {
   RejectFinalQuoteBodyDto,
   UpdateCurrentRingItemVersionBodyDto,
 } from '../dto/ordering.dto';
+import { CreateOrderPaymentLinkBodyDto } from '../dto/payos-payments.dto';
+import { ApiCreateOrderPaymentLink } from '../docs/payos-payments.swagger';
 import {
   ApiCancelOrderDocs,
   ApiConfirmFinalQuoteDocs,
@@ -415,6 +417,27 @@ export class OrdersController {
     return this.orderingClient.getOrderInvoice({
       actor,
       orderId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-016] POST /api/v1/orders/:orderId/payments
+  // ---------------------------------------------------------------------------
+  @Post(':orderId/payments')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiCreateOrderPaymentLink()
+  async createOrderPaymentLink(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: CreateOrderPaymentLinkBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.createOrderPaymentLink({
+      orderId,
+      paymentStage: body.paymentStage,
+      returnUrl: body.returnUrl,
+      cancelUrl: body.cancelUrl,
+      actor,
     });
   }
 }

@@ -5,6 +5,7 @@ import { AdminOrdersController } from './controllers/admin-orders.controller';
 import { AdminPaymentsController } from './controllers/admin-payments.controller';
 import { ClaimQuotesController } from './controllers/claim-quotes.controller';
 import { OrdersController } from './controllers/orders.controller';
+import { PaymentsWebhookController } from './controllers/payments-webhook.controller';
 import {
   COMMERCE_ORDERING_GRPC_CLIENT,
   OrderingGrpcClient,
@@ -26,6 +27,7 @@ import {
     AdminOrdersController,
     AdminPaymentsController,
     ClaimQuotesController,
+    PaymentsWebhookController,
   ],
   providers: [OrderingGrpcClient],
   exports: [OrderingGrpcClient],

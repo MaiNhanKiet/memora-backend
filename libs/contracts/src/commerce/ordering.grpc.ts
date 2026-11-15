@@ -633,6 +633,53 @@ export interface AcceptServiceQuoteResponse {
   acceptedAt: string;
 }
 
+export interface CreateOrderPaymentLinkRequest {
+  orderId: string;
+  paymentStage?: string;
+  returnUrl?: string;
+  cancelUrl?: string;
+  actor: VerifiedActor;
+}
+
+export interface PaymentLinkResponse {
+  transactionId: string;
+  orderCode: number | string;
+  checkoutUrl: string;
+  qrCode: string;
+  amount: number;
+  currency: string;
+  paymentStage: string;
+  status: string;
+  expiresAt?: string;
+}
+
+export interface PayosWebhookRequest {
+  code: string;
+  desc: string;
+  success: boolean;
+  dataJson: string;
+  signature: string;
+}
+
+export interface PayosWebhookResponse {
+  success: boolean;
+  message: string;
+  transactionId?: string;
+  status?: string;
+}
+
+export interface ReconcilePaymentTransactionRequest {
+  transactionId: string;
+  actor: VerifiedActor;
+}
+
+export interface CreateClaimPaymentLinkRequest {
+  claimId: string;
+  returnUrl?: string;
+  cancelUrl?: string;
+  actor: VerifiedActor;
+}
+
 export interface GetOrderPersonalizationContextRequest {
   orderId: string;
 }
@@ -829,4 +876,20 @@ export interface CommerceOrderingServiceClient {
     request: AcceptServiceQuoteRequest,
     metadata?: Metadata,
   ): Observable<AcceptServiceQuoteResponse>;
+  createOrderPaymentLink(
+    request: CreateOrderPaymentLinkRequest,
+    metadata?: Metadata,
+  ): Observable<PaymentLinkResponse>;
+  processPayosWebhook(
+    request: PayosWebhookRequest,
+    metadata?: Metadata,
+  ): Observable<PayosWebhookResponse>;
+  reconcilePaymentTransaction(
+    request: ReconcilePaymentTransactionRequest,
+    metadata?: Metadata,
+  ): Observable<PaymentTransactionDetail>;
+  createClaimPaymentLink(
+    request: CreateClaimPaymentLinkRequest,
+    metadata?: Metadata,
+  ): Observable<PaymentLinkResponse>;
 }

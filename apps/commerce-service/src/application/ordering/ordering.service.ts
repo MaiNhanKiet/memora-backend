@@ -13,7 +13,9 @@ import type {
   CancelOrderResponse,
   ConfirmFinalQuoteRequest,
   ConfirmFinalQuoteResponse,
+  CreateClaimPaymentLinkRequest,
   CreateFinalQuoteRequest,
+  CreateOrderPaymentLinkRequest,
   CreateOrderRequest,
   CreateOrderResponse,
   CreateRefundRequestMessage,
@@ -48,10 +50,14 @@ import type {
   ListRingItemVersionsRequest,
   ListRingItemVersionsResponse,
   OrderInvoiceDetail,
+  PaymentLinkResponse,
   PaymentReceiptDetail,
   PaymentTransactionDetail,
+  PayosWebhookRequest,
+  PayosWebhookResponse,
   PersonalizationRingItem,
   PublishFinalQuoteRequest,
+  ReconcilePaymentTransactionRequest,
   RejectFinalQuoteRequest,
   RejectFinalQuoteResponse,
   RingItemVersionSummary,
@@ -65,11 +71,15 @@ import type {
   VerifiedActor,
 } from '@app/contracts';
 import { OrderingRepository } from '../../repositories/ordering.repository';
+import { PayosProvider } from '../../infrastructure/payment/payos.provider';
 import type { Prisma } from '../../../generated/prisma/client';
 
 @Injectable()
 export class OrderingService {
-  constructor(private readonly repository: OrderingRepository) {}
+  constructor(
+    private readonly repository: OrderingRepository,
+    private readonly payosProvider: PayosProvider,
+  ) {}
 
   // ---------------------------------------------------------------------------
   // [ORDER-001] Create Order
@@ -1572,6 +1582,316 @@ export class OrderingService {
       quoteId: updated.id,
       status: updated.status,
       acceptedAt: updated.accepted_at ? updated.accepted_at.toISOString() : new Date().toISOString(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-016] Create Order Payment Link (PayOS)
+  // ---------------------------------------------------------------------------
+  async createOrderPaymentLink(
+    request: CreateOrderPaymentLinkRequest,
+  ): Promise<PaymentLinkResponse> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const order = await this.repository.findOrderById(request.orderId, actorId);
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    // Determine payment stage
+    let stage = request.paymentStage;
+    if (!stage) {
+      if (order.status === 'AWAITING_P1') {
+        stage = 'DEPOSIT_P1';
+      } else if (order.status === 'AWAITING_P2') {
+        stage = 'MILESTONE_P2';
+      } else if (order.status === 'AWAITING_P3' || order.status === 'READY_FOR_DELIVERY') {
+        stage = 'FINAL_P3';
+      } else if (order.status === 'PENDING_FINAL_QUOTE') {
+        stage = 'FULL_PAYMENT';
+      } else {
+        throw new BadRequestException(
+          `Cannot create payment link for order in status '${order.status}'`,
+        );
+      }
+    }
+
+    // Determine payment amount
+    let amount = 0;
+    const currentQuote = order.quotes_orders_current_quote_idToquotes;
+    const totalAmount = currentQuote ? Number(currentQuote.total_amount) : 0;
+    const currency = currentQuote?.currency?.trim() || 'VND';
+
+    if (stage === 'DEPOSIT_P1') {
+      amount = Math.round(totalAmount * 0.3);
+    } else if (stage === 'MILESTONE_P2') {
+      amount = Math.round(totalAmount * 0.4);
+    } else if (stage === 'FINAL_P3') {
+      const existingPayments = await this.repository.findOrderPayments(order.id);
+      const paid = existingPayments
+        .filter((p) => p.status === 'SUCCEEDED' && p.transaction_type === 'PAYMENT')
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+      amount = Math.max(0, totalAmount - paid);
+    } else {
+      amount = totalAmount;
+    }
+
+    if (amount <= 0) {
+      throw new BadRequestException('Payment amount must be greater than 0');
+    }
+
+    const orderCode = this.payosProvider.generateOrderCode();
+    const returnUrl = request.returnUrl || 'https://memora.vn/orders/' + order.id;
+    const cancelUrl = request.cancelUrl || 'https://memora.vn/orders/' + order.id;
+
+    const paymentLink = await this.payosProvider.createPaymentLink({
+      orderCode,
+      amount,
+      description: `MEMORA ${order.order_no} ${stage}`,
+      returnUrl,
+      cancelUrl,
+    });
+
+    const tx = await this.repository.createPaymentTransaction({
+      orderId: order.id,
+      paymentStage: stage,
+      providerOrderCode: BigInt(orderCode),
+      amount,
+      currency,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
+      metadata: {
+        paymentLinkId: paymentLink.paymentLinkId,
+        checkoutUrl: paymentLink.checkoutUrl,
+        qrCode: paymentLink.qrCode,
+      },
+    });
+
+    return {
+      transactionId: tx.id,
+      orderCode,
+      checkoutUrl: paymentLink.checkoutUrl,
+      qrCode: paymentLink.qrCode,
+      amount,
+      currency: tx.currency,
+      paymentStage: stage,
+      status: tx.status,
+      expiresAt: tx.expires_at ? tx.expires_at.toISOString() : undefined,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-019] Process PayOS Webhook
+  // ---------------------------------------------------------------------------
+  async processPayosWebhook(
+    request: PayosWebhookRequest,
+  ): Promise<PayosWebhookResponse> {
+    let payloadData: any;
+    try {
+      payloadData = typeof request.dataJson === 'string'
+        ? JSON.parse(request.dataJson)
+        : request.dataJson;
+    } catch {
+      throw new BadRequestException('Invalid dataJson in PayOS webhook');
+    }
+
+    const isValid = this.payosProvider.verifyWebhookSignature({
+      code: request.code,
+      desc: request.desc,
+      success: request.success,
+      data: payloadData,
+      signature: request.signature,
+    });
+
+    if (!isValid) {
+      throw new ForbiddenException('Invalid PayOS webhook signature');
+    }
+
+    const orderCode = BigInt(payloadData.orderCode);
+    const tx = await this.repository.findTransactionByOrderCode(orderCode);
+    if (!tx) {
+      return {
+        success: false,
+        message: `Transaction with provider_order_code ${orderCode} not found`,
+      };
+    }
+
+    if (tx.status === 'SUCCEEDED') {
+      return {
+        success: true,
+        message: 'Transaction already processed',
+        transactionId: tx.id,
+        status: tx.status,
+      };
+    }
+
+    // Determine next order status based on payment stage
+    let nextOrderStatus: string | undefined;
+    if (tx.orders) {
+      if (tx.payment_stage === 'DEPOSIT_P1') {
+        nextOrderStatus = 'PENDING_FINAL_QUOTE';
+      } else if (tx.payment_stage === 'MILESTONE_P2') {
+        nextOrderStatus = 'MANUFACTURING';
+      } else if (tx.payment_stage === 'FINAL_P3' || tx.payment_stage === 'FULL_PAYMENT') {
+        nextOrderStatus = tx.orders.status === 'READY_FOR_DELIVERY' ? 'DELIVERING' : undefined;
+      }
+    }
+
+    const updated = await this.repository.markPaymentTransactionSucceeded({
+      transactionId: tx.id,
+      providerTransactionId: payloadData.reference || payloadData.paymentLinkId,
+      providerReference: payloadData.reference,
+      completedAt: payloadData.transactionDateTime
+        ? new Date(payloadData.transactionDateTime)
+        : new Date(),
+      nextOrderStatus,
+    });
+
+    return {
+      success: true,
+      message: 'Payment processed successfully',
+      transactionId: updated.id,
+      status: updated.status,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-020] Reconcile Payment Transaction
+  // ---------------------------------------------------------------------------
+  async reconcilePaymentTransaction(
+    request: ReconcilePaymentTransactionRequest,
+  ): Promise<PaymentTransactionDetail> {
+    const tx = await this.repository.findPaymentTransactionById(request.transactionId);
+    if (!tx) {
+      throw new NotFoundException(`Transaction ${request.transactionId} not found`);
+    }
+
+    if (tx.status === 'SUCCEEDED') {
+      return this.mapPaymentTransactionDetail(tx);
+    }
+
+    if (!tx.provider_order_code) {
+      throw new BadRequestException('Transaction has no provider_order_code to reconcile');
+    }
+
+    const info = await this.payosProvider.getPaymentInformation(
+      Number(tx.provider_order_code),
+    );
+
+    if (info && info.status === 'PAID') {
+      let nextOrderStatus: string | undefined;
+      if (tx.orders) {
+        if (tx.payment_stage === 'DEPOSIT_P1') {
+          nextOrderStatus = 'PENDING_FINAL_QUOTE';
+        } else if (tx.payment_stage === 'MILESTONE_P2') {
+          nextOrderStatus = 'MANUFACTURING';
+        }
+      }
+
+      const updated = await this.repository.markPaymentTransactionSucceeded({
+        transactionId: tx.id,
+        completedAt: new Date(),
+        nextOrderStatus,
+      });
+
+      return this.mapPaymentTransactionDetail(updated);
+    }
+
+    return this.mapPaymentTransactionDetail(tx);
+  }
+
+  private mapPaymentTransactionDetail(p: any): PaymentTransactionDetail {
+    return {
+      id: p.id,
+      orderId: p.order_id || '',
+      paymentStage: p.payment_stage,
+      transactionType: p.transaction_type,
+      amount: Number(p.amount),
+      currency: p.currency,
+      status: p.status,
+      provider: p.provider ?? undefined,
+      paymentMethod: p.payment_method ?? undefined,
+      providerOrderCode: p.provider_order_code
+        ? p.provider_order_code.toString()
+        : undefined,
+      providerTransactionId: p.provider_transaction_id ?? undefined,
+      providerReference: p.provider_reference ?? undefined,
+      relatedTransactionId: p.related_transaction_id ?? undefined,
+      requestedAt: p.requested_at.toISOString(),
+      completedAt: p.completed_at ? p.completed_at.toISOString() : undefined,
+      failedAt: p.failed_at ? p.failed_at.toISOString() : undefined,
+      failureReason: p.failure_reason ?? undefined,
+      receiptNo: p.receipt_no ?? undefined,
+      receiptIssuedAt: p.receipt_issued_at
+        ? p.receipt_issued_at.toISOString()
+        : undefined,
+      metadataJson: p.metadata_json
+        ? JSON.stringify(p.metadata_json)
+        : undefined,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-026] Create Claim Payment Link
+  // ---------------------------------------------------------------------------
+  async createClaimPaymentLink(
+    request: CreateClaimPaymentLinkRequest,
+  ): Promise<PaymentLinkResponse> {
+    if (!request.claimId) {
+      throw new BadRequestException('Claim ID is required');
+    }
+    this.validateActor(request.actor);
+
+    const quotes = await this.repository.findClaimQuotes(request.claimId);
+    const acceptedQuote = quotes.find((q) => q.status === 'ACCEPTED');
+    if (!acceptedQuote) {
+      throw new BadRequestException(
+        `No ACCEPTED service quote found for claim ${request.claimId}`,
+      );
+    }
+
+    const amount = Number(acceptedQuote.total_amount);
+    if (amount <= 0) {
+      throw new BadRequestException('Accepted quote amount must be greater than 0');
+    }
+
+    const orderCode = this.payosProvider.generateOrderCode();
+    const returnUrl = request.returnUrl || 'https://memora.vn/claims/' + request.claimId;
+    const cancelUrl = request.cancelUrl || 'https://memora.vn/claims/' + request.claimId;
+
+    const paymentLink = await this.payosProvider.createPaymentLink({
+      orderCode,
+      amount,
+      description: `MEMORA CLAIM ${acceptedQuote.quote_no}`,
+      returnUrl,
+      cancelUrl,
+    });
+
+    const tx = await this.repository.createPaymentTransaction({
+      claimId: request.claimId,
+      quoteId: acceptedQuote.id,
+      paymentStage: 'SERVICE_FEE',
+      providerOrderCode: BigInt(orderCode),
+      amount,
+      currency: acceptedQuote.currency || 'VND',
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      metadata: {
+        paymentLinkId: paymentLink.paymentLinkId,
+        checkoutUrl: paymentLink.checkoutUrl,
+        qrCode: paymentLink.qrCode,
+      },
+    });
+
+    return {
+      transactionId: tx.id,
+      orderCode,
+      checkoutUrl: paymentLink.checkoutUrl,
+      qrCode: paymentLink.qrCode,
+      amount,
+      currency: tx.currency,
+      paymentStage: 'SERVICE_FEE',
+      status: tx.status,
+      expiresAt: tx.expires_at ? tx.expires_at.toISOString() : undefined,
     };
   }
 

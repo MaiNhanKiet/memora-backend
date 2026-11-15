@@ -1027,6 +1027,16 @@ export class OrderingRepository {
     });
   }
 
+  async findPaymentTransactionById(transactionId: string) {
+    return this.prisma.payment_transactions.findUnique({
+      where: { id: transactionId },
+      include: {
+        orders: true,
+        quotes: true,
+      },
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // [ORDER-021] Get Payment Receipt
   // ---------------------------------------------------------------------------
@@ -1205,6 +1215,85 @@ export class OrderingRepository {
         accepted_by_customer_identity_id: params.customerIdentityId,
         accepted_at: new Date(),
       },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-016 & ORDER-026] Create Payment Transaction for PayOS
+  // ---------------------------------------------------------------------------
+  async createPaymentTransaction(params: {
+    orderId?: string;
+    claimId?: string;
+    quoteId?: string;
+    paymentStage: string;
+    providerOrderCode: bigint;
+    amount: number;
+    currency?: string;
+    expiresAt?: Date;
+    metadata?: Prisma.InputJsonValue;
+  }) {
+    return this.prisma.payment_transactions.create({
+      data: {
+        order_id: params.orderId ?? null,
+        claim_id: params.claimId ?? null,
+        quote_id: params.quoteId ?? null,
+        payment_stage: params.paymentStage,
+        transaction_type: 'PAYMENT',
+        payment_method: 'PAYOS',
+        provider: 'PAYOS',
+        provider_order_code: params.providerOrderCode,
+        amount: new Prisma.Decimal(params.amount),
+        currency: params.currency ?? 'VND',
+        status: 'PENDING',
+        expires_at: params.expiresAt ?? null,
+        metadata_json: params.metadata ?? {},
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-019 & ORDER-020] Find and Complete Transaction by Provider Order Code
+  // ---------------------------------------------------------------------------
+  async findTransactionByOrderCode(orderCode: bigint) {
+    return this.prisma.payment_transactions.findFirst({
+      where: { provider_order_code: orderCode },
+      include: {
+        orders: true,
+        quotes: true,
+      },
+    });
+  }
+
+  async markPaymentTransactionSucceeded(params: {
+    transactionId: string;
+    providerTransactionId?: string;
+    providerReference?: string;
+    completedAt?: Date;
+    nextOrderStatus?: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const updatedTx = await tx.payment_transactions.update({
+        where: { id: params.transactionId },
+        data: {
+          status: 'SUCCEEDED',
+          completed_at: params.completedAt ?? new Date(),
+          provider_transaction_id: params.providerTransactionId ?? null,
+          provider_reference: params.providerReference ?? null,
+        },
+        include: {
+          orders: true,
+          quotes: true,
+        },
+      });
+
+      if (updatedTx.order_id && params.nextOrderStatus) {
+        await tx.orders.update({
+          where: { id: updatedTx.order_id },
+          data: { status: params.nextOrderStatus },
+        });
+      }
+
+      return updatedTx;
     });
   }
 }

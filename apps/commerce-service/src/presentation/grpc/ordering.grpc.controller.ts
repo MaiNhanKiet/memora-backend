@@ -7,7 +7,9 @@ import type {
   CancelOrderResponse,
   ConfirmFinalQuoteRequest,
   ConfirmFinalQuoteResponse,
+  CreateClaimPaymentLinkRequest,
   CreateFinalQuoteRequest,
+  CreateOrderPaymentLinkRequest,
   CreateOrderRequest,
   CreateOrderResponse,
   CreateRefundRequestMessage,
@@ -43,9 +45,13 @@ import type {
   ListRingItemVersionsResponse,
   OrderInvoiceDetail,
   OrderingServiceHandler,
+  PaymentLinkResponse,
   PaymentReceiptDetail,
   PaymentTransactionDetail,
+  PayosWebhookRequest,
+  PayosWebhookResponse,
   PublishFinalQuoteRequest,
+  ReconcilePaymentTransactionRequest,
   RejectFinalQuoteRequest,
   RejectFinalQuoteResponse,
   UpdateCurrentRingItemVersionRequest,
@@ -241,5 +247,33 @@ export class OrderingGrpcController implements OrderingServiceHandler {
     request: AcceptServiceQuoteRequest,
   ): Promise<AcceptServiceQuoteResponse> {
     return this.orderingService.acceptServiceQuote(request);
+  }
+
+  @GrpcMethod('OrderingService', 'CreateOrderPaymentLink')
+  createOrderPaymentLink(
+    request: CreateOrderPaymentLinkRequest,
+  ): Promise<PaymentLinkResponse> {
+    return this.orderingService.createOrderPaymentLink(request);
+  }
+
+  @GrpcMethod('OrderingService', 'ProcessPayosWebhook')
+  processPayosWebhook(
+    request: PayosWebhookRequest,
+  ): Promise<PayosWebhookResponse> {
+    return this.orderingService.processPayosWebhook(request);
+  }
+
+  @GrpcMethod('OrderingService', 'ReconcilePaymentTransaction')
+  reconcilePaymentTransaction(
+    request: ReconcilePaymentTransactionRequest,
+  ): Promise<PaymentTransactionDetail> {
+    return this.orderingService.reconcilePaymentTransaction(request);
+  }
+
+  @GrpcMethod('OrderingService', 'CreateClaimPaymentLink')
+  createClaimPaymentLink(
+    request: CreateClaimPaymentLinkRequest,
+  ): Promise<PaymentLinkResponse> {
+    return this.orderingService.createClaimPaymentLink(request);
   }
 }

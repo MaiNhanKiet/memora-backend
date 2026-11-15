@@ -14,6 +14,8 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { OrderingGrpcClient } from '../clients/ordering-grpc.client';
 import { CreateRefundRequestBodyDto } from '../dto/ordering.dto';
 import { ApiCreateRefundRequestDocs } from '../docs/ordering.swagger';
+import { ApiReconcilePaymentTransaction } from '../docs/payos-payments.swagger';
+import { toVerifiedActor } from '../../../common/grpc/verified-actor';
 
 @ApiTags('Admin Payments')
 @Controller('admin/payments')
@@ -38,6 +40,23 @@ export class AdminPaymentsController {
       reason: body.reason,
       notes: body.notes,
       staffUserId: user?.userId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-020] POST /api/v1/admin/payments/:transactionId/reconcile
+  // ---------------------------------------------------------------------------
+  @Post(':transactionId/reconcile')
+  @HttpCode(HttpStatus.OK)
+  @ApiReconcilePaymentTransaction()
+  async reconcilePayment(
+    @Param('transactionId', ParseUUIDPipe) transactionId: string,
+    @CurrentUser() user: AuthenticatedPrincipal,
+  ) {
+    const actor = toVerifiedActor(user);
+    return this.orderingClient.reconcilePaymentTransaction({
+      transactionId,
+      actor,
     });
   }
 }
