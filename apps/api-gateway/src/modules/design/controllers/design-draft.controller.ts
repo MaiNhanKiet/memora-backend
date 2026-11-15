@@ -1,5 +1,7 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -19,6 +21,15 @@ import {
   ApiDuplicateDesignDraftDocs,
   ApiGetDesignDraftDocs,
 } from '../docs/design-draft.swagger';
+import {
+  ApiCreateDesignShareLink,
+  ApiRevokeDesignShareLink,
+} from '../docs/design-share.swagger';
+import {
+  CreateDesignShareLinkBodyDto,
+  CreateDesignShareLinkResponseDto,
+  RevokeDesignShareLinkResponseDto,
+} from '../dto/design-share.dto';
 
 @ApiTags('design-drafts')
 @Controller('design/drafts')
@@ -58,6 +69,48 @@ export class DesignDraftController {
     const actor = toActorFromUserOrGuest(user, guest);
     return this.designClient.duplicateDesignDraft({
       draftId,
+      actor,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [DESIG-009] POST /api/v1/design/drafts/:draftId/share-links
+  // ---------------------------------------------------------------------------
+  @AllowGuest({ session: true })
+  @Post(':draftId/share-links')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiCreateDesignShareLink()
+  async createDesignShareLink(
+    @Param('draftId', ParseUUIDPipe) draftId: string,
+    @Body() body: CreateDesignShareLinkBodyDto,
+    @CurrentUser() user?: AuthenticatedPrincipal,
+    @CurrentGuest() guest?: GatewayGuest,
+  ): Promise<CreateDesignShareLinkResponseDto> {
+    const actor = toActorFromUserOrGuest(user, guest);
+    return this.designClient.createDesignShareLink({
+      draftId,
+      expiresInDays: body.expiresInDays,
+      actor,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [DESIG-010] DELETE /api/v1/design/drafts/:draftId/share-links/:linkId
+  // ---------------------------------------------------------------------------
+  @AllowGuest({ session: true })
+  @Delete(':draftId/share-links/:linkId')
+  @HttpCode(HttpStatus.OK)
+  @ApiRevokeDesignShareLink()
+  async revokeDesignShareLink(
+    @Param('draftId', ParseUUIDPipe) draftId: string,
+    @Param('linkId', ParseUUIDPipe) linkId: string,
+    @CurrentUser() user?: AuthenticatedPrincipal,
+    @CurrentGuest() guest?: GatewayGuest,
+  ): Promise<RevokeDesignShareLinkResponseDto> {
+    const actor = toActorFromUserOrGuest(user, guest);
+    return this.designClient.revokeDesignShareLink({
+      draftId,
+      linkId,
       actor,
     });
   }

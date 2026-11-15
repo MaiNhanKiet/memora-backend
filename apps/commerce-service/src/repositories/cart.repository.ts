@@ -175,4 +175,44 @@ export class CartRepository {
       data: { status },
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // [DESIG-009] Create Design Share Code
+  // ---------------------------------------------------------------------------
+  async createDesignShareCode(params: {
+    draftId: string;
+    codeHash: string;
+    expiresAt: Date;
+  }) {
+    return this.prisma.design_codes.create({
+      data: {
+        ring_design_draft_id: params.draftId,
+        code_hash: params.codeHash,
+        status: 'ACTIVE',
+        expires_at: params.expiresAt,
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [DESIG-010] Revoke Design Share Code
+  // ---------------------------------------------------------------------------
+  async findDesignCodeById(linkId: string, draftId: string) {
+    return this.prisma.design_codes.findFirst({
+      where: {
+        id: linkId,
+        ring_design_draft_id: draftId,
+      },
+    });
+  }
+
+  async revokeDesignShareCode(linkId: string) {
+    return this.prisma.design_codes.update({
+      where: { id: linkId },
+      data: {
+        status: 'REVOKED',
+        revoked_at: new Date(),
+      },
+    });
+  }
 }

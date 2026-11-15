@@ -6,6 +6,8 @@ import type {
   AddCartItemRequest,
   AddCartItemResponse,
   CartServiceHandler,
+  CreateDesignShareLinkRequest,
+  CreateDesignShareLinkResponse,
   DuplicateDesignDraftRequest,
   DuplicateDesignDraftResponse,
   GetCartRequest,
@@ -14,6 +16,8 @@ import type {
   GetDesignDraftResponse,
   RemoveCartItemRequest,
   RemoveCartItemResponse,
+  RevokeDesignShareLinkRequest,
+  RevokeDesignShareLinkResponse,
   UpdateCartItemRequest,
   UpdateCartItemResponse,
   ValidateCheckoutRequest,
@@ -75,5 +79,19 @@ export class CartGrpcController implements CartServiceHandler {
     request: DuplicateDesignDraftRequest,
   ): Promise<DuplicateDesignDraftResponse> {
     return this.cartService.duplicateDesignDraft(request);
+  }
+
+  @GrpcMethod('CartService', 'CreateDesignShareLink')
+  createDesignShareLink(
+    request: CreateDesignShareLinkRequest,
+  ): Promise<CreateDesignShareLinkResponse> {
+    return this.cartService.createDesignShareLink(request);
+  }
+
+  @GrpcMethod('CartService', 'RevokeDesignShareLink')
+  revokeDesignShareLink(
+    request: RevokeDesignShareLinkRequest,
+  ): Promise<RevokeDesignShareLinkResponse> {
+    return this.cartService.revokeDesignShareLink(request);
   }
 }

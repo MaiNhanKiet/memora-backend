@@ -7,6 +7,8 @@ import type {
   AddCartItemRequest,
   AddCartItemResponse,
   CartServiceClient,
+  CreateDesignShareLinkRequest,
+  CreateDesignShareLinkResponse,
   DuplicateDesignDraftRequest,
   DuplicateDesignDraftResponse,
   GetCartRequest,
@@ -15,6 +17,8 @@ import type {
   GetDesignDraftResponse,
   RemoveCartItemRequest,
   RemoveCartItemResponse,
+  RevokeDesignShareLinkRequest,
+  RevokeDesignShareLinkResponse,
   UpdateCartItemRequest,
   UpdateCartItemResponse,
   ValidateCheckoutRequest,
@@ -96,6 +100,22 @@ export class DesignGrpcClient extends DomainGrpcClient implements OnModuleInit {
   ): Promise<DuplicateDesignDraftResponse> {
     return this.unary((metadata) =>
       this.cartService.duplicateDesignDraft(request, metadata),
+    );
+  }
+
+  createDesignShareLink(
+    request: CreateDesignShareLinkRequest,
+  ): Promise<CreateDesignShareLinkResponse> {
+    return this.unary((metadata) =>
+      this.cartService.createDesignShareLink(request, metadata),
+    );
+  }
+
+  revokeDesignShareLink(
+    request: RevokeDesignShareLinkRequest,
+  ): Promise<RevokeDesignShareLinkResponse> {
+    return this.unary((metadata) =>
+      this.cartService.revokeDesignShareLink(request, metadata),
     );
   }
 }

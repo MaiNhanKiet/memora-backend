@@ -11,6 +11,8 @@ import type {
   AddCartItemRequest,
   AddCartItemResponse,
   CartItemDraft,
+  CreateDesignShareLinkRequest,
+  CreateDesignShareLinkResponse,
   DuplicateDesignDraftRequest,
   DuplicateDesignDraftResponse,
   GemstoneSelectionItem,
@@ -20,12 +22,15 @@ import type {
   GetDesignDraftResponse,
   RemoveCartItemRequest,
   RemoveCartItemResponse,
+  RevokeDesignShareLinkRequest,
+  RevokeDesignShareLinkResponse,
   UpdateCartItemRequest,
   UpdateCartItemResponse,
   ValidateCheckoutRequest,
   ValidateCheckoutResponse,
   VerifiedActor,
 } from '@app/contracts';
+import * as crypto from 'crypto';
 import {
   CartRepository,
   type CartWithDrafts,
@@ -476,6 +481,90 @@ export class CartService {
         : '',
       status: draft.status,
       createdAt: draft.created_at.toISOString(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [DESIG-009] Create Design Share Link
+  // ---------------------------------------------------------------------------
+  async createDesignShareLink(
+    request: CreateDesignShareLinkRequest,
+  ): Promise<CreateDesignShareLinkResponse> {
+    const actor = this.validateActor(request.actor);
+    const draft = await this.repository.findDraftById(request.draftId);
+    if (!draft) {
+      throw new NotFoundException(`Draft ${request.draftId} not found`);
+    }
+
+    // Ownership check
+    if (actor.userId && draft.owner_user_id && draft.owner_user_id !== actor.userId) {
+      throw new ForbiddenException('You do not own this design draft');
+    }
+    if (
+      actor.guestSessionId &&
+      draft.guest_session_id &&
+      draft.guest_session_id !== actor.guestSessionId
+    ) {
+      throw new ForbiddenException('You do not own this design draft');
+    }
+
+    const days = request.expiresInDays && request.expiresInDays > 0 ? request.expiresInDays : 7;
+    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+    const rawCode = `MMR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const codeHash = crypto.createHash('sha256').update(rawCode).digest('hex');
+
+    const created = await this.repository.createDesignShareCode({
+      draftId: draft.id,
+      codeHash,
+      expiresAt,
+    });
+
+    return {
+      linkId: created.id,
+      code: rawCode,
+      shareUrl: `https://memora.vn/design/shared?code=${rawCode}`,
+      status: created.status,
+      expiresAt: created.expires_at.toISOString(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [DESIG-010] Revoke Design Share Link
+  // ---------------------------------------------------------------------------
+  async revokeDesignShareLink(
+    request: RevokeDesignShareLinkRequest,
+  ): Promise<RevokeDesignShareLinkResponse> {
+    const actor = this.validateActor(request.actor);
+    const draft = await this.repository.findDraftById(request.draftId);
+    if (!draft) {
+      throw new NotFoundException(`Draft ${request.draftId} not found`);
+    }
+
+    if (actor.userId && draft.owner_user_id && draft.owner_user_id !== actor.userId) {
+      throw new ForbiddenException('You do not own this design draft');
+    }
+
+    const designCode = await this.repository.findDesignCodeById(
+      request.linkId,
+      request.draftId,
+    );
+    if (!designCode) {
+      throw new NotFoundException(`Share link ${request.linkId} not found for this draft`);
+    }
+
+    if (designCode.status === 'REVOKED') {
+      return {
+        success: true,
+        message: 'Share link already revoked',
+      };
+    }
+
+    await this.repository.revokeDesignShareCode(designCode.id);
+
+    return {
+      success: true,
+      message: 'Share link revoked successfully',
     };
   }
 }

@@ -21,6 +21,9 @@ describe('CartService', () => {
     updateDraft: jest.fn(),
     deleteDraft: jest.fn(),
     updateCartStatus: jest.fn(),
+    createDesignShareCode: jest.fn(),
+    findDesignCodeById: jest.fn(),
+    revokeDesignShareCode: jest.fn(),
   };
 
   const mockPricingService = {
@@ -347,6 +350,108 @@ describe('CartService', () => {
       );
       expect(res.draft.draftId).toBe('draft-new');
       expect(res.itemsCount).toBe(0);
+    });
+  });
+
+  describe('createDesignShareLink (DESIG-009)', () => {
+    it('should throw NotFoundException if draft not found', async () => {
+      mockRepository.findDraftById.mockResolvedValue(null);
+
+      await expect(
+        service.createDesignShareLink({
+          draftId: 'draft-not-found',
+          actor: { userId: validUserId1 },
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException if user does not own draft', async () => {
+      mockRepository.findDraftById.mockResolvedValue({
+        id: 'draft-1',
+        owner_user_id: validUserId2,
+      });
+
+      await expect(
+        service.createDesignShareLink({
+          draftId: 'draft-1',
+          actor: { userId: validUserId1 },
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should create share link successfully', async () => {
+      mockRepository.findDraftById.mockResolvedValue({
+        id: 'draft-1',
+        owner_user_id: validUserId1,
+      });
+
+      mockRepository.createDesignShareCode.mockResolvedValue({
+        id: 'link-1',
+        ring_design_draft_id: 'draft-1',
+        status: 'ACTIVE',
+        expires_at: new Date('2026-11-22T00:00:00.000Z'),
+      });
+
+      const res = await service.createDesignShareLink({
+        draftId: 'draft-1',
+        actor: { userId: validUserId1 },
+      });
+
+      expect(res.linkId).toBe('link-1');
+      expect(res.status).toBe('ACTIVE');
+      expect(res.code).toMatch(/^MMR-/);
+      expect(res.shareUrl).toContain(res.code);
+    });
+  });
+
+  describe('revokeDesignShareLink (DESIG-010)', () => {
+    it('should throw NotFoundException if draft not found', async () => {
+      mockRepository.findDraftById.mockResolvedValue(null);
+
+      await expect(
+        service.revokeDesignShareLink({
+          draftId: 'draft-1',
+          linkId: 'link-1',
+          actor: { userId: validUserId1 },
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if linkId not found for draft', async () => {
+      mockRepository.findDraftById.mockResolvedValue({
+        id: 'draft-1',
+        owner_user_id: validUserId1,
+      });
+      mockRepository.findDesignCodeById.mockResolvedValue(null);
+
+      await expect(
+        service.revokeDesignShareLink({
+          draftId: 'draft-1',
+          linkId: 'link-1',
+          actor: { userId: validUserId1 },
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should revoke share link successfully', async () => {
+      mockRepository.findDraftById.mockResolvedValue({
+        id: 'draft-1',
+        owner_user_id: validUserId1,
+      });
+      mockRepository.findDesignCodeById.mockResolvedValue({
+        id: 'link-1',
+        ring_design_draft_id: 'draft-1',
+        status: 'ACTIVE',
+      });
+
+      const res = await service.revokeDesignShareLink({
+        draftId: 'draft-1',
+        linkId: 'link-1',
+        actor: { userId: validUserId1 },
+      });
+
+      expect(res.success).toBe(true);
+      expect(mockRepository.revokeDesignShareCode).toHaveBeenCalledWith('link-1');
     });
   });
 });
