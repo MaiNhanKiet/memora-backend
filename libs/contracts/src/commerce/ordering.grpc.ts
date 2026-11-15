@@ -320,6 +320,7 @@ export interface QuoteLineItem {
   unitAmount: number;
   lineAmount: number;
   priceSourceType: string;
+  ringItemId?: string;
 }
 
 export interface FullQuoteDetail {
@@ -335,11 +336,279 @@ export interface FullQuoteDetail {
   currency: string;
   items: QuoteLineItem[];
   createdAt: string;
+  validUntil?: string;
+  issuedAt?: string;
+  acceptedAt?: string;
 }
 
 export interface ListOrderQuotesResponse {
   orderId: string;
   quotes: FullQuoteDetail[];
+}
+
+export interface CancelOrderRequest {
+  actor: VerifiedActor;
+  orderId: string;
+  reason?: string;
+}
+
+export interface CancelOrderResponse {
+  orderId: string;
+  status: string;
+  cancelledAt: string;
+  cancellationReason?: string;
+}
+
+export interface QuoteLineItemInput {
+  ringItemId?: string;
+  componentType: string;
+  description?: string;
+  quantity?: number;
+  unitAmount: number;
+  lineAmount: number;
+  priceSourceType?: string;
+}
+
+export interface CreateFinalQuoteRequest {
+  orderId: string;
+  subtotalAmount?: number;
+  deliveryAmount?: number;
+  adjustmentAmount?: number;
+  totalAmount: number;
+  currency?: string;
+  validUntil?: string;
+  staffUserId?: string;
+  items: QuoteLineItemInput[];
+}
+
+export interface UpdateQuoteLineItemInput {
+  id?: string;
+  ringItemId?: string;
+  componentType: string;
+  description?: string;
+  quantity?: number;
+  unitAmount: number;
+  lineAmount: number;
+  priceSourceType?: string;
+}
+
+export interface UpdateFinalQuoteRequest {
+  orderId: string;
+  quoteId: string;
+  subtotalAmount?: number;
+  deliveryAmount?: number;
+  adjustmentAmount?: number;
+  totalAmount?: number;
+  validUntil?: string;
+  staffUserId?: string;
+  items?: UpdateQuoteLineItemInput[];
+}
+
+export interface PublishFinalQuoteRequest {
+  orderId: string;
+  quoteId: string;
+  staffUserId?: string;
+}
+
+export interface GetOrderQuoteByIdRequest {
+  actor?: VerifiedActor;
+  orderId: string;
+  quoteId: string;
+}
+
+export interface FinalConfirmationItemSummary {
+  id: string;
+  ringItemId: string;
+  ringItemVersionId: string;
+  versionNo: number;
+}
+
+export interface ConfirmFinalQuoteRequest {
+  actor: VerifiedActor;
+  orderId: string;
+  quoteId?: string;
+  notes?: string;
+}
+
+export interface ConfirmFinalQuoteResponse {
+  confirmationId: string;
+  orderId: string;
+  quoteId: string;
+  status: string;
+  confirmedAt: string;
+  nextOrderStatus: string;
+  items: FinalConfirmationItemSummary[];
+}
+
+export interface RejectFinalQuoteRequest {
+  actor: VerifiedActor;
+  orderId: string;
+  quoteId?: string;
+  reason: string;
+}
+
+export interface RejectFinalQuoteResponse {
+  orderId: string;
+  quoteId: string;
+  status: string;
+  reason: string;
+  updatedOrderStatus: string;
+}
+
+export interface GetOrderFinalConfirmationsRequest {
+  actor: VerifiedActor;
+  orderId: string;
+}
+
+export interface FinalConfirmationDetail {
+  id: string;
+  orderId: string;
+  quoteId: string;
+  quoteNo: string;
+  quoteTotalAmount: number;
+  confirmedByCustomerIdentityId: string;
+  status: string;
+  confirmedAt: string;
+  invalidatedAt?: string;
+  invalidationReason?: string;
+  items: FinalConfirmationItemSummary[];
+}
+
+export interface GetOrderFinalConfirmationsResponse {
+  orderId: string;
+  confirmations: FinalConfirmationDetail[];
+}
+
+export interface ListOrderPaymentsRequest {
+  actor: VerifiedActor;
+  orderId: string;
+}
+
+export interface PaymentTransactionSummary {
+  id: string;
+  orderId: string;
+  paymentStage: string;
+  transactionType: string;
+  amount: number;
+  currency: string;
+  status: string;
+  provider?: string;
+  paymentMethod?: string;
+  requestedAt: string;
+  completedAt?: string;
+  receiptNo?: string;
+}
+
+export interface ListOrderPaymentsResponse {
+  orderId: string;
+  totalPaidAmount: number;
+  currency: string;
+  payments: PaymentTransactionSummary[];
+}
+
+export interface GetOrderPaymentByIdRequest {
+  actor: VerifiedActor;
+  orderId: string;
+  transactionId: string;
+}
+
+export interface PaymentTransactionDetail {
+  id: string;
+  orderId: string;
+  paymentStage: string;
+  transactionType: string;
+  amount: number;
+  currency: string;
+  status: string;
+  provider?: string;
+  paymentMethod?: string;
+  providerOrderCode?: string;
+  providerTransactionId?: string;
+  providerReference?: string;
+  relatedTransactionId?: string;
+  requestedAt: string;
+  completedAt?: string;
+  failedAt?: string;
+  failureReason?: string;
+  receiptNo?: string;
+  receiptIssuedAt?: string;
+  metadataJson?: string;
+}
+
+export interface GetPaymentReceiptRequest {
+  actor: VerifiedActor;
+  orderId: string;
+  transactionId: string;
+}
+
+export interface PaymentReceiptDetail {
+  receiptNo: string;
+  transactionId: string;
+  orderId: string;
+  orderNo: string;
+  paymentStage: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  completedAt: string;
+  recipientName: string;
+  issuedAt: string;
+}
+
+export interface GetOrderInvoiceRequest {
+  actor: VerifiedActor;
+  orderId: string;
+}
+
+export interface InvoiceItemSummary {
+  componentType: string;
+  description: string;
+  quantity: number;
+  unitAmount: number;
+  lineAmount: number;
+}
+
+export interface InvoicePaymentRecord {
+  paymentStage: string;
+  amount: number;
+  completedAt: string;
+  receiptNo?: string;
+}
+
+export interface OrderInvoiceDetail {
+  invoiceNo: string;
+  orderId: string;
+  orderNo: string;
+  status: string;
+  issuedAt: string;
+  totalAmount: number;
+  totalPaidAmount: number;
+  remainingAmount: number;
+  currency: string;
+  recipientName: string;
+  recipientPhone?: string;
+  deliveryAddressJson?: string;
+  items: InvoiceItemSummary[];
+  paymentTransactions: InvoicePaymentRecord[];
+}
+
+export interface CreateRefundRequestMessage {
+  transactionId: string;
+  refundAmount: number;
+  reason: string;
+  notes?: string;
+  staffUserId?: string;
+}
+
+export interface CreateRefundResponse {
+  refundTransactionId: string;
+  originalTransactionId: string;
+  orderId: string;
+  refundAmount: number;
+  currency: string;
+  status: string;
+  requestedAt: string;
+  reason: string;
 }
 
 export interface GetOrderPersonalizationContextRequest {
@@ -394,6 +663,39 @@ export interface OrderingServiceHandler {
   getOrderPersonalizationContext(
     request: GetOrderPersonalizationContextRequest,
   ): Promise<GetOrderPersonalizationContextResponse>;
+  cancelOrder(request: CancelOrderRequest): Promise<CancelOrderResponse>;
+  createFinalQuote(request: CreateFinalQuoteRequest): Promise<FullQuoteDetail>;
+  updateFinalQuote(request: UpdateFinalQuoteRequest): Promise<FullQuoteDetail>;
+  publishFinalQuote(
+    request: PublishFinalQuoteRequest,
+  ): Promise<FullQuoteDetail>;
+  getOrderQuoteById(
+    request: GetOrderQuoteByIdRequest,
+  ): Promise<FullQuoteDetail>;
+  confirmFinalQuote(
+    request: ConfirmFinalQuoteRequest,
+  ): Promise<ConfirmFinalQuoteResponse>;
+  rejectFinalQuote(
+    request: RejectFinalQuoteRequest,
+  ): Promise<RejectFinalQuoteResponse>;
+  getOrderFinalConfirmations(
+    request: GetOrderFinalConfirmationsRequest,
+  ): Promise<GetOrderFinalConfirmationsResponse>;
+  listOrderPayments(
+    request: ListOrderPaymentsRequest,
+  ): Promise<ListOrderPaymentsResponse>;
+  getOrderPaymentById(
+    request: GetOrderPaymentByIdRequest,
+  ): Promise<PaymentTransactionDetail>;
+  getPaymentReceipt(
+    request: GetPaymentReceiptRequest,
+  ): Promise<PaymentReceiptDetail>;
+  getOrderInvoice(
+    request: GetOrderInvoiceRequest,
+  ): Promise<OrderInvoiceDetail>;
+  createRefundRequest(
+    request: CreateRefundRequestMessage,
+  ): Promise<CreateRefundResponse>;
 }
 
 export interface CommerceOrderingServiceClient {
@@ -445,4 +747,56 @@ export interface CommerceOrderingServiceClient {
     request: GetOrderPersonalizationContextRequest,
     metadata?: Metadata,
   ): Observable<GetOrderPersonalizationContextResponse>;
+  cancelOrder(
+    request: CancelOrderRequest,
+    metadata?: Metadata,
+  ): Observable<CancelOrderResponse>;
+  createFinalQuote(
+    request: CreateFinalQuoteRequest,
+    metadata?: Metadata,
+  ): Observable<FullQuoteDetail>;
+  updateFinalQuote(
+    request: UpdateFinalQuoteRequest,
+    metadata?: Metadata,
+  ): Observable<FullQuoteDetail>;
+  publishFinalQuote(
+    request: PublishFinalQuoteRequest,
+    metadata?: Metadata,
+  ): Observable<FullQuoteDetail>;
+  getOrderQuoteById(
+    request: GetOrderQuoteByIdRequest,
+    metadata?: Metadata,
+  ): Observable<FullQuoteDetail>;
+  confirmFinalQuote(
+    request: ConfirmFinalQuoteRequest,
+    metadata?: Metadata,
+  ): Observable<ConfirmFinalQuoteResponse>;
+  rejectFinalQuote(
+    request: RejectFinalQuoteRequest,
+    metadata?: Metadata,
+  ): Observable<RejectFinalQuoteResponse>;
+  getOrderFinalConfirmations(
+    request: GetOrderFinalConfirmationsRequest,
+    metadata?: Metadata,
+  ): Observable<GetOrderFinalConfirmationsResponse>;
+  listOrderPayments(
+    request: ListOrderPaymentsRequest,
+    metadata?: Metadata,
+  ): Observable<ListOrderPaymentsResponse>;
+  getOrderPaymentById(
+    request: GetOrderPaymentByIdRequest,
+    metadata?: Metadata,
+  ): Observable<PaymentTransactionDetail>;
+  getPaymentReceipt(
+    request: GetPaymentReceiptRequest,
+    metadata?: Metadata,
+  ): Observable<PaymentReceiptDetail>;
+  getOrderInvoice(
+    request: GetOrderInvoiceRequest,
+    metadata?: Metadata,
+  ): Observable<OrderInvoiceDetail>;
+  createRefundRequest(
+    request: CreateRefundRequestMessage,
+    metadata?: Metadata,
+  ): Observable<CreateRefundResponse>;
 }

@@ -1,29 +1,52 @@
 import { Controller, UseGuards } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import type {
+  CancelOrderRequest,
+  CancelOrderResponse,
+  ConfirmFinalQuoteRequest,
+  ConfirmFinalQuoteResponse,
+  CreateFinalQuoteRequest,
   CreateOrderRequest,
   CreateOrderResponse,
+  CreateRefundRequestMessage,
+  CreateRefundResponse,
+  FullQuoteDetail,
   GetAdminOrderDetailsRequest,
   GetAdminOrderDetailsResponse,
   GetOrderByIdRequest,
   GetOrderByIdResponse,
+  GetOrderFinalConfirmationsRequest,
+  GetOrderFinalConfirmationsResponse,
+  GetOrderInvoiceRequest,
+  GetOrderPaymentByIdRequest,
   GetOrderPersonalizationContextRequest,
   GetOrderPersonalizationContextResponse,
+  GetOrderQuoteByIdRequest,
   GetOrderTimelineRequest,
   GetOrderTimelineResponse,
+  GetPaymentReceiptRequest,
   GetRingItemDetailsRequest,
   GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
+  ListOrderPaymentsRequest,
+  ListOrderPaymentsResponse,
   ListOrderQuotesRequest,
   ListOrderQuotesResponse,
   ListOrdersRequest,
   ListOrdersResponse,
   ListRingItemVersionsRequest,
   ListRingItemVersionsResponse,
+  OrderInvoiceDetail,
   OrderingServiceHandler,
+  PaymentReceiptDetail,
+  PaymentTransactionDetail,
+  PublishFinalQuoteRequest,
+  RejectFinalQuoteRequest,
+  RejectFinalQuoteResponse,
   UpdateCurrentRingItemVersionRequest,
   UpdateCurrentRingItemVersionResponse,
+  UpdateFinalQuoteRequest,
   UpdateOrderStatusRequest,
   UpdateOrderStatusResponse,
 } from '@app/contracts';
@@ -111,5 +134,94 @@ export class OrderingGrpcController implements OrderingServiceHandler {
     request: GetOrderPersonalizationContextRequest,
   ): Promise<GetOrderPersonalizationContextResponse> {
     return this.orderingService.getOrderPersonalizationContext(request);
+  }
+
+  @GrpcMethod('OrderingService', 'CancelOrder')
+  cancelOrder(request: CancelOrderRequest): Promise<CancelOrderResponse> {
+    return this.orderingService.cancelOrder(request);
+  }
+
+  @GrpcMethod('OrderingService', 'CreateFinalQuote')
+  createFinalQuote(
+    request: CreateFinalQuoteRequest,
+  ): Promise<FullQuoteDetail> {
+    return this.orderingService.createFinalQuote(request);
+  }
+
+  @GrpcMethod('OrderingService', 'UpdateFinalQuote')
+  updateFinalQuote(
+    request: UpdateFinalQuoteRequest,
+  ): Promise<FullQuoteDetail> {
+    return this.orderingService.updateFinalQuote(request);
+  }
+
+  @GrpcMethod('OrderingService', 'PublishFinalQuote')
+  publishFinalQuote(
+    request: PublishFinalQuoteRequest,
+  ): Promise<FullQuoteDetail> {
+    return this.orderingService.publishFinalQuote(request);
+  }
+
+  @GrpcMethod('OrderingService', 'GetOrderQuoteById')
+  getOrderQuoteById(
+    request: GetOrderQuoteByIdRequest,
+  ): Promise<FullQuoteDetail> {
+    return this.orderingService.getOrderQuoteById(request);
+  }
+
+  @GrpcMethod('OrderingService', 'ConfirmFinalQuote')
+  confirmFinalQuote(
+    request: ConfirmFinalQuoteRequest,
+  ): Promise<ConfirmFinalQuoteResponse> {
+    return this.orderingService.confirmFinalQuote(request);
+  }
+
+  @GrpcMethod('OrderingService', 'RejectFinalQuote')
+  rejectFinalQuote(
+    request: RejectFinalQuoteRequest,
+  ): Promise<RejectFinalQuoteResponse> {
+    return this.orderingService.rejectFinalQuote(request);
+  }
+
+  @GrpcMethod('OrderingService', 'GetOrderFinalConfirmations')
+  getOrderFinalConfirmations(
+    request: GetOrderFinalConfirmationsRequest,
+  ): Promise<GetOrderFinalConfirmationsResponse> {
+    return this.orderingService.getOrderFinalConfirmations(request);
+  }
+
+  @GrpcMethod('OrderingService', 'ListOrderPayments')
+  listOrderPayments(
+    request: ListOrderPaymentsRequest,
+  ): Promise<ListOrderPaymentsResponse> {
+    return this.orderingService.listOrderPayments(request);
+  }
+
+  @GrpcMethod('OrderingService', 'GetOrderPaymentById')
+  getOrderPaymentById(
+    request: GetOrderPaymentByIdRequest,
+  ): Promise<PaymentTransactionDetail> {
+    return this.orderingService.getOrderPaymentById(request);
+  }
+
+  @GrpcMethod('OrderingService', 'GetPaymentReceipt')
+  getPaymentReceipt(
+    request: GetPaymentReceiptRequest,
+  ): Promise<PaymentReceiptDetail> {
+    return this.orderingService.getPaymentReceipt(request);
+  }
+
+  @GrpcMethod('OrderingService', 'GetOrderInvoice')
+  getOrderInvoice(
+    request: GetOrderInvoiceRequest,
+  ): Promise<OrderInvoiceDetail> {
+    return this.orderingService.getOrderInvoice(request);
+  }
+
+  @GrpcMethod('OrderingService', 'CreateRefundRequest')
+  createRefundRequest(
+    request: CreateRefundRequestMessage,
+  ): Promise<CreateRefundResponse> {
+    return this.orderingService.createRefundRequest(request);
   }
 }

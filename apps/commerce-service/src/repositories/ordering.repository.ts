@@ -665,4 +665,497 @@ export class OrderingRepository {
       },
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-005] Cancel Order & Release Allocations
+  // ---------------------------------------------------------------------------
+  async cancelOrder(orderId: string, reason?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const ringItems = await tx.ring_items.findMany({
+        where: { order_id: orderId },
+        select: { id: true },
+      });
+
+      const ringItemIds = ringItems.map((r) => r.id);
+      if (ringItemIds.length > 0) {
+        await tx.allocations.updateMany({
+          where: {
+            ring_item_id: { in: ringItemIds },
+            status: { in: ['HOLD', 'RESERVED'] },
+          },
+          data: { status: 'RELEASED' },
+        });
+      }
+
+      return tx.orders.update({
+        where: { id: orderId },
+        data: {
+          status: 'CANCELLED',
+          cancelled_at: new Date(),
+          cancellation_reason: reason ?? null,
+        },
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-011] Create Final Quote
+  // ---------------------------------------------------------------------------
+  async createFinalQuote(params: {
+    orderId: string;
+    subtotalAmount?: number;
+    deliveryAmount?: number;
+    adjustmentAmount?: number;
+    totalAmount: number;
+    currency?: string;
+    validUntil?: string;
+    staffUserId?: string;
+    items: Array<{
+      ringItemId?: string;
+      componentType: string;
+      description?: string;
+      quantity?: number;
+      unitAmount: number;
+      lineAmount: number;
+      priceSourceType?: string;
+    }>;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.orders.findUnique({
+        where: { id: params.orderId },
+        select: { id: true, order_no: true },
+      });
+      if (!order) {
+        return null;
+      }
+
+      const lastQuote = await tx.quotes.findFirst({
+        where: { order_id: params.orderId, quote_type: 'FINAL' },
+        orderBy: { version_no: 'desc' },
+      });
+      const versionNo = (lastQuote?.version_no ?? 0) + 1;
+      const quoteNo = `QUO-${order.order_no}-F${versionNo}`;
+
+      return tx.quotes.create({
+        data: {
+          quote_no: quoteNo,
+          order_id: params.orderId,
+          quote_type: 'FINAL',
+          version_no: versionNo,
+          status: 'DRAFT',
+          subtotal_amount: new Prisma.Decimal(
+            params.subtotalAmount ?? params.totalAmount,
+          ),
+          delivery_amount: new Prisma.Decimal(params.deliveryAmount ?? 0),
+          adjustment_amount: new Prisma.Decimal(params.adjustmentAmount ?? 0),
+          total_amount: new Prisma.Decimal(params.totalAmount),
+          currency: params.currency ?? 'VND',
+          valid_until: params.validUntil ? new Date(params.validUntil) : null,
+          created_by_user_id: params.staffUserId ?? null,
+          quote_items: {
+            create: params.items.map((item) => ({
+              ring_item_id: item.ringItemId ?? null,
+              component_type: item.componentType,
+              description: item.description ?? null,
+              quantity: new Prisma.Decimal(item.quantity ?? 1),
+              unit_amount: new Prisma.Decimal(item.unitAmount),
+              line_amount: new Prisma.Decimal(item.lineAmount),
+              price_source_type: item.priceSourceType ?? 'MANUAL',
+            })),
+          },
+        },
+        include: {
+          quote_items: {
+            orderBy: { created_at: 'asc' },
+          },
+        },
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-013 Part B] Find Quote By ID
+  // ---------------------------------------------------------------------------
+  async findQuoteById(orderId: string, quoteId: string) {
+    return this.prisma.quotes.findFirst({
+      where: { id: quoteId, order_id: orderId },
+      include: {
+        quote_items: {
+          orderBy: { created_at: 'asc' },
+        },
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-012] Update Final Quote (DRAFT only)
+  // ---------------------------------------------------------------------------
+  async updateFinalQuote(params: {
+    orderId: string;
+    quoteId: string;
+    subtotalAmount?: number;
+    deliveryAmount?: number;
+    adjustmentAmount?: number;
+    totalAmount?: number;
+    validUntil?: string;
+    staffUserId?: string;
+    items?: Array<{
+      id?: string;
+      ringItemId?: string;
+      componentType: string;
+      description?: string;
+      quantity?: number;
+      unitAmount: number;
+      lineAmount: number;
+      priceSourceType?: string;
+    }>;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const updateData: Prisma.quotesUpdateInput = {};
+      if (params.subtotalAmount !== undefined) {
+        updateData.subtotal_amount = new Prisma.Decimal(params.subtotalAmount);
+      }
+      if (params.deliveryAmount !== undefined) {
+        updateData.delivery_amount = new Prisma.Decimal(params.deliveryAmount);
+      }
+      if (params.adjustmentAmount !== undefined) {
+        updateData.adjustment_amount = new Prisma.Decimal(
+          params.adjustmentAmount,
+        );
+      }
+      if (params.totalAmount !== undefined) {
+        updateData.total_amount = new Prisma.Decimal(params.totalAmount);
+      }
+      if (params.validUntil !== undefined) {
+        updateData.valid_until = new Date(params.validUntil);
+      }
+
+      if (params.items && params.items.length > 0) {
+        await tx.quote_items.deleteMany({
+          where: { quote_id: params.quoteId },
+        });
+        await tx.quote_items.createMany({
+          data: params.items.map((item) => ({
+            quote_id: params.quoteId,
+            ring_item_id: item.ringItemId ?? null,
+            component_type: item.componentType,
+            description: item.description ?? null,
+            quantity: new Prisma.Decimal(item.quantity ?? 1),
+            unit_amount: new Prisma.Decimal(item.unitAmount),
+            line_amount: new Prisma.Decimal(item.lineAmount),
+            price_source_type: item.priceSourceType ?? 'MANUAL',
+          })),
+        });
+      }
+
+      return tx.quotes.update({
+        where: { id: params.quoteId },
+        data: updateData,
+        include: {
+          quote_items: {
+            orderBy: { created_at: 'asc' },
+          },
+        },
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-013 Part A] Publish Final Quote
+  // ---------------------------------------------------------------------------
+  async publishFinalQuote(orderId: string, quoteId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.quotes.findUnique({
+        where: { id: quoteId },
+      });
+      const validUntil =
+        existing?.valid_until ??
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      const quote = await tx.quotes.update({
+        where: { id: quoteId },
+        data: {
+          status: 'ISSUED',
+          issued_at: new Date(),
+          valid_until: validUntil,
+        },
+        include: {
+          quote_items: {
+            orderBy: { created_at: 'asc' },
+          },
+        },
+      });
+
+      await tx.orders.update({
+        where: { id: orderId },
+        data: {
+          current_quote_id: quoteId,
+          status: 'AWAITING_CUSTOMER_CONFIRMATION',
+        },
+      });
+
+      return quote;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-014] Customer Confirm Final Quote
+  // ---------------------------------------------------------------------------
+  async confirmFinalQuote(
+    orderId: string,
+    quoteId: string,
+    customerIdentityId: string,
+    nextOrderStatus: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Invalidate any existing active confirmations for this order
+      await tx.final_confirmations.updateMany({
+        where: { order_id: orderId, status: 'ACTIVE' },
+        data: {
+          status: 'INVALIDATED',
+          invalidated_at: new Date(),
+          invalidation_reason: 'Superseded by new confirmation',
+        },
+      });
+
+      // 2. Query all ring items for current versions
+      const ringItems = await tx.ring_items.findMany({
+        where: { order_id: orderId },
+        select: {
+          id: true,
+          current_version_id: true,
+          ring_item_versions_ring_items_current_version_idToring_item_versions:
+            {
+              select: { version_no: true },
+            },
+        },
+      });
+
+      // 3. Create final confirmation record
+      const confirmation = await tx.final_confirmations.create({
+        data: {
+          order_id: orderId,
+          quote_id: quoteId,
+          confirmed_by_customer_identity_id: customerIdentityId,
+          status: 'ACTIVE',
+          confirmed_at: new Date(),
+          final_confirmation_items: {
+            create: ringItems
+              .filter((r) => r.current_version_id)
+              .map((r) => ({
+                ring_item_id: r.id,
+                ring_item_version_id: r.current_version_id!,
+              })),
+          },
+        },
+        include: {
+          final_confirmation_items: true,
+        },
+      });
+
+      // 4. Update quote
+      await tx.quotes.update({
+        where: { id: quoteId },
+        data: {
+          status: 'ACCEPTED',
+          accepted_by_customer_identity_id: customerIdentityId,
+          accepted_at: new Date(),
+        },
+      });
+
+      // 5. Advance order status
+      await tx.orders.update({
+        where: { id: orderId },
+        data: { status: nextOrderStatus },
+      });
+
+      return { confirmation, ringItems };
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-015 Part B] Customer Reject Final Quote
+  // ---------------------------------------------------------------------------
+  async rejectFinalQuote(orderId: string, quoteId: string, reason?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.quotes.update({
+        where: { id: quoteId },
+        data: { status: 'REJECTED' },
+      });
+
+      return tx.orders.update({
+        where: { id: orderId },
+        data: { status: 'PENDING_FINAL_QUOTE' },
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-015 Part A] List Final Confirmations
+  // ---------------------------------------------------------------------------
+  async findFinalConfirmations(orderId: string) {
+    return this.prisma.final_confirmations.findMany({
+      where: { order_id: orderId },
+      orderBy: { confirmed_at: 'desc' },
+      include: {
+        quotes: true,
+        final_confirmation_items: {
+          include: {
+            ring_item_versions: true,
+          },
+        },
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-017] List Order Payments
+  // ---------------------------------------------------------------------------
+  async findOrderPayments(orderId: string) {
+    return this.prisma.payment_transactions.findMany({
+      where: { order_id: orderId },
+      orderBy: { requested_at: 'desc' },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-018] Get Payment Transaction by ID
+  // ---------------------------------------------------------------------------
+  async findOrderPaymentById(orderId: string, transactionId: string) {
+    return this.prisma.payment_transactions.findFirst({
+      where: { id: transactionId, order_id: orderId },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-021] Get Payment Receipt
+  // ---------------------------------------------------------------------------
+  async findPaymentReceipt(orderId: string, transactionId: string) {
+    const tx = await this.prisma.payment_transactions.findFirst({
+      where: { id: transactionId, order_id: orderId },
+      include: {
+        orders: {
+          select: {
+            order_no: true,
+            recipient_name: true,
+          },
+        },
+      },
+    });
+
+    if (!tx) {
+      return null;
+    }
+
+    // Auto-generate immutable receipt_no if not assigned yet
+    if (!tx.receipt_no && tx.status === 'SUCCEEDED') {
+      const orderNo = tx.orders?.order_no || 'ORD';
+      const randomSuffix = Math.random()
+        .toString(36)
+        .substring(2, 6)
+        .toUpperCase();
+      const generatedReceiptNo = `REC-${orderNo}-${tx.payment_stage}-${randomSuffix}`;
+      const now = new Date();
+
+      await this.prisma.payment_transactions.update({
+        where: { id: tx.id },
+        data: {
+          receipt_no: generatedReceiptNo,
+          receipt_issued_at: now,
+        },
+      });
+
+      tx.receipt_no = generatedReceiptNo;
+      tx.receipt_issued_at = now;
+    }
+
+    return tx;
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-022] Get Order Invoice
+  // ---------------------------------------------------------------------------
+  async findOrderInvoice(orderId: string) {
+    const order = await this.prisma.orders.findUnique({
+      where: { id: orderId },
+      include: {
+        quotes_orders_current_quote_idToquotes: {
+          include: {
+            quote_items: {
+              orderBy: { created_at: 'asc' },
+            },
+          },
+        },
+        payment_transactions: {
+          where: { status: 'SUCCEEDED' },
+          orderBy: { completed_at: 'asc' },
+        },
+      },
+    });
+
+    if (!order) {
+      return null;
+    }
+
+    // Auto-generate invoice_no if not assigned yet
+    if (!order.invoice_no) {
+      const invoiceNo = `INV-${order.order_no}`;
+      const now = new Date();
+
+      await this.prisma.orders.update({
+        where: { id: order.id },
+        data: {
+          invoice_no: invoiceNo,
+          invoice_issued_at: now,
+        },
+      });
+
+      order.invoice_no = invoiceNo;
+      order.invoice_issued_at = now;
+    }
+
+    return order;
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-023] Create Refund Request
+  // ---------------------------------------------------------------------------
+  async createRefundRequest(params: {
+    transactionId: string;
+    refundAmount: number;
+    reason: string;
+    notes?: string;
+    staffUserId?: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const original = await tx.payment_transactions.findUnique({
+        where: { id: params.transactionId },
+      });
+
+      if (!original) {
+        return null;
+      }
+
+      return tx.payment_transactions.create({
+        data: {
+          order_id: original.order_id,
+          related_transaction_id: original.id,
+          transaction_type: 'REFUND',
+          payment_stage: original.payment_stage,
+          payment_method: original.payment_method,
+          provider: original.provider,
+          amount: new Prisma.Decimal(params.refundAmount),
+          currency: original.currency,
+          status: 'PENDING',
+          recorded_by_user_id: params.staffUserId ?? null,
+          metadata_json: {
+            reason: params.reason,
+            notes: params.notes ?? null,
+            originalProviderTransactionId:
+              original.provider_transaction_id ?? null,
+          },
+        },
+      });
+    });
+  }
 }

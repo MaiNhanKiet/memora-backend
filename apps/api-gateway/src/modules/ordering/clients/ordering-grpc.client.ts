@@ -2,27 +2,50 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { ClientGrpc } from '@nestjs/microservices';
 import type {
+  CancelOrderRequest,
+  CancelOrderResponse,
   CommerceOrderingServiceClient,
+  ConfirmFinalQuoteRequest,
+  ConfirmFinalQuoteResponse,
+  CreateFinalQuoteRequest,
   CreateOrderRequest,
   CreateOrderResponse,
+  CreateRefundRequestMessage,
+  CreateRefundResponse,
+  FullQuoteDetail,
   GetAdminOrderDetailsRequest,
   GetAdminOrderDetailsResponse,
   GetOrderByIdRequest,
   GetOrderByIdResponse,
+  GetOrderFinalConfirmationsRequest,
+  GetOrderFinalConfirmationsResponse,
+  GetOrderInvoiceRequest,
+  GetOrderPaymentByIdRequest,
+  GetOrderQuoteByIdRequest,
   GetOrderTimelineRequest,
   GetOrderTimelineResponse,
+  GetPaymentReceiptRequest,
   GetRingItemDetailsRequest,
   GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
+  ListOrderPaymentsRequest,
+  ListOrderPaymentsResponse,
   ListOrderQuotesRequest,
   ListOrderQuotesResponse,
   ListOrdersRequest,
   ListOrdersResponse,
   ListRingItemVersionsRequest,
   ListRingItemVersionsResponse,
+  OrderInvoiceDetail,
+  PaymentReceiptDetail,
+  PaymentTransactionDetail,
+  PublishFinalQuoteRequest,
+  RejectFinalQuoteRequest,
+  RejectFinalQuoteResponse,
   UpdateCurrentRingItemVersionRequest,
   UpdateCurrentRingItemVersionResponse,
+  UpdateFinalQuoteRequest,
   UpdateOrderStatusRequest,
   UpdateOrderStatusResponse,
 } from '@app/contracts';
@@ -131,6 +154,108 @@ export class OrderingGrpcClient
   ): Promise<ListOrderQuotesResponse> {
     return this.unary((metadata) =>
       this.orderingService.listOrderQuotes(request, metadata),
+    );
+  }
+
+  cancelOrder(request: CancelOrderRequest): Promise<CancelOrderResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.cancelOrder(request, metadata),
+    );
+  }
+
+  createFinalQuote(
+    request: CreateFinalQuoteRequest,
+  ): Promise<FullQuoteDetail> {
+    return this.unary((metadata) =>
+      this.orderingService.createFinalQuote(request, metadata),
+    );
+  }
+
+  updateFinalQuote(
+    request: UpdateFinalQuoteRequest,
+  ): Promise<FullQuoteDetail> {
+    return this.unary((metadata) =>
+      this.orderingService.updateFinalQuote(request, metadata),
+    );
+  }
+
+  publishFinalQuote(
+    request: PublishFinalQuoteRequest,
+  ): Promise<FullQuoteDetail> {
+    return this.unary((metadata) =>
+      this.orderingService.publishFinalQuote(request, metadata),
+    );
+  }
+
+  getOrderQuoteById(
+    request: GetOrderQuoteByIdRequest,
+  ): Promise<FullQuoteDetail> {
+    return this.unary((metadata) =>
+      this.orderingService.getOrderQuoteById(request, metadata),
+    );
+  }
+
+  confirmFinalQuote(
+    request: ConfirmFinalQuoteRequest,
+  ): Promise<ConfirmFinalQuoteResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.confirmFinalQuote(request, metadata),
+    );
+  }
+
+  rejectFinalQuote(
+    request: RejectFinalQuoteRequest,
+  ): Promise<RejectFinalQuoteResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.rejectFinalQuote(request, metadata),
+    );
+  }
+
+  getOrderFinalConfirmations(
+    request: GetOrderFinalConfirmationsRequest,
+  ): Promise<GetOrderFinalConfirmationsResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.getOrderFinalConfirmations(request, metadata),
+    );
+  }
+
+  listOrderPayments(
+    request: ListOrderPaymentsRequest,
+  ): Promise<ListOrderPaymentsResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.listOrderPayments(request, metadata),
+    );
+  }
+
+  getOrderPaymentById(
+    request: GetOrderPaymentByIdRequest,
+  ): Promise<PaymentTransactionDetail> {
+    return this.unary((metadata) =>
+      this.orderingService.getOrderPaymentById(request, metadata),
+    );
+  }
+
+  getPaymentReceipt(
+    request: GetPaymentReceiptRequest,
+  ): Promise<PaymentReceiptDetail> {
+    return this.unary((metadata) =>
+      this.orderingService.getPaymentReceipt(request, metadata),
+    );
+  }
+
+  getOrderInvoice(
+    request: GetOrderInvoiceRequest,
+  ): Promise<OrderInvoiceDetail> {
+    return this.unary((metadata) =>
+      this.orderingService.getOrderInvoice(request, metadata),
+    );
+  }
+
+  createRefundRequest(
+    request: CreateRefundRequestMessage,
+  ): Promise<CreateRefundResponse> {
+    return this.unary((metadata) =>
+      this.orderingService.createRefundRequest(request, metadata),
     );
   }
 }

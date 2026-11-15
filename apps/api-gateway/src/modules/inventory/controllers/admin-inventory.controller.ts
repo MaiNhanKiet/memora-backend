@@ -4,6 +4,8 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
 } from '@nestjs/common';
@@ -11,24 +13,33 @@ import { ApiTags } from '@nestjs/swagger';
 import { Roles } from '@app/auth';
 import type { AuthenticatedPrincipal } from '@app/auth';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { toVerifiedActor } from '../../../common/grpc/verified-actor';
 import { InventoryGrpcClient } from '../clients/inventory-grpc.client';
 import {
   AdjustInventoryBodyDto,
+  AllocateInventoryBodyDto,
   CreateCertifiedGemstoneBodyDto,
+  HoldInventoryBodyDto,
   ListGemstoneBatchesQueryDto,
   ListInventoryMovementsQueryDto,
   ListRingBlankStocksQueryDto,
   ReceiveGemstoneBatchBodyDto,
   ReceiveRingBlankStockBodyDto,
+  ReleaseInventoryBodyDto,
 } from '../dto/request/admin-inventory.dto';
 import {
   ApiAdjustInventoryDocs,
+  ApiAllocateInventoryDocs,
+  ApiConsumeInventoryDocs,
   ApiCreateCertifiedGemstoneDocs,
+  ApiHoldInventoryDocs,
   ApiListGemstoneBatchesDocs,
   ApiListInventoryMovementsDocs,
   ApiListRingBlankStocksDocs,
   ApiReceiveGemstoneBatchDocs,
   ApiReceiveRingBlankStockDocs,
+  ApiReleaseInventoryDocs,
+  ApiReserveInventoryDocs,
 } from '../docs/admin-inventory.swagger';
 
 @ApiTags('Admin Inventory')
@@ -168,6 +179,99 @@ export class AdminInventoryController {
       reason: body.reason,
       metadataJson: body.metadata ? JSON.stringify(body.metadata) : undefined,
       performedByUserId: actor?.userId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [INVEN-007] POST /api/v1/admin/inventory/allocations/hold
+  // ---------------------------------------------------------------------------
+  @Post('allocations/hold')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiHoldInventoryDocs()
+  async holdInventory(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Body() body: HoldInventoryBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.inventoryClient.holdInventory({
+      actor,
+      ringItemId: body.ringItemId,
+      stockLotId: body.stockLotId,
+      certifiedGemstoneId: body.certifiedGemstoneId,
+      quantity: body.quantity,
+      ttlMinutes: body.ttlMinutes,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [INVEN-008] POST /api/v1/admin/inventory/allocations/:allocationId/reserve
+  // ---------------------------------------------------------------------------
+  @Post('allocations/:allocationId/reserve')
+  @HttpCode(HttpStatus.OK)
+  @ApiReserveInventoryDocs()
+  async reserveInventory(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('allocationId', ParseUUIDPipe) allocationId: string,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.inventoryClient.reserveInventory({
+      actor,
+      allocationId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [INVEN-009] POST /api/v1/admin/inventory/allocations/:allocationId/allocate
+  // ---------------------------------------------------------------------------
+  @Post('allocations/:allocationId/allocate')
+  @HttpCode(HttpStatus.OK)
+  @ApiAllocateInventoryDocs()
+  async allocateInventory(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('allocationId', ParseUUIDPipe) allocationId: string,
+    @Body() body: AllocateInventoryBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.inventoryClient.allocateInventory({
+      actor,
+      allocationId,
+      productionAttemptId: body.productionAttemptId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [INVEN-010] POST /api/v1/admin/inventory/allocations/:allocationId/consume
+  // ---------------------------------------------------------------------------
+  @Post('allocations/:allocationId/consume')
+  @HttpCode(HttpStatus.OK)
+  @ApiConsumeInventoryDocs()
+  async consumeInventory(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('allocationId', ParseUUIDPipe) allocationId: string,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.inventoryClient.consumeInventory({
+      actor,
+      allocationId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [INVEN-011] POST /api/v1/admin/inventory/allocations/:allocationId/release
+  // ---------------------------------------------------------------------------
+  @Post('allocations/:allocationId/release')
+  @HttpCode(HttpStatus.OK)
+  @ApiReleaseInventoryDocs()
+  async releaseInventory(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('allocationId', ParseUUIDPipe) allocationId: string,
+    @Body() body: ReleaseInventoryBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.inventoryClient.releaseInventory({
+      actor,
+      allocationId,
+      reason: body.reason,
     });
   }
 }

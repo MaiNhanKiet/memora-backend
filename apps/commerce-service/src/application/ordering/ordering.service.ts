@@ -7,33 +7,55 @@ import {
 import { parseVerifiedActor, type ParsedVerifiedActor } from '@app/common';
 import type {
   AdminOrderSummaryItem,
+  CancelOrderRequest,
+  CancelOrderResponse,
+  ConfirmFinalQuoteRequest,
+  ConfirmFinalQuoteResponse,
+  CreateFinalQuoteRequest,
   CreateOrderRequest,
   CreateOrderResponse,
+  CreateRefundRequestMessage,
+  CreateRefundResponse,
   FullQuoteDetail,
   GetAdminOrderDetailsRequest,
   GetAdminOrderDetailsResponse,
   GetOrderByIdRequest,
   GetOrderByIdResponse,
+  GetOrderFinalConfirmationsRequest,
+  GetOrderFinalConfirmationsResponse,
+  GetOrderInvoiceRequest,
+  GetOrderPaymentByIdRequest,
   GetOrderPersonalizationContextRequest,
   GetOrderPersonalizationContextResponse,
+  GetOrderQuoteByIdRequest,
   GetOrderTimelineRequest,
   GetOrderTimelineResponse,
+  GetPaymentReceiptRequest,
   GetRingItemDetailsRequest,
   GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
+  ListOrderPaymentsRequest,
+  ListOrderPaymentsResponse,
   ListOrderQuotesRequest,
   ListOrderQuotesResponse,
   ListOrdersRequest,
   ListOrdersResponse,
   ListRingItemVersionsRequest,
   ListRingItemVersionsResponse,
+  OrderInvoiceDetail,
+  PaymentReceiptDetail,
+  PaymentTransactionDetail,
   PersonalizationRingItem,
+  PublishFinalQuoteRequest,
+  RejectFinalQuoteRequest,
+  RejectFinalQuoteResponse,
   RingItemVersionSummary,
   StageGateItem,
   TimelineEventItem,
   UpdateCurrentRingItemVersionRequest,
   UpdateCurrentRingItemVersionResponse,
+  UpdateFinalQuoteRequest,
   UpdateOrderStatusRequest,
   UpdateOrderStatusResponse,
   VerifiedActor,
@@ -836,6 +858,640 @@ export class OrderingService {
       p1Paid,
       sourcePlanMode: order.source_plan_mode,
       ringItems,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-005] Customer Cancel Order
+  // ---------------------------------------------------------------------------
+  async cancelOrder(request: CancelOrderRequest): Promise<CancelOrderResponse> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const order = await this.repository.findOrderById(request.orderId, actorId);
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const cancellableStatuses = [
+      'AWAITING_P1',
+      'PENDING_FINAL_QUOTE',
+      'AWAITING_CUSTOMER_CONFIRMATION',
+    ];
+    if (!cancellableStatuses.includes(order.status)) {
+      throw new BadRequestException(
+        `Order in status '${order.status}' cannot be cancelled. Only pre-production orders can be cancelled.`,
+      );
+    }
+
+    const updated = await this.repository.cancelOrder(
+      request.orderId,
+      request.reason,
+    );
+
+    return {
+      orderId: updated.id,
+      status: updated.status,
+      cancelledAt: updated.cancelled_at
+        ? updated.cancelled_at.toISOString()
+        : new Date().toISOString(),
+      cancellationReason: updated.cancellation_reason ?? undefined,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-011] Create Final Quote
+  // ---------------------------------------------------------------------------
+  async createFinalQuote(
+    request: CreateFinalQuoteRequest,
+  ): Promise<FullQuoteDetail> {
+    const order = await this.repository.findAdminOrderById(request.orderId);
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    if (!request.items || request.items.length === 0) {
+      throw new BadRequestException(
+        'Final quote must contain at least one line item',
+      );
+    }
+
+    const quote = await this.repository.createFinalQuote(request);
+    if (!quote) {
+      throw new NotFoundException(`Failed to create quote: order not found`);
+    }
+
+    return this.mapQuoteToDetail(quote);
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-012] Update Final Quote
+  // ---------------------------------------------------------------------------
+  async updateFinalQuote(
+    request: UpdateFinalQuoteRequest,
+  ): Promise<FullQuoteDetail> {
+    const existing = await this.repository.findQuoteById(
+      request.orderId,
+      request.quoteId,
+    );
+    if (!existing) {
+      throw new NotFoundException(
+        `Quote ${request.quoteId} not found for order ${request.orderId}`,
+      );
+    }
+
+    if (existing.status !== 'DRAFT') {
+      throw new BadRequestException(
+        `Quote in status '${existing.status}' cannot be modified. Only DRAFT quotes can be edited.`,
+      );
+    }
+
+    if (existing.quote_type !== 'FINAL') {
+      throw new BadRequestException(
+        `Quote type '${existing.quote_type}' cannot be modified through this endpoint. Only FINAL quotes are editable.`,
+      );
+    }
+
+    const updated = await this.repository.updateFinalQuote(request);
+    return this.mapQuoteToDetail(updated);
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-013 Part A] Publish Final Quote
+  // ---------------------------------------------------------------------------
+  async publishFinalQuote(
+    request: PublishFinalQuoteRequest,
+  ): Promise<FullQuoteDetail> {
+    const existing = await this.repository.findQuoteById(
+      request.orderId,
+      request.quoteId,
+    );
+    if (!existing) {
+      throw new NotFoundException(
+        `Quote ${request.quoteId} not found for order ${request.orderId}`,
+      );
+    }
+
+    if (existing.status !== 'DRAFT') {
+      throw new BadRequestException(
+        `Cannot publish quote in status '${existing.status}'. Expected 'DRAFT'.`,
+      );
+    }
+
+    const published = await this.repository.publishFinalQuote(
+      request.orderId,
+      request.quoteId,
+    );
+    return this.mapQuoteToDetail(published);
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-013 Part B] Get Quote By ID
+  // ---------------------------------------------------------------------------
+  async getOrderQuoteById(
+    request: GetOrderQuoteByIdRequest,
+  ): Promise<FullQuoteDetail> {
+    if (request.actor) {
+      const actor = this.validateActor(request.actor);
+      const actorId = actor.userId ?? actor.guestSessionId!;
+      const order = await this.repository.findOrderById(
+        request.orderId,
+        actorId,
+      );
+      if (!order) {
+        throw new NotFoundException(`Order ${request.orderId} not found`);
+      }
+    }
+
+    const quote = await this.repository.findQuoteById(
+      request.orderId,
+      request.quoteId,
+    );
+    if (!quote) {
+      throw new NotFoundException(
+        `Quote ${request.quoteId} not found for order ${request.orderId}`,
+      );
+    }
+
+    return this.mapQuoteToDetail(quote);
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-014] Customer Confirm Final Quote
+  // ---------------------------------------------------------------------------
+  async confirmFinalQuote(
+    request: ConfirmFinalQuoteRequest,
+  ): Promise<ConfirmFinalQuoteResponse> {
+    const actor = this.validateActor(request.actor);
+    if (!actor.userId) {
+      throw new ForbiddenException(
+        'Only registered customers can confirm a final quote',
+      );
+    }
+
+    const order = await this.repository.findOrderById(
+      request.orderId,
+      actor.userId,
+    );
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const targetQuoteId = request.quoteId || order.current_quote_id;
+    if (!targetQuoteId) {
+      throw new BadRequestException(
+        'Order does not have an active quote to confirm',
+      );
+    }
+
+    const quote = await this.repository.findQuoteById(
+      request.orderId,
+      targetQuoteId,
+    );
+    if (!quote) {
+      throw new NotFoundException(`Quote ${targetQuoteId} not found`);
+    }
+
+    if (quote.status !== 'ISSUED') {
+      throw new BadRequestException(
+        `Quote in status '${quote.status}' cannot be confirmed. Only ISSUED quotes are eligible.`,
+      );
+    }
+
+    if (quote.valid_until && quote.valid_until < new Date()) {
+      throw new BadRequestException(
+        'This quote has expired. Please contact our support team for an updated quote.',
+      );
+    }
+
+    const nextOrderStatus =
+      order.source_plan_mode === 'NONE'
+        ? 'PRODUCTION_AUTHORIZED'
+        : 'AWAITING_P2';
+
+    const { confirmation, ringItems } =
+      await this.repository.confirmFinalQuote(
+        request.orderId,
+        quote.id,
+        actor.userId,
+        nextOrderStatus,
+      );
+
+    return {
+      confirmationId: confirmation.id,
+      orderId: confirmation.order_id,
+      quoteId: confirmation.quote_id,
+      status: confirmation.status,
+      confirmedAt: confirmation.confirmed_at.toISOString(),
+      nextOrderStatus,
+      items: confirmation.final_confirmation_items.map((i) => {
+        const item = ringItems.find((r) => r.id === i.ring_item_id);
+        const ver =
+          item?.ring_item_versions_ring_items_current_version_idToring_item_versions;
+        return {
+          id: i.id,
+          ringItemId: i.ring_item_id,
+          ringItemVersionId: i.ring_item_version_id,
+          versionNo: ver?.version_no ?? 1,
+        };
+      }),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-015 Part B] Customer Reject Final Quote
+  // ---------------------------------------------------------------------------
+  async rejectFinalQuote(
+    request: RejectFinalQuoteRequest,
+  ): Promise<RejectFinalQuoteResponse> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const order = await this.repository.findOrderById(request.orderId, actorId);
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const targetQuoteId = request.quoteId || order.current_quote_id;
+    if (!targetQuoteId) {
+      throw new BadRequestException(
+        'Order does not have an active quote to reject',
+      );
+    }
+
+    const quote = await this.repository.findQuoteById(
+      request.orderId,
+      targetQuoteId,
+    );
+    if (!quote) {
+      throw new NotFoundException(`Quote ${targetQuoteId} not found`);
+    }
+
+    if (quote.status !== 'ISSUED') {
+      throw new BadRequestException(
+        `Quote in status '${quote.status}' cannot be rejected. Only ISSUED quotes can be rejected.`,
+      );
+    }
+
+    if (!request.reason || request.reason.trim().length === 0) {
+      throw new BadRequestException('A reason for rejection is required');
+    }
+
+    await this.repository.rejectFinalQuote(
+      request.orderId,
+      quote.id,
+      request.reason,
+    );
+
+    return {
+      orderId: request.orderId,
+      quoteId: quote.id,
+      status: 'REJECTED',
+      reason: request.reason,
+      updatedOrderStatus: 'PENDING_FINAL_QUOTE',
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-015 Part A] Get Order Final Confirmations History
+  // ---------------------------------------------------------------------------
+  async getOrderFinalConfirmations(
+    request: GetOrderFinalConfirmationsRequest,
+  ): Promise<GetOrderFinalConfirmationsResponse> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const order = await this.repository.findOrderById(request.orderId, actorId);
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const confirmations = await this.repository.findFinalConfirmations(
+      request.orderId,
+    );
+
+    return {
+      orderId: request.orderId,
+      confirmations: confirmations.map((c) => ({
+        id: c.id,
+        orderId: c.order_id,
+        quoteId: c.quote_id,
+        quoteNo: c.quotes?.quote_no ?? '',
+        quoteTotalAmount: c.quotes ? Number(c.quotes.total_amount) : 0,
+        confirmedByCustomerIdentityId: c.confirmed_by_customer_identity_id,
+        status: c.status,
+        confirmedAt: c.confirmed_at.toISOString(),
+        invalidatedAt: c.invalidated_at
+          ? c.invalidated_at.toISOString()
+          : undefined,
+        invalidationReason: c.invalidation_reason ?? undefined,
+        items: c.final_confirmation_items.map((i) => ({
+          id: i.id,
+          ringItemId: i.ring_item_id,
+          ringItemVersionId: i.ring_item_version_id,
+          versionNo: i.ring_item_versions?.version_no ?? 1,
+        })),
+      })),
+    };
+  }
+
+  private mapQuoteToDetail(quote: {
+    id: string;
+    quote_no: string;
+    quote_type: string;
+    version_no: number;
+    status: string;
+    subtotal_amount: Prisma.Decimal;
+    delivery_amount: Prisma.Decimal;
+    adjustment_amount: Prisma.Decimal;
+    total_amount: Prisma.Decimal;
+    currency: string;
+    created_at: Date;
+    valid_until: Date | null;
+    issued_at: Date | null;
+    accepted_at: Date | null;
+    quote_items: Array<{
+      id: string;
+      ring_item_id: string | null;
+      component_type: string;
+      description: string | null;
+      quantity: Prisma.Decimal;
+      unit_amount: Prisma.Decimal;
+      line_amount: Prisma.Decimal;
+      price_source_type: string;
+    }>;
+  }): FullQuoteDetail {
+    return {
+      id: quote.id,
+      quoteNo: quote.quote_no,
+      quoteType: quote.quote_type,
+      versionNo: quote.version_no,
+      status: quote.status,
+      subtotalAmount: Number(quote.subtotal_amount),
+      deliveryAmount: Number(quote.delivery_amount),
+      adjustmentAmount: Number(quote.adjustment_amount),
+      totalAmount: Number(quote.total_amount),
+      currency: quote.currency,
+      createdAt: quote.created_at.toISOString(),
+      validUntil: quote.valid_until ? quote.valid_until.toISOString() : undefined,
+      issuedAt: quote.issued_at ? quote.issued_at.toISOString() : undefined,
+      acceptedAt: quote.accepted_at ? quote.accepted_at.toISOString() : undefined,
+      items: quote.quote_items.map((i) => ({
+        id: i.id,
+        ringItemId: i.ring_item_id ?? undefined,
+        componentType: i.component_type,
+        description: i.description ?? undefined,
+        quantity: Number(i.quantity),
+        unitAmount: Number(i.unit_amount),
+        lineAmount: Number(i.line_amount),
+        priceSourceType: i.price_source_type,
+      })),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-017] List Order Payments
+  // ---------------------------------------------------------------------------
+  async listOrderPayments(
+    request: ListOrderPaymentsRequest,
+  ): Promise<ListOrderPaymentsResponse> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const order = await this.repository.findOrderById(request.orderId, actorId);
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const payments = await this.repository.findOrderPayments(request.orderId);
+    const totalPaidAmount = payments
+      .filter(
+        (p) => p.status === 'SUCCEEDED' && p.transaction_type === 'PAYMENT',
+      )
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+
+    return {
+      orderId: request.orderId,
+      totalPaidAmount,
+      currency: payments[0]?.currency || 'VND',
+      payments: payments.map((p) => ({
+        id: p.id,
+        orderId: p.order_id || request.orderId,
+        paymentStage: p.payment_stage,
+        transactionType: p.transaction_type,
+        amount: Number(p.amount),
+        currency: p.currency,
+        status: p.status,
+        provider: p.provider ?? undefined,
+        paymentMethod: p.payment_method ?? undefined,
+        requestedAt: p.requested_at.toISOString(),
+        completedAt: p.completed_at ? p.completed_at.toISOString() : undefined,
+        receiptNo: p.receipt_no ?? undefined,
+      })),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-018] Get Payment Transaction by ID
+  // ---------------------------------------------------------------------------
+  async getOrderPaymentById(
+    request: GetOrderPaymentByIdRequest,
+  ): Promise<PaymentTransactionDetail> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const order = await this.repository.findOrderById(request.orderId, actorId);
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const p = await this.repository.findOrderPaymentById(
+      request.orderId,
+      request.transactionId,
+    );
+    if (!p) {
+      throw new NotFoundException(
+        `Payment transaction ${request.transactionId} not found for order ${request.orderId}`,
+      );
+    }
+
+    return {
+      id: p.id,
+      orderId: p.order_id || request.orderId,
+      paymentStage: p.payment_stage,
+      transactionType: p.transaction_type,
+      amount: Number(p.amount),
+      currency: p.currency,
+      status: p.status,
+      provider: p.provider ?? undefined,
+      paymentMethod: p.payment_method ?? undefined,
+      providerOrderCode: p.provider_order_code
+        ? p.provider_order_code.toString()
+        : undefined,
+      providerTransactionId: p.provider_transaction_id ?? undefined,
+      providerReference: p.provider_reference ?? undefined,
+      relatedTransactionId: p.related_transaction_id ?? undefined,
+      requestedAt: p.requested_at.toISOString(),
+      completedAt: p.completed_at ? p.completed_at.toISOString() : undefined,
+      failedAt: p.failed_at ? p.failed_at.toISOString() : undefined,
+      failureReason: p.failure_reason ?? undefined,
+      receiptNo: p.receipt_no ?? undefined,
+      receiptIssuedAt: p.receipt_issued_at
+        ? p.receipt_issued_at.toISOString()
+        : undefined,
+      metadataJson: p.metadata_json
+        ? JSON.stringify(p.metadata_json)
+        : undefined,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-021] Get Payment Receipt
+  // ---------------------------------------------------------------------------
+  async getPaymentReceipt(
+    request: GetPaymentReceiptRequest,
+  ): Promise<PaymentReceiptDetail> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const order = await this.repository.findOrderById(request.orderId, actorId);
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const tx = await this.repository.findPaymentReceipt(
+      request.orderId,
+      request.transactionId,
+    );
+    if (!tx) {
+      throw new NotFoundException(
+        `Payment transaction ${request.transactionId} not found for order ${request.orderId}`,
+      );
+    }
+
+    if (tx.status !== 'SUCCEEDED') {
+      throw new BadRequestException(
+        `Receipt is only available for SUCCEEDED transactions. Current status: '${tx.status}'.`,
+      );
+    }
+
+    return {
+      receiptNo:
+        tx.receipt_no ||
+        `REC-${tx.orders?.order_no || 'ORD'}-${tx.payment_stage}`,
+      transactionId: tx.id,
+      orderId: tx.order_id || request.orderId,
+      orderNo: tx.orders?.order_no || '',
+      paymentStage: tx.payment_stage,
+      amount: Number(tx.amount),
+      currency: tx.currency,
+      paymentMethod: tx.payment_method,
+      completedAt: tx.completed_at
+        ? tx.completed_at.toISOString()
+        : tx.requested_at.toISOString(),
+      recipientName: tx.orders?.recipient_name || '',
+      issuedAt: tx.receipt_issued_at
+        ? tx.receipt_issued_at.toISOString()
+        : new Date().toISOString(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-022] Get Order Invoice
+  // ---------------------------------------------------------------------------
+  async getOrderInvoice(
+    request: GetOrderInvoiceRequest,
+  ): Promise<OrderInvoiceDetail> {
+    const actor = this.validateActor(request.actor);
+    const actorId = actor.userId ?? actor.guestSessionId!;
+
+    const order = await this.repository.findOrderById(request.orderId, actorId);
+    if (!order) {
+      throw new NotFoundException(`Order ${request.orderId} not found`);
+    }
+
+    const orderDetails = await this.repository.findOrderInvoice(
+      request.orderId,
+    );
+    if (!orderDetails) {
+      throw new NotFoundException(
+        `Invoice details not found for order ${request.orderId}`,
+      );
+    }
+
+    const quote = orderDetails.quotes_orders_current_quote_idToquotes;
+    const totalAmount = quote ? Number(quote.total_amount) : 0;
+    const totalPaidAmount = orderDetails.payment_transactions.reduce(
+      (sum, p) => sum + Number(p.amount),
+      0,
+    );
+    const remainingAmount = Math.max(0, totalAmount - totalPaidAmount);
+
+    return {
+      invoiceNo: orderDetails.invoice_no || `INV-${orderDetails.order_no}`,
+      orderId: orderDetails.id,
+      orderNo: orderDetails.order_no,
+      status: orderDetails.status,
+      issuedAt: orderDetails.invoice_issued_at
+        ? orderDetails.invoice_issued_at.toISOString()
+        : new Date().toISOString(),
+      totalAmount,
+      totalPaidAmount,
+      remainingAmount,
+      currency: quote?.currency || 'VND',
+      recipientName: orderDetails.recipient_name || '',
+      recipientPhone: orderDetails.recipient_phone ?? undefined,
+      deliveryAddressJson: orderDetails.delivery_address_json
+        ? JSON.stringify(orderDetails.delivery_address_json)
+        : undefined,
+      items: (quote?.quote_items || []).map((item) => ({
+        componentType: item.component_type,
+        description: item.description || '',
+        quantity: Number(item.quantity),
+        unitAmount: Number(item.unit_amount),
+        lineAmount: Number(item.line_amount),
+      })),
+      paymentTransactions: orderDetails.payment_transactions.map((pt) => ({
+        paymentStage: pt.payment_stage,
+        amount: Number(pt.amount),
+        completedAt: pt.completed_at
+          ? pt.completed_at.toISOString()
+          : pt.requested_at.toISOString(),
+        receiptNo: pt.receipt_no ?? undefined,
+      })),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-023] Create Refund Request (Staff / Admin)
+  // ---------------------------------------------------------------------------
+  async createRefundRequest(
+    request: CreateRefundRequestMessage,
+  ): Promise<CreateRefundResponse> {
+    if (!request.refundAmount || request.refundAmount <= 0) {
+      throw new BadRequestException('Refund amount must be greater than zero');
+    }
+
+    if (!request.reason || request.reason.trim().length === 0) {
+      throw new BadRequestException('A reason for the refund is required');
+    }
+
+    const refund = await this.repository.createRefundRequest(request);
+    if (!refund) {
+      throw new NotFoundException(
+        `Original payment transaction ${request.transactionId} not found`,
+      );
+    }
+
+    return {
+      refundTransactionId: refund.id,
+      originalTransactionId: refund.related_transaction_id || request.transactionId,
+      orderId: refund.order_id || '',
+      refundAmount: Number(refund.amount),
+      currency: refund.currency,
+      status: refund.status,
+      requestedAt: refund.requested_at.toISOString(),
+      reason: request.reason,
     };
   }
 

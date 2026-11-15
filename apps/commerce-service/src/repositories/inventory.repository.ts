@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../generated/prisma/client';
 import type {
+  allocations,
   certified_gemstones,
   inventory_movements,
   stock_lots,
@@ -333,6 +334,261 @@ export class InventoryRepository {
       });
 
       return updatedLot;
+    });
+  }
+
+  // --- Allocations & Stock Lifecycle (INVEN-007..011) ---
+
+  async findAllocationById(id: string): Promise<allocations | null> {
+    return this.prisma.allocations.findUnique({
+      where: { id },
+      include: {
+        stock_lots: true,
+        certified_gemstones: true,
+      },
+    });
+  }
+
+  async holdInventory(params: {
+    ringItemId: string;
+    stockLotId?: string;
+    certifiedGemstoneId?: string;
+    quantity: number;
+    expiresAt: Date;
+    allocatedByUserId: string;
+  }): Promise<allocations> {
+    return this.prisma.$transaction(async (tx) => {
+      if (params.stockLotId) {
+        const lot = await tx.stock_lots.findUnique({
+          where: { id: params.stockLotId },
+        });
+        if (!lot) throw new Error('STOCK_LOT_NOT_FOUND');
+        const available = lot.quantity_on_hand - lot.quantity_reserved;
+        if (available < params.quantity) {
+          throw new Error('STOCK_INSUFFICIENT');
+        }
+
+        await tx.stock_lots.update({
+          where: { id: params.stockLotId },
+          data: {
+            quantity_reserved: lot.quantity_reserved + params.quantity,
+            updated_at: new Date(),
+          },
+        });
+      }
+
+      if (params.certifiedGemstoneId) {
+        const gem = await tx.certified_gemstones.findUnique({
+          where: { id: params.certifiedGemstoneId },
+        });
+        if (!gem) throw new Error('CERTIFIED_GEMSTONE_NOT_FOUND');
+        if (gem.status !== 'AVAILABLE') {
+          throw new Error('GEMSTONE_NOT_AVAILABLE');
+        }
+
+        await tx.certified_gemstones.update({
+          where: { id: params.certifiedGemstoneId },
+          data: {
+            status: 'RESERVED',
+            updated_at: new Date(),
+          },
+        });
+      }
+
+      return tx.allocations.create({
+        data: {
+          ring_item_id: params.ringItemId,
+          stock_lot_id: params.stockLotId,
+          certified_gemstone_id: params.certifiedGemstoneId,
+          quantity: params.quantity,
+          status: 'HOLD',
+          expires_at: params.expiresAt,
+          allocated_by_user_id: params.allocatedByUserId,
+        },
+      });
+    });
+  }
+
+  async reserveInventory(params: {
+    allocationId: string;
+    allocatedByUserId: string;
+  }): Promise<allocations> {
+    return this.prisma.$transaction(async (tx) => {
+      const allocation = await tx.allocations.findUnique({
+        where: { id: params.allocationId },
+      });
+      if (!allocation) throw new Error('ALLOCATION_NOT_FOUND');
+      if (allocation.status !== 'HOLD') {
+        throw new Error('INVALID_ALLOCATION_STATUS');
+      }
+
+      return tx.allocations.update({
+        where: { id: params.allocationId },
+        data: {
+          status: 'RESERVED',
+          expires_at: null, // clear TTL on reserve
+          allocated_by_user_id: params.allocatedByUserId,
+          updated_at: new Date(),
+        },
+      });
+    });
+  }
+
+  async allocateInventory(params: {
+    allocationId: string;
+    productionAttemptId: string;
+    allocatedByUserId: string;
+  }): Promise<allocations> {
+    return this.prisma.$transaction(async (tx) => {
+      const allocation = await tx.allocations.findUnique({
+        where: { id: params.allocationId },
+      });
+      if (!allocation) throw new Error('ALLOCATION_NOT_FOUND');
+      if (allocation.status !== 'RESERVED' && allocation.status !== 'HOLD') {
+        throw new Error('INVALID_ALLOCATION_STATUS');
+      }
+
+      return tx.allocations.update({
+        where: { id: params.allocationId },
+        data: {
+          status: 'ALLOCATED',
+          production_attempt_id: params.productionAttemptId,
+          allocated_by_user_id: params.allocatedByUserId,
+          updated_at: new Date(),
+        },
+      });
+    });
+  }
+
+  async consumeInventory(params: {
+    allocationId: string;
+    allocatedByUserId: string;
+  }): Promise<allocations> {
+    return this.prisma.$transaction(async (tx) => {
+      const allocation = await tx.allocations.findUnique({
+        where: { id: params.allocationId },
+        include: { stock_lots: true, certified_gemstones: true },
+      });
+      if (!allocation) throw new Error('ALLOCATION_NOT_FOUND');
+      if (allocation.status !== 'ALLOCATED') {
+        throw new Error('INVALID_ALLOCATION_STATUS');
+      }
+
+      const now = new Date();
+      if (allocation.stock_lot_id && allocation.stock_lots) {
+        const lot = allocation.stock_lots;
+        const nextOnHand = lot.quantity_on_hand - allocation.quantity;
+        const nextReserved = lot.quantity_reserved - allocation.quantity;
+        await tx.stock_lots.update({
+          where: { id: allocation.stock_lot_id },
+          data: {
+            quantity_on_hand: Math.max(0, nextOnHand),
+            quantity_reserved: Math.max(0, nextReserved),
+            status: nextOnHand <= 0 ? 'EXHAUSTED' : 'AVAILABLE',
+            updated_at: now,
+          },
+        });
+
+        await tx.inventory_movements.create({
+          data: {
+            movement_type: 'OUTBOUND',
+            stock_lot_id: allocation.stock_lot_id,
+            allocation_id: allocation.id,
+            ring_item_id: allocation.ring_item_id,
+            production_attempt_id: allocation.production_attempt_id,
+            quantity: -allocation.quantity,
+            unit_cost_snapshot: lot.unit_cost,
+            reason: 'Consumed for production',
+            performed_by_user_id: params.allocatedByUserId,
+            occurred_at: now,
+          },
+        });
+      }
+
+      if (allocation.certified_gemstone_id && allocation.certified_gemstones) {
+        const gem = allocation.certified_gemstones;
+        await tx.certified_gemstones.update({
+          where: { id: allocation.certified_gemstone_id },
+          data: {
+            status: 'MOUNTED',
+            updated_at: now,
+          },
+        });
+
+        await tx.inventory_movements.create({
+          data: {
+            movement_type: 'OUTBOUND',
+            certified_gemstone_id: allocation.certified_gemstone_id,
+            allocation_id: allocation.id,
+            ring_item_id: allocation.ring_item_id,
+            production_attempt_id: allocation.production_attempt_id,
+            quantity: -1,
+            unit_cost_snapshot: gem.purchase_cost ?? 0,
+            reason: 'Mounted gemstone for production',
+            performed_by_user_id: params.allocatedByUserId,
+            occurred_at: now,
+          },
+        });
+      }
+
+      return tx.allocations.update({
+        where: { id: params.allocationId },
+        data: {
+          status: 'CONSUMED',
+          updated_at: now,
+        },
+      });
+    });
+  }
+
+  async releaseInventory(params: {
+    allocationId: string;
+    reason?: string;
+    allocatedByUserId: string;
+  }): Promise<allocations> {
+    return this.prisma.$transaction(async (tx) => {
+      const allocation = await tx.allocations.findUnique({
+        where: { id: params.allocationId },
+        include: { stock_lots: true, certified_gemstones: true },
+      });
+      if (!allocation) throw new Error('ALLOCATION_NOT_FOUND');
+      if (allocation.status === 'CONSUMED' || allocation.status === 'RELEASED') {
+        throw new Error('INVALID_ALLOCATION_STATUS');
+      }
+
+      const now = new Date();
+      if (allocation.stock_lot_id && allocation.stock_lots) {
+        const lot = allocation.stock_lots;
+        const nextReserved = Math.max(
+          0,
+          lot.quantity_reserved - allocation.quantity,
+        );
+        await tx.stock_lots.update({
+          where: { id: allocation.stock_lot_id },
+          data: {
+            quantity_reserved: nextReserved,
+            updated_at: now,
+          },
+        });
+      }
+
+      if (allocation.certified_gemstone_id) {
+        await tx.certified_gemstones.update({
+          where: { id: allocation.certified_gemstone_id },
+          data: {
+            status: 'AVAILABLE',
+            updated_at: now,
+          },
+        });
+      }
+
+      return tx.allocations.update({
+        where: { id: params.allocationId },
+        data: {
+          status: 'RELEASED',
+          updated_at: now,
+        },
+      });
     });
   }
 }

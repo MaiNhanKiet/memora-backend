@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type {
+  allocations,
   certified_gemstones,
   inventory_movements,
   stock_lots,
 } from '../../../generated/prisma/client';
 import type {
+  AllocationResponse,
   CertifiedGemstoneResponse,
   InventoryMovementResponse,
   StockLotResponse,
@@ -75,6 +77,22 @@ export class InventoryMapper {
       metadataJson: movement.metadata_json
         ? JSON.stringify(movement.metadata_json)
         : undefined,
+    };
+  }
+
+  toAllocationResponse(allocation: allocations): AllocationResponse {
+    return {
+      id: allocation.id,
+      ringItemId: allocation.ring_item_id,
+      productionAttemptId: allocation.production_attempt_id ?? undefined,
+      stockLotId: allocation.stock_lot_id ?? undefined,
+      certifiedGemstoneId: allocation.certified_gemstone_id ?? undefined,
+      quantity: allocation.quantity,
+      status: allocation.status,
+      expiresAt: allocation.expires_at?.toISOString(),
+      allocatedByUserId: allocation.allocated_by_user_id ?? undefined,
+      createdAt: allocation.created_at.toISOString(),
+      updatedAt: allocation.updated_at.toISOString(),
     };
   }
 }

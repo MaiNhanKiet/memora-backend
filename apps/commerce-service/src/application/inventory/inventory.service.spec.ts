@@ -21,6 +21,11 @@ describe('InventoryService', () => {
     createCertifiedGemstone: jest.fn(),
     findInventoryMovements: jest.fn(),
     adjustInventory: jest.fn(),
+    holdInventory: jest.fn(),
+    reserveInventory: jest.fn(),
+    allocateInventory: jest.fn(),
+    consumeInventory: jest.fn(),
+    releaseInventory: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -306,6 +311,116 @@ describe('InventoryService', () => {
 
       expect(res.id).toBe('lot-1');
       expect(res.quantityOnHand).toBe(8);
+    });
+  });
+
+  describe('Inventory Allocations (INVEN-007..011)', () => {
+    const validUserId = '11111111-1111-4111-8111-111111111111';
+    const actor = { userId: validUserId };
+    const now = new Date();
+
+    it('should hold inventory successfully (INVEN-007)', async () => {
+      mockRepository.holdInventory.mockResolvedValue({
+        id: 'alloc-1',
+        ring_item_id: 'ring-1',
+        stock_lot_id: 'lot-1',
+        quantity: 1,
+        status: 'HOLD',
+        expires_at: now,
+        allocated_by_user_id: validUserId,
+        created_at: now,
+        updated_at: now,
+      });
+
+      const res = await service.holdInventory({
+        actor,
+        ringItemId: 'ring-1',
+        stockLotId: 'lot-1',
+        quantity: 1,
+      });
+
+      expect(res.id).toBe('alloc-1');
+      expect(res.status).toBe('HOLD');
+    });
+
+    it('should reserve inventory successfully (INVEN-008)', async () => {
+      mockRepository.reserveInventory.mockResolvedValue({
+        id: 'alloc-1',
+        ring_item_id: 'ring-1',
+        quantity: 1,
+        status: 'RESERVED',
+        allocated_by_user_id: validUserId,
+        created_at: now,
+        updated_at: now,
+      });
+
+      const res = await service.reserveInventory({
+        actor,
+        allocationId: 'alloc-1',
+      });
+
+      expect(res.status).toBe('RESERVED');
+    });
+
+    it('should allocate inventory to production attempt (INVEN-009)', async () => {
+      mockRepository.allocateInventory.mockResolvedValue({
+        id: 'alloc-1',
+        ring_item_id: 'ring-1',
+        production_attempt_id: 'prod-att-1',
+        quantity: 1,
+        status: 'ALLOCATED',
+        allocated_by_user_id: validUserId,
+        created_at: now,
+        updated_at: now,
+      });
+
+      const res = await service.allocateInventory({
+        actor,
+        allocationId: 'alloc-1',
+        productionAttemptId: 'prod-att-1',
+      });
+
+      expect(res.status).toBe('ALLOCATED');
+      expect(res.productionAttemptId).toBe('prod-att-1');
+    });
+
+    it('should consume inventory successfully (INVEN-010)', async () => {
+      mockRepository.consumeInventory.mockResolvedValue({
+        id: 'alloc-1',
+        ring_item_id: 'ring-1',
+        quantity: 1,
+        status: 'CONSUMED',
+        allocated_by_user_id: validUserId,
+        created_at: now,
+        updated_at: now,
+      });
+
+      const res = await service.consumeInventory({
+        actor,
+        allocationId: 'alloc-1',
+      });
+
+      expect(res.status).toBe('CONSUMED');
+    });
+
+    it('should release inventory successfully (INVEN-011)', async () => {
+      mockRepository.releaseInventory.mockResolvedValue({
+        id: 'alloc-1',
+        ring_item_id: 'ring-1',
+        quantity: 1,
+        status: 'RELEASED',
+        allocated_by_user_id: validUserId,
+        created_at: now,
+        updated_at: now,
+      });
+
+      const res = await service.releaseInventory({
+        actor,
+        allocationId: 'alloc-1',
+        reason: 'Customer cancelled',
+      });
+
+      expect(res.status).toBe('RELEASED');
     });
   });
 });

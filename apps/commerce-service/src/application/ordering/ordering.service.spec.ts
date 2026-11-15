@@ -28,6 +28,19 @@ describe('OrderingService', () => {
     updateCurrentRingItemVersion: jest.fn(),
     listOrderQuotes: jest.fn(),
     findOrderPersonalizationContext: jest.fn(),
+    cancelOrder: jest.fn(),
+    createFinalQuote: jest.fn(),
+    findQuoteById: jest.fn(),
+    updateFinalQuote: jest.fn(),
+    publishFinalQuote: jest.fn(),
+    confirmFinalQuote: jest.fn(),
+    rejectFinalQuote: jest.fn(),
+    findFinalConfirmations: jest.fn(),
+    findOrderPayments: jest.fn(),
+    findOrderPaymentById: jest.fn(),
+    findPaymentReceipt: jest.fn(),
+    findOrderInvoice: jest.fn(),
+    createRefundRequest: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -673,6 +686,653 @@ describe('OrderingService', () => {
       expect(res.p1Paid).toBe(false);
       expect(res.status).toBe('PENDING_FINAL_QUOTE');
       expect(res.ringItems).toHaveLength(0);
+    });
+  });
+
+  describe('cancelOrder', () => {
+    it('should throw NotFoundException if order does not exist', async () => {
+      mockRepository.findOrderById.mockResolvedValue(null);
+
+      await expect(
+        service.cancelOrder({
+          actor: { userId: validUserId },
+          orderId: 'ord-1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if order is not in cancellable status', async () => {
+      mockRepository.findOrderById.mockResolvedValue({
+        id: 'ord-1',
+        status: 'IN_PRODUCTION',
+      });
+
+      await expect(
+        service.cancelOrder({
+          actor: { userId: validUserId },
+          orderId: 'ord-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should cancel order successfully and release allocations', async () => {
+      mockRepository.findOrderById.mockResolvedValue({
+        id: 'ord-1',
+        status: 'AWAITING_P1',
+      });
+      mockRepository.cancelOrder.mockResolvedValue({
+        id: 'ord-1',
+        status: 'CANCELLED',
+        cancelled_at: new Date('2026-11-15T08:00:00.000Z'),
+        cancellation_reason: 'Changed my mind',
+      });
+
+      const res = await service.cancelOrder({
+        actor: { userId: validUserId },
+        orderId: 'ord-1',
+        reason: 'Changed my mind',
+      });
+
+      expect(res.orderId).toBe('ord-1');
+      expect(res.status).toBe('CANCELLED');
+      expect(res.cancellationReason).toBe('Changed my mind');
+      expect(mockRepository.cancelOrder).toHaveBeenCalledWith(
+        'ord-1',
+        'Changed my mind',
+      );
+    });
+  });
+
+  describe('createFinalQuote', () => {
+    it('should throw NotFoundException if order does not exist', async () => {
+      mockRepository.findAdminOrderById.mockResolvedValue(null);
+
+      await expect(
+        service.createFinalQuote({
+          orderId: 'ord-1',
+          totalAmount: 14000000,
+          items: [],
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if line items are empty', async () => {
+      mockRepository.findAdminOrderById.mockResolvedValue({ id: 'ord-1' });
+
+      await expect(
+        service.createFinalQuote({
+          orderId: 'ord-1',
+          totalAmount: 14000000,
+          items: [],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create final quote draft successfully', async () => {
+      mockRepository.findAdminOrderById.mockResolvedValue({ id: 'ord-1' });
+      mockRepository.createFinalQuote.mockResolvedValue({
+        id: 'quo-1',
+        quote_no: 'QUO-ORD-1-F1',
+        quote_type: 'FINAL',
+        version_no: 1,
+        status: 'DRAFT',
+        subtotal_amount: new Prisma.Decimal(14000000),
+        delivery_amount: new Prisma.Decimal(0),
+        adjustment_amount: new Prisma.Decimal(0),
+        total_amount: new Prisma.Decimal(14000000),
+        currency: 'VND',
+        created_at: new Date('2026-11-15T08:00:00.000Z'),
+        valid_until: null,
+        issued_at: null,
+        accepted_at: null,
+        quote_items: [
+          {
+            id: 'qi-1',
+            ring_item_id: null,
+            component_type: 'GOLD',
+            description: '18K Gold',
+            quantity: new Prisma.Decimal(1),
+            unit_amount: new Prisma.Decimal(14000000),
+            line_amount: new Prisma.Decimal(14000000),
+            price_source_type: 'MANUAL',
+          },
+        ],
+      });
+
+      const res = await service.createFinalQuote({
+        orderId: 'ord-1',
+        totalAmount: 14000000,
+        items: [
+          {
+            componentType: 'GOLD',
+            description: '18K Gold',
+            quantity: 1,
+            unitAmount: 14000000,
+            lineAmount: 14000000,
+          },
+        ],
+      });
+
+      expect(res.id).toBe('quo-1');
+      expect(res.status).toBe('DRAFT');
+      expect(res.items).toHaveLength(1);
+    });
+  });
+
+  describe('updateFinalQuote', () => {
+    it('should throw NotFoundException if quote does not exist', async () => {
+      mockRepository.findQuoteById.mockResolvedValue(null);
+
+      await expect(
+        service.updateFinalQuote({
+          orderId: 'ord-1',
+          quoteId: 'quo-1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if quote is not in DRAFT status', async () => {
+      mockRepository.findQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        status: 'ISSUED',
+        quote_type: 'FINAL',
+      });
+
+      await expect(
+        service.updateFinalQuote({
+          orderId: 'ord-1',
+          quoteId: 'quo-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should update quote successfully', async () => {
+      mockRepository.findQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        status: 'DRAFT',
+        quote_type: 'FINAL',
+      });
+      mockRepository.updateFinalQuote.mockResolvedValue({
+        id: 'quo-1',
+        quote_no: 'QUO-ORD-1-F1',
+        quote_type: 'FINAL',
+        version_no: 1,
+        status: 'DRAFT',
+        subtotal_amount: new Prisma.Decimal(13500000),
+        delivery_amount: new Prisma.Decimal(0),
+        adjustment_amount: new Prisma.Decimal(-500000),
+        total_amount: new Prisma.Decimal(13000000),
+        currency: 'VND',
+        created_at: new Date('2026-11-15T08:00:00.000Z'),
+        valid_until: null,
+        issued_at: null,
+        accepted_at: null,
+        quote_items: [],
+      });
+
+      const res = await service.updateFinalQuote({
+        orderId: 'ord-1',
+        quoteId: 'quo-1',
+        totalAmount: 13000000,
+      });
+
+      expect(res.totalAmount).toBe(13000000);
+    });
+  });
+
+  describe('publishFinalQuote', () => {
+    it('should throw BadRequestException if quote is not in DRAFT status', async () => {
+      mockRepository.findQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        status: 'ACCEPTED',
+      });
+
+      await expect(
+        service.publishFinalQuote({
+          orderId: 'ord-1',
+          quoteId: 'quo-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should publish quote successfully', async () => {
+      mockRepository.findQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        status: 'DRAFT',
+      });
+      mockRepository.publishFinalQuote.mockResolvedValue({
+        id: 'quo-1',
+        quote_no: 'QUO-ORD-1-F1',
+        quote_type: 'FINAL',
+        version_no: 1,
+        status: 'ISSUED',
+        subtotal_amount: new Prisma.Decimal(14000000),
+        delivery_amount: new Prisma.Decimal(0),
+        adjustment_amount: new Prisma.Decimal(0),
+        total_amount: new Prisma.Decimal(14000000),
+        currency: 'VND',
+        created_at: new Date('2026-11-15T08:00:00.000Z'),
+        valid_until: new Date('2026-11-22T08:00:00.000Z'),
+        issued_at: new Date('2026-11-15T08:00:00.000Z'),
+        accepted_at: null,
+        quote_items: [],
+      });
+
+      const res = await service.publishFinalQuote({
+        orderId: 'ord-1',
+        quoteId: 'quo-1',
+      });
+
+      expect(res.status).toBe('ISSUED');
+      expect(res.issuedAt).toBeDefined();
+    });
+  });
+
+  describe('confirmFinalQuote', () => {
+    it('should throw BadRequestException if quote is not in ISSUED status', async () => {
+      mockRepository.findOrderById.mockResolvedValue({
+        id: 'ord-1',
+        current_quote_id: 'quo-1',
+        source_plan_mode: 'SHARED',
+      });
+      mockRepository.findQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        status: 'DRAFT',
+      });
+
+      await expect(
+        service.confirmFinalQuote({
+          actor: { userId: validUserId },
+          orderId: 'ord-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should confirm quote and advance order to AWAITING_P2 for personalized orders', async () => {
+      mockRepository.findOrderById.mockResolvedValue({
+        id: 'ord-1',
+        current_quote_id: 'quo-1',
+        source_plan_mode: 'SHARED',
+      });
+      mockRepository.findQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        status: 'ISSUED',
+        valid_until: new Date(Date.now() + 86400000),
+      });
+      mockRepository.confirmFinalQuote.mockResolvedValue({
+        confirmation: {
+          id: 'conf-1',
+          order_id: 'ord-1',
+          quote_id: 'quo-1',
+          status: 'ACTIVE',
+          confirmed_at: new Date('2026-11-15T09:00:00.000Z'),
+          final_confirmation_items: [
+            {
+              id: 'fci-1',
+              ring_item_id: 'item-1',
+              ring_item_version_id: 'ver-1',
+            },
+          ],
+        },
+        ringItems: [
+          {
+            id: 'item-1',
+            current_version_id: 'ver-1',
+            ring_item_versions_ring_items_current_version_idToring_item_versions:
+              { version_no: 1 },
+          },
+        ],
+      });
+
+      const res = await service.confirmFinalQuote({
+        actor: { userId: validUserId },
+        orderId: 'ord-1',
+      });
+
+      expect(res.confirmationId).toBe('conf-1');
+      expect(res.nextOrderStatus).toBe('AWAITING_P2');
+      expect(res.items).toHaveLength(1);
+      expect(res.items[0].versionNo).toBe(1);
+    });
+  });
+
+  describe('rejectFinalQuote', () => {
+    it('should throw BadRequestException if rejection reason is missing', async () => {
+      mockRepository.findOrderById.mockResolvedValue({
+        id: 'ord-1',
+        current_quote_id: 'quo-1',
+      });
+      mockRepository.findQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        status: 'ISSUED',
+      });
+
+      await expect(
+        service.rejectFinalQuote({
+          actor: { userId: validUserId },
+          orderId: 'ord-1',
+          reason: '',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject quote and set order status to PENDING_FINAL_QUOTE', async () => {
+      mockRepository.findOrderById.mockResolvedValue({
+        id: 'ord-1',
+        current_quote_id: 'quo-1',
+      });
+      mockRepository.findQuoteById.mockResolvedValue({
+        id: 'quo-1',
+        status: 'ISSUED',
+      });
+      mockRepository.rejectFinalQuote.mockResolvedValue({
+        id: 'ord-1',
+        status: 'PENDING_FINAL_QUOTE',
+      });
+
+      const res = await service.rejectFinalQuote({
+        actor: { userId: validUserId },
+        orderId: 'ord-1',
+        reason: 'Price too high',
+      });
+
+      expect(res.status).toBe('REJECTED');
+      expect(res.updatedOrderStatus).toBe('PENDING_FINAL_QUOTE');
+      expect(res.reason).toBe('Price too high');
+    });
+  });
+
+  describe('getOrderFinalConfirmations', () => {
+    it('should return confirmations list', async () => {
+      mockRepository.findOrderById.mockResolvedValue({ id: 'ord-1' });
+      mockRepository.findFinalConfirmations.mockResolvedValue([
+        {
+          id: 'conf-1',
+          order_id: 'ord-1',
+          quote_id: 'quo-1',
+          confirmed_by_customer_identity_id: validUserId,
+          status: 'ACTIVE',
+          confirmed_at: new Date('2026-11-15T09:00:00.000Z'),
+          quotes: {
+            quote_no: 'QUO-1',
+            total_amount: new Prisma.Decimal(14000000),
+          },
+          final_confirmation_items: [
+            {
+              id: 'fci-1',
+              ring_item_id: 'item-1',
+              ring_item_version_id: 'ver-1',
+              ring_item_versions: { version_no: 1 },
+            },
+          ],
+        },
+      ]);
+
+      const res = await service.getOrderFinalConfirmations({
+        actor: { userId: validUserId },
+        orderId: 'ord-1',
+      });
+
+      expect(res.confirmations).toHaveLength(1);
+      expect(res.confirmations[0].quoteNo).toBe('QUO-1');
+      expect(res.confirmations[0].items[0].versionNo).toBe(1);
+    });
+  });
+
+  describe('listOrderPayments', () => {
+    it('should throw NotFoundException if order not found', async () => {
+      mockRepository.findOrderById.mockResolvedValue(null);
+
+      await expect(
+        service.listOrderPayments({
+          actor: { userId: validUserId },
+          orderId: 'ord-1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return list of payments and calculate totalPaidAmount', async () => {
+      mockRepository.findOrderById.mockResolvedValue({ id: 'ord-1' });
+      mockRepository.findOrderPayments.mockResolvedValue([
+        {
+          id: 'tx-1',
+          order_id: 'ord-1',
+          payment_stage: 'P1',
+          transaction_type: 'PAYMENT',
+          amount: new Prisma.Decimal(4500000),
+          currency: 'VND',
+          status: 'SUCCEEDED',
+          provider: 'PAYOS',
+          payment_method: 'PAYOS',
+          requested_at: new Date('2026-11-15T04:00:00.000Z'),
+          completed_at: new Date('2026-11-15T04:05:00.000Z'),
+          receipt_no: 'REC-1',
+        },
+        {
+          id: 'tx-2',
+          order_id: 'ord-1',
+          payment_stage: 'P2',
+          transaction_type: 'PAYMENT',
+          amount: new Prisma.Decimal(6000000),
+          currency: 'VND',
+          status: 'PENDING',
+          provider: 'PAYOS',
+          payment_method: 'PAYOS',
+          requested_at: new Date('2026-11-15T08:00:00.000Z'),
+          completed_at: null,
+          receipt_no: null,
+        },
+      ]);
+
+      const res = await service.listOrderPayments({
+        actor: { userId: validUserId },
+        orderId: 'ord-1',
+      });
+
+      expect(res.orderId).toBe('ord-1');
+      expect(res.totalPaidAmount).toBe(4500000);
+      expect(res.payments).toHaveLength(2);
+      expect(res.payments[0].receiptNo).toBe('REC-1');
+    });
+  });
+
+  describe('getOrderPaymentById', () => {
+    it('should throw NotFoundException if transaction not found', async () => {
+      mockRepository.findOrderById.mockResolvedValue({ id: 'ord-1' });
+      mockRepository.findOrderPaymentById.mockResolvedValue(null);
+
+      await expect(
+        service.getOrderPaymentById({
+          actor: { userId: validUserId },
+          orderId: 'ord-1',
+          transactionId: 'tx-1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return transaction detail', async () => {
+      mockRepository.findOrderById.mockResolvedValue({ id: 'ord-1' });
+      mockRepository.findOrderPaymentById.mockResolvedValue({
+        id: 'tx-1',
+        order_id: 'ord-1',
+        payment_stage: 'P1',
+        transaction_type: 'PAYMENT',
+        amount: new Prisma.Decimal(4500000),
+        currency: 'VND',
+        status: 'SUCCEEDED',
+        provider: 'PAYOS',
+        payment_method: 'PAYOS',
+        requested_at: new Date('2026-11-15T04:00:00.000Z'),
+        completed_at: new Date('2026-11-15T04:05:00.000Z'),
+        receipt_no: 'REC-1',
+      });
+
+      const res = await service.getOrderPaymentById({
+        actor: { userId: validUserId },
+        orderId: 'ord-1',
+        transactionId: 'tx-1',
+      });
+
+      expect(res.id).toBe('tx-1');
+      expect(res.status).toBe('SUCCEEDED');
+      expect(res.amount).toBe(4500000);
+    });
+  });
+
+  describe('getPaymentReceipt', () => {
+    it('should throw BadRequestException if transaction is not SUCCEEDED', async () => {
+      mockRepository.findOrderById.mockResolvedValue({ id: 'ord-1' });
+      mockRepository.findPaymentReceipt.mockResolvedValue({
+        id: 'tx-1',
+        status: 'PENDING',
+      });
+
+      await expect(
+        service.getPaymentReceipt({
+          actor: { userId: validUserId },
+          orderId: 'ord-1',
+          transactionId: 'tx-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should return receipt detail for successful transaction', async () => {
+      mockRepository.findOrderById.mockResolvedValue({ id: 'ord-1' });
+      mockRepository.findPaymentReceipt.mockResolvedValue({
+        id: 'tx-1',
+        order_id: 'ord-1',
+        payment_stage: 'P1',
+        amount: new Prisma.Decimal(4500000),
+        currency: 'VND',
+        payment_method: 'PAYOS',
+        status: 'SUCCEEDED',
+        receipt_no: 'REC-ORD-123-P1',
+        requested_at: new Date('2026-11-15T04:00:00.000Z'),
+        completed_at: new Date('2026-11-15T04:05:00.000Z'),
+        receipt_issued_at: new Date('2026-11-15T04:05:00.000Z'),
+        orders: {
+          order_no: 'ORD-123',
+          recipient_name: 'Nguyen Van A',
+        },
+      });
+
+      const res = await service.getPaymentReceipt({
+        actor: { userId: validUserId },
+        orderId: 'ord-1',
+        transactionId: 'tx-1',
+      });
+
+      expect(res.receiptNo).toBe('REC-ORD-123-P1');
+      expect(res.recipientName).toBe('Nguyen Van A');
+      expect(res.amount).toBe(4500000);
+    });
+  });
+
+  describe('getOrderInvoice', () => {
+    it('should throw NotFoundException if invoice details not found', async () => {
+      mockRepository.findOrderById.mockResolvedValue({ id: 'ord-1' });
+      mockRepository.findOrderInvoice.mockResolvedValue(null);
+
+      await expect(
+        service.getOrderInvoice({
+          actor: { userId: validUserId },
+          orderId: 'ord-1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should calculate paid, total, remaining amounts and return invoice', async () => {
+      mockRepository.findOrderById.mockResolvedValue({ id: 'ord-1' });
+      mockRepository.findOrderInvoice.mockResolvedValue({
+        id: 'ord-1',
+        order_no: 'ORD-123',
+        status: 'AWAITING_P2',
+        invoice_no: 'INV-ORD-123',
+        invoice_issued_at: new Date('2026-11-15T09:00:00.000Z'),
+        recipient_name: 'Nguyen Van A',
+        recipient_phone: '0901234567',
+        delivery_address_json: { street: '123 Le Loi' },
+        quotes_orders_current_quote_idToquotes: {
+          total_amount: new Prisma.Decimal(15000000),
+          currency: 'VND',
+          quote_items: [
+            {
+              component_type: 'GOLD',
+              description: '18K Gold',
+              quantity: new Prisma.Decimal(1),
+              unit_amount: new Prisma.Decimal(15000000),
+              line_amount: new Prisma.Decimal(15000000),
+            },
+          ],
+        },
+        payment_transactions: [
+          {
+            payment_stage: 'P1',
+            amount: new Prisma.Decimal(4500000),
+            completed_at: new Date('2026-11-15T04:05:00.000Z'),
+            receipt_no: 'REC-1',
+          },
+        ],
+      });
+
+      const res = await service.getOrderInvoice({
+        actor: { userId: validUserId },
+        orderId: 'ord-1',
+      });
+
+      expect(res.invoiceNo).toBe('INV-ORD-123');
+      expect(res.totalAmount).toBe(15000000);
+      expect(res.totalPaidAmount).toBe(4500000);
+      expect(res.remainingAmount).toBe(10500000);
+      expect(res.items).toHaveLength(1);
+      expect(res.paymentTransactions).toHaveLength(1);
+    });
+  });
+
+  describe('createRefundRequest', () => {
+    it('should throw BadRequestException if refundAmount is invalid', async () => {
+      await expect(
+        service.createRefundRequest({
+          transactionId: 'tx-1',
+          refundAmount: 0,
+          reason: 'Cancel',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException if original transaction does not exist', async () => {
+      mockRepository.createRefundRequest.mockResolvedValue(null);
+
+      await expect(
+        service.createRefundRequest({
+          transactionId: 'tx-1',
+          refundAmount: 4500000,
+          reason: 'Valid cancel',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should create refund request successfully', async () => {
+      mockRepository.createRefundRequest.mockResolvedValue({
+        id: 'ref-1',
+        related_transaction_id: 'tx-1',
+        order_id: 'ord-1',
+        amount: new Prisma.Decimal(4500000),
+        currency: 'VND',
+        status: 'PENDING',
+        requested_at: new Date('2026-11-15T10:00:00.000Z'),
+      });
+
+      const res = await service.createRefundRequest({
+        transactionId: 'tx-1',
+        refundAmount: 4500000,
+        reason: 'Customer cancelled order before production',
+      });
+
+      expect(res.refundTransactionId).toBe('ref-1');
+      expect(res.originalTransactionId).toBe('tx-1');
+      expect(res.refundAmount).toBe(4500000);
+      expect(res.status).toBe('PENDING');
     });
   });
 });

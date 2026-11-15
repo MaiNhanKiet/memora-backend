@@ -242,3 +242,283 @@ export function ApiListOrderQuotesDocs() {
     }),
   );
 }
+
+export function ApiCancelOrderDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-005] Cancel Order (Pre-production)',
+      description:
+        'Allows customer or staff to cancel an order prior to production authorization (status must be AWAITING_P1, PENDING_FINAL_QUOTE, or AWAITING_CUSTOMER_CONFIRMATION). Releases all active inventory allocations.',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'Order successfully cancelled and allocations released',
+    }),
+    ApiBadRequestResponse({
+      description: 'Order is not in a cancellable status',
+    }),
+    ApiNotFoundResponse({
+      description: 'Order not found or not owned by actor',
+    }),
+  );
+}
+
+export function ApiCreateFinalQuoteDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-011] Create Final Quote for Order (Staff / Manager)',
+      description:
+        'Allows staff to generate a formal Final Quote (quote_type = FINAL, status = DRAFT) with itemized cost components (gold weight, stone costs, custom labor).',
+    }),
+    ApiBearerAuth(),
+    ApiCreatedResponse({
+      description: 'Final quote draft created successfully',
+    }),
+    ApiBadRequestResponse({
+      description: 'Invalid quote line items or amounts',
+    }),
+    ApiNotFoundResponse({
+      description: 'Order not found',
+    }),
+  );
+}
+
+export function ApiUpdateFinalQuoteDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-012] Update Draft Final Quote (Staff / Manager)',
+      description:
+        'Allows staff to modify line items, discounts, delivery fees, or valid date while the quote is still in DRAFT status.',
+    }),
+    ApiBearerAuth(),
+    ApiOkResponse({
+      description: 'Final quote updated successfully',
+    }),
+    ApiBadRequestResponse({
+      description: 'Quote cannot be edited because it is not in DRAFT status',
+    }),
+    ApiNotFoundResponse({
+      description: 'Quote not found for order',
+    }),
+  );
+}
+
+export function ApiPublishFinalQuoteDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-013] Publish Final Quote to Customer (Staff / Manager)',
+      description:
+        'Publishes the final quote: status transitions to ISSUED, valid_until is set (default +7 days), order current_quote_id is updated, and order status transitions to AWAITING_CUSTOMER_CONFIRMATION.',
+    }),
+    ApiBearerAuth(),
+    ApiOkResponse({
+      description: 'Quote published successfully and order ready for confirmation',
+    }),
+    ApiBadRequestResponse({
+      description: 'Quote is not in DRAFT status',
+    }),
+    ApiNotFoundResponse({
+      description: 'Quote not found for order',
+    }),
+  );
+}
+
+export function ApiGetOrderQuoteByIdDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-013 Part B] Get specific Quote details',
+      description:
+        'Retrieves comprehensive breakdown of a single quote (provisional or final) including all line items and validity dates.',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'Quote details retrieved successfully',
+    }),
+    ApiNotFoundResponse({
+      description: 'Quote or order not found',
+    }),
+  );
+}
+
+export function ApiConfirmFinalQuoteDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-014] Confirm Final Quote and Ring Item Versions (Customer)',
+      description:
+        'Customer accepts the ISSUED final quote and locks all ring item versions. Creates an immutable record in final_confirmations and final_confirmation_items. Order advances to AWAITING_P2 (or PRODUCTION_AUTHORIZED if All-NONE).',
+    }),
+    ApiBearerAuth(),
+    ApiOkResponse({
+      description: 'Final quote and versions successfully confirmed',
+    }),
+    ApiBadRequestResponse({
+      description: 'Quote is expired or not in ISSUED status',
+    }),
+    ApiNotFoundResponse({
+      description: 'Order or quote not found',
+    }),
+  );
+}
+
+export function ApiRejectFinalQuoteDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-015 Part B] Reject Final Quote (Customer)',
+      description:
+        'Customer rejects the current ISSUED final quote with a reason. Quote status changes to REJECTED, and order reverts to PENDING_FINAL_QUOTE for staff revision.',
+    }),
+    ApiBearerAuth(),
+    ApiOkResponse({
+      description: 'Quote rejected successfully',
+    }),
+    ApiBadRequestResponse({
+      description: 'Quote is not in ISSUED status or rejection reason is empty',
+    }),
+    ApiNotFoundResponse({
+      description: 'Order or quote not found',
+    }),
+  );
+}
+
+export function ApiGetOrderFinalConfirmationsDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-015 Part A] Get Order Final Confirmations History',
+      description:
+        'Retrieves confirmation records and locked version snapshots for the order.',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'Confirmations history retrieved successfully',
+    }),
+    ApiNotFoundResponse({
+      description: 'Order not found',
+    }),
+  );
+}
+
+export function ApiListOrderPaymentsDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-017] List all payments of an order',
+      description:
+        'Retrieves list of payment attempts, stages (P1/P2/P3), amounts, and total amount paid for the order.',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'List of order payments returned successfully',
+    }),
+    ApiNotFoundResponse({
+      description: 'Order not found or not owned by actor',
+    }),
+  );
+}
+
+export function ApiGetOrderPaymentByIdDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-018] Get Payment Transaction by ID',
+      description:
+        'Retrieves full details of a payment transaction (provider info, timing, status, failure reasons).',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'Payment transaction details returned successfully',
+    }),
+    ApiNotFoundResponse({
+      description: 'Payment transaction or order not found',
+    }),
+  );
+}
+
+export function ApiGetPaymentReceiptDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-021] Get Immutable Payment Receipt',
+      description:
+        'Retrieves official electronic payment receipt with immutable receipt_no for a completed payment.',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'Payment receipt returned successfully',
+    }),
+    ApiBadRequestResponse({
+      description: 'Receipt is only available for SUCCEEDED transactions',
+    }),
+    ApiNotFoundResponse({
+      description: 'Payment transaction or order not found',
+    }),
+  );
+}
+
+export function ApiGetOrderInvoiceDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-022] Get Order Invoice / Summary',
+      description:
+        'Retrieves comprehensive order invoice breakdown with invoice_no, total, totalPaid, remaining, and items.',
+    }),
+    ApiBearerAuth(),
+    ApiHeader({
+      name: 'x-guest-session-id',
+      description: 'Guest session UUID',
+      required: false,
+    }),
+    ApiOkResponse({
+      description: 'Order invoice returned successfully',
+    }),
+    ApiNotFoundResponse({
+      description: 'Order not found or invoice unavailable',
+    }),
+  );
+}
+
+export function ApiCreateRefundRequestDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[ORDER-023] Create Refund Request (Staff / Admin)',
+      description:
+        'Allows staff to create an audited refund request linked to an existing successful transaction.',
+    }),
+    ApiBearerAuth(),
+    ApiCreatedResponse({
+      description: 'Refund request created successfully with PENDING status',
+    }),
+    ApiBadRequestResponse({
+      description: 'Invalid refund amount or missing reason',
+    }),
+    ApiNotFoundResponse({
+      description: 'Original payment transaction not found',
+    }),
+  );
+}

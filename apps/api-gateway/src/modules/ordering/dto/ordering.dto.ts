@@ -576,3 +576,577 @@ export class ListOrderQuotesResponseDto {
   @ApiProperty({ type: [FullQuoteDetailDto] })
   quotes!: FullQuoteDetailDto[];
 }
+
+export class CancelOrderBodyDto {
+  @ApiPropertyOptional({
+    description: 'Reason for cancellation',
+    example: 'Changed my mind about design specifications',
+  })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class CancelOrderResponseDto {
+  @ApiProperty({ example: 'order-uuid' })
+  orderId!: string;
+
+  @ApiProperty({ example: 'CANCELLED' })
+  status!: string;
+
+  @ApiProperty({ example: '2026-11-15T07:00:00.000Z' })
+  cancelledAt!: string;
+
+  @ApiPropertyOptional({ example: 'Changed my mind' })
+  cancellationReason?: string;
+}
+
+export class CreateQuoteLineItemDto {
+  @ApiPropertyOptional({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  @IsOptional()
+  @IsUUID('4')
+  ringItemId?: string;
+
+  @ApiProperty({ example: 'GOLD_MATERIAL' })
+  @IsString()
+  @IsNotEmpty()
+  componentType!: string;
+
+  @ApiPropertyOptional({ example: '18K White Gold Setting 4.2g' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  quantity?: number;
+
+  @ApiProperty({ example: 8500000 })
+  @Type(() => Number)
+  unitAmount!: number;
+
+  @ApiProperty({ example: 8500000 })
+  @Type(() => Number)
+  lineAmount!: number;
+
+  @ApiPropertyOptional({ example: 'CATALOG_RULE', default: 'MANUAL' })
+  @IsOptional()
+  @IsString()
+  priceSourceType?: string;
+}
+
+export class CreateFinalQuoteBodyDto {
+  @ApiPropertyOptional({ example: 15000000 })
+  @IsOptional()
+  @Type(() => Number)
+  subtotalAmount?: number;
+
+  @ApiPropertyOptional({ example: 50000, default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  deliveryAmount?: number;
+
+  @ApiPropertyOptional({ example: -500000, default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  adjustmentAmount?: number;
+
+  @ApiProperty({ example: 14550000 })
+  @Type(() => Number)
+  totalAmount!: number;
+
+  @ApiPropertyOptional({ example: 'VND', default: 'VND' })
+  @IsOptional()
+  @IsString()
+  currency?: string;
+
+  @ApiPropertyOptional({ example: '2026-11-22T23:59:59.000Z' })
+  @IsOptional()
+  @IsString()
+  validUntil?: string;
+
+  @ApiProperty({ type: [CreateQuoteLineItemDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateQuoteLineItemDto)
+  items!: CreateQuoteLineItemDto[];
+}
+
+export class UpdateQuoteLineItemDto {
+  @ApiPropertyOptional({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  @IsOptional()
+  @IsUUID('4')
+  id?: string;
+
+  @ApiPropertyOptional({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  @IsOptional()
+  @IsUUID('4')
+  ringItemId?: string;
+
+  @ApiProperty({ example: 'GOLD_MATERIAL' })
+  @IsString()
+  @IsNotEmpty()
+  componentType!: string;
+
+  @ApiPropertyOptional({ example: '18K White Gold Setting 4.2g' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  quantity?: number;
+
+  @ApiProperty({ example: 8500000 })
+  @Type(() => Number)
+  unitAmount!: number;
+
+  @ApiProperty({ example: 8500000 })
+  @Type(() => Number)
+  lineAmount!: number;
+
+  @ApiPropertyOptional({ example: 'MANUAL' })
+  @IsOptional()
+  @IsString()
+  priceSourceType?: string;
+}
+
+export class UpdateFinalQuoteBodyDto {
+  @ApiPropertyOptional({ example: 15000000 })
+  @IsOptional()
+  @Type(() => Number)
+  subtotalAmount?: number;
+
+  @ApiPropertyOptional({ example: 50000 })
+  @IsOptional()
+  @Type(() => Number)
+  deliveryAmount?: number;
+
+  @ApiPropertyOptional({ example: -500000 })
+  @IsOptional()
+  @Type(() => Number)
+  adjustmentAmount?: number;
+
+  @ApiPropertyOptional({ example: 14550000 })
+  @IsOptional()
+  @Type(() => Number)
+  totalAmount?: number;
+
+  @ApiPropertyOptional({ example: '2026-11-22T23:59:59.000Z' })
+  @IsOptional()
+  @IsString()
+  validUntil?: string;
+
+  @ApiPropertyOptional({ type: [UpdateQuoteLineItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateQuoteLineItemDto)
+  items?: UpdateQuoteLineItemDto[];
+}
+
+export class ConfirmFinalQuoteBodyDto {
+  @ApiPropertyOptional({
+    description:
+      'Specific quote UUID to confirm (defaults to order current_quote_id if omitted)',
+    example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  quoteId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Customer notes',
+    example: 'Ready to proceed with fabrication',
+  })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class FinalConfirmationItemSummaryDto {
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  id!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  ringItemId!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  ringItemVersionId!: string;
+
+  @ApiProperty({ example: 1 })
+  versionNo!: number;
+}
+
+export class ConfirmFinalQuoteResponseDto {
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  confirmationId!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  quoteId!: string;
+
+  @ApiProperty({ example: 'ACTIVE' })
+  status!: string;
+
+  @ApiProperty({ example: '2026-11-15T08:00:00.000Z' })
+  confirmedAt!: string;
+
+  @ApiProperty({ example: 'AWAITING_P2' })
+  nextOrderStatus!: string;
+
+  @ApiProperty({ type: [FinalConfirmationItemSummaryDto] })
+  items!: FinalConfirmationItemSummaryDto[];
+}
+
+export class RejectFinalQuoteBodyDto {
+  @ApiPropertyOptional({
+    description:
+      'Quote UUID being rejected (defaults to current_quote_id if omitted)',
+    example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  quoteId?: string;
+
+  @ApiProperty({
+    description: 'Reason for rejecting the final quote',
+    example:
+      'Diamond price is higher than discussed, request replacement gemstone',
+  })
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+}
+
+export class RejectFinalQuoteResponseDto {
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  quoteId!: string;
+
+  @ApiProperty({ example: 'REJECTED' })
+  status!: string;
+
+  @ApiProperty({ example: 'Diamond price is higher than discussed' })
+  reason!: string;
+
+  @ApiProperty({ example: 'PENDING_FINAL_QUOTE' })
+  updatedOrderStatus!: string;
+}
+
+export class FinalConfirmationDetailDto {
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  id!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  quoteId!: string;
+
+  @ApiProperty({ example: 'QUO-ORD-123-F1' })
+  quoteNo!: string;
+
+  @ApiProperty({ example: 14500000 })
+  quoteTotalAmount!: number;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  confirmedByCustomerIdentityId!: string;
+
+  @ApiProperty({ example: 'ACTIVE' })
+  status!: string;
+
+  @ApiProperty({ example: '2026-11-15T08:00:00.000Z' })
+  confirmedAt!: string;
+
+  @ApiPropertyOptional({ example: '2026-11-15T09:00:00.000Z' })
+  invalidatedAt?: string;
+
+  @ApiPropertyOptional({ example: 'Superseded by new confirmation' })
+  invalidationReason?: string;
+
+  @ApiProperty({ type: [FinalConfirmationItemSummaryDto] })
+  items!: FinalConfirmationItemSummaryDto[];
+}
+
+export class GetFinalConfirmationsResponseDto {
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ type: [FinalConfirmationDetailDto] })
+  confirmations!: FinalConfirmationDetailDto[];
+}
+
+export class PaymentTransactionSummaryDto {
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  id!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 'P1' })
+  paymentStage!: string;
+
+  @ApiProperty({ example: 'PAYMENT' })
+  transactionType!: string;
+
+  @ApiProperty({ example: 4500000 })
+  amount!: number;
+
+  @ApiProperty({ example: 'VND' })
+  currency!: string;
+
+  @ApiProperty({ example: 'SUCCEEDED' })
+  status!: string;
+
+  @ApiPropertyOptional({ example: 'PAYOS' })
+  provider?: string;
+
+  @ApiPropertyOptional({ example: 'PAYOS' })
+  paymentMethod?: string;
+
+  @ApiProperty({ example: '2026-11-15T04:00:00.000Z' })
+  requestedAt!: string;
+
+  @ApiPropertyOptional({ example: '2026-11-15T04:05:00.000Z' })
+  completedAt?: string;
+
+  @ApiPropertyOptional({ example: 'REC-ORD-123-P1-A1' })
+  receiptNo?: string;
+}
+
+export class ListOrderPaymentsResponseDto {
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 15000000 })
+  totalPaidAmount!: number;
+
+  @ApiProperty({ example: 'VND' })
+  currency!: string;
+
+  @ApiProperty({ type: [PaymentTransactionSummaryDto] })
+  payments!: PaymentTransactionSummaryDto[];
+}
+
+export class PaymentTransactionDetailDto {
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  id!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 'P1' })
+  paymentStage!: string;
+
+  @ApiProperty({ example: 'PAYMENT' })
+  transactionType!: string;
+
+  @ApiProperty({ example: 4500000 })
+  amount!: number;
+
+  @ApiProperty({ example: 'VND' })
+  currency!: string;
+
+  @ApiProperty({ example: 'SUCCEEDED' })
+  status!: string;
+
+  @ApiPropertyOptional({ example: 'PAYOS' })
+  provider?: string;
+
+  @ApiPropertyOptional({ example: 'PAYOS' })
+  paymentMethod?: string;
+
+  @ApiPropertyOptional({ example: '123456789' })
+  providerOrderCode?: string;
+
+  @ApiPropertyOptional({ example: 'payos-tx-123' })
+  providerTransactionId?: string;
+
+  @ApiPropertyOptional({ example: 'ref-123' })
+  providerReference?: string;
+
+  @ApiPropertyOptional({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  relatedTransactionId?: string;
+
+  @ApiProperty({ example: '2026-11-15T04:00:00.000Z' })
+  requestedAt!: string;
+
+  @ApiPropertyOptional({ example: '2026-11-15T04:05:00.000Z' })
+  completedAt?: string;
+
+  @ApiPropertyOptional({ example: '2026-11-15T04:05:00.000Z' })
+  failedAt?: string;
+
+  @ApiPropertyOptional({ example: 'User cancelled payment' })
+  failureReason?: string;
+
+  @ApiPropertyOptional({ example: 'REC-ORD-123-P1-A1' })
+  receiptNo?: string;
+
+  @ApiPropertyOptional({ example: '2026-11-15T04:05:00.000Z' })
+  receiptIssuedAt?: string;
+}
+
+export class PaymentReceiptDetailDto {
+  @ApiProperty({ example: 'REC-ORD-123-P1-A1' })
+  receiptNo!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  transactionId!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 'ORD-20261115-A1B2' })
+  orderNo!: string;
+
+  @ApiProperty({ example: 'P1' })
+  paymentStage!: string;
+
+  @ApiProperty({ example: 4500000 })
+  amount!: number;
+
+  @ApiProperty({ example: 'VND' })
+  currency!: string;
+
+  @ApiProperty({ example: 'PAYOS' })
+  paymentMethod!: string;
+
+  @ApiProperty({ example: '2026-11-15T04:05:00.000Z' })
+  completedAt!: string;
+
+  @ApiProperty({ example: 'Nguyen Van A' })
+  recipientName!: string;
+
+  @ApiProperty({ example: '2026-11-15T04:05:00.000Z' })
+  issuedAt!: string;
+}
+
+export class InvoiceItemSummaryDto {
+  @ApiProperty({ example: 'GOLD_MATERIAL' })
+  componentType!: string;
+
+  @ApiProperty({ example: '18K White Gold Setting 4.2g' })
+  description!: string;
+
+  @ApiProperty({ example: 1 })
+  quantity!: number;
+
+  @ApiProperty({ example: 8500000 })
+  unitAmount!: number;
+
+  @ApiProperty({ example: 8500000 })
+  lineAmount!: number;
+}
+
+export class InvoicePaymentRecordDto {
+  @ApiProperty({ example: 'P1' })
+  paymentStage!: string;
+
+  @ApiProperty({ example: 4500000 })
+  amount!: number;
+
+  @ApiProperty({ example: '2026-11-15T04:05:00.000Z' })
+  completedAt!: string;
+
+  @ApiPropertyOptional({ example: 'REC-ORD-123-P1-A1' })
+  receiptNo?: string;
+}
+
+export class OrderInvoiceDetailDto {
+  @ApiProperty({ example: 'INV-ORD-20261115-A1B2' })
+  invoiceNo!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 'ORD-20261115-A1B2' })
+  orderNo!: string;
+
+  @ApiProperty({ example: 'AWAITING_CUSTOMER_CONFIRMATION' })
+  status!: string;
+
+  @ApiProperty({ example: '2026-11-15T09:00:00.000Z' })
+  issuedAt!: string;
+
+  @ApiProperty({ example: 15000000 })
+  totalAmount!: number;
+
+  @ApiProperty({ example: 4500000 })
+  totalPaidAmount!: number;
+
+  @ApiProperty({ example: 10500000 })
+  remainingAmount!: number;
+
+  @ApiProperty({ example: 'VND' })
+  currency!: string;
+
+  @ApiProperty({ example: 'Nguyen Van A' })
+  recipientName!: string;
+
+  @ApiPropertyOptional({ example: '0901234567' })
+  recipientPhone?: string;
+
+  @ApiPropertyOptional({
+    example: '{"street":"123 Le Loi","city":"Ho Chi Minh"}',
+  })
+  deliveryAddressJson?: string;
+
+  @ApiProperty({ type: [InvoiceItemSummaryDto] })
+  items!: InvoiceItemSummaryDto[];
+
+  @ApiProperty({ type: [InvoicePaymentRecordDto] })
+  paymentTransactions!: InvoicePaymentRecordDto[];
+}
+
+export class CreateRefundRequestBodyDto {
+  @ApiProperty({ example: 4500000 })
+  @Type(() => Number)
+  refundAmount!: number;
+
+  @ApiProperty({
+    example: 'Customer requested order cancellation before machining stage',
+  })
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+
+  @ApiPropertyOptional({ example: 'Approved by Store Manager' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class CreateRefundResponseDto {
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  refundTransactionId!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  originalTransactionId!: string;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 4500000 })
+  refundAmount!: number;
+
+  @ApiProperty({ example: 'VND' })
+  currency!: string;
+
+  @ApiProperty({ example: 'PENDING' })
+  status!: string;
+
+  @ApiProperty({ example: '2026-11-15T10:00:00.000Z' })
+  requestedAt!: string;
+
+  @ApiProperty({ example: 'Customer cancellation' })
+  reason!: string;
+}

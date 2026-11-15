@@ -16,18 +16,30 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { OrderingGrpcClient } from '../clients/ordering-grpc.client';
 import { toVerifiedActor } from '../../../common/grpc/verified-actor';
 import {
+  CancelOrderBodyDto,
+  ConfirmFinalQuoteBodyDto,
   CreateOrderBodyDto,
   ListOrdersQueryDto,
+  RejectFinalQuoteBodyDto,
   UpdateCurrentRingItemVersionBodyDto,
 } from '../dto/ordering.dto';
 import {
+  ApiCancelOrderDocs,
+  ApiConfirmFinalQuoteDocs,
   ApiCreateOrderDocs,
   ApiGetOrderByIdDocs,
+  ApiGetOrderFinalConfirmationsDocs,
+  ApiGetOrderInvoiceDocs,
+  ApiGetOrderPaymentByIdDocs,
+  ApiGetOrderQuoteByIdDocs,
   ApiGetOrderTimelineDocs,
+  ApiGetPaymentReceiptDocs,
   ApiGetRingItemDetailsDocs,
+  ApiListOrderPaymentsDocs,
   ApiListOrderQuotesDocs,
   ApiListOrdersDocs,
   ApiListRingItemVersionsDocs,
+  ApiRejectFinalQuoteDocs,
   ApiUpdateCurrentRingItemVersionDocs,
 } from '../docs/ordering.swagger';
 
@@ -189,6 +201,218 @@ export class OrdersController {
   ) {
     const actor = toVerifiedActor(principal);
     return this.orderingClient.listOrderQuotes({
+      actor,
+      orderId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-005] POST /api/v1/orders/:orderId/cancel (and /cancel-requests)
+  // ---------------------------------------------------------------------------
+  @Post(':orderId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiCancelOrderDocs()
+  async cancelOrder(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: CancelOrderBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.cancelOrder({
+      actor,
+      orderId,
+      reason: body?.reason,
+    });
+  }
+
+  @Post(':orderId/cancel-requests')
+  @HttpCode(HttpStatus.OK)
+  @ApiCancelOrderDocs()
+  async cancelOrderRequest(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: CancelOrderBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.cancelOrder({
+      actor,
+      orderId,
+      reason: body?.reason,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-013 Part B] GET /api/v1/orders/:orderId/quotes/:quoteId
+  // ---------------------------------------------------------------------------
+  @Get(':orderId/quotes/:quoteId')
+  @ApiGetOrderQuoteByIdDocs()
+  async getOrderQuoteById(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Param('quoteId', ParseUUIDPipe) quoteId: string,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.getOrderQuoteById({
+      actor,
+      orderId,
+      quoteId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-014] POST /api/v1/orders/:orderId/final-confirmations (and /quotes/confirm)
+  // ---------------------------------------------------------------------------
+  @Post(':orderId/final-confirmations')
+  @HttpCode(HttpStatus.OK)
+  @ApiConfirmFinalQuoteDocs()
+  async confirmFinalQuote(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: ConfirmFinalQuoteBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.confirmFinalQuote({
+      actor,
+      orderId,
+      quoteId: body?.quoteId,
+      notes: body?.notes,
+    });
+  }
+
+  @Post(':orderId/quotes/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiConfirmFinalQuoteDocs()
+  async confirmFinalQuoteAlias(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: ConfirmFinalQuoteBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.confirmFinalQuote({
+      actor,
+      orderId,
+      quoteId: body?.quoteId,
+      notes: body?.notes,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-015 Part B] POST /api/v1/orders/:orderId/quotes/reject
+  // ---------------------------------------------------------------------------
+  @Post(':orderId/quotes/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiRejectFinalQuoteDocs()
+  async rejectFinalQuote(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: RejectFinalQuoteBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.rejectFinalQuote({
+      actor,
+      orderId,
+      quoteId: body?.quoteId,
+      reason: body.reason,
+    });
+  }
+
+  @Post(':orderId/quotes/:quoteId/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiRejectFinalQuoteDocs()
+  async rejectFinalQuoteWithParam(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Param('quoteId', ParseUUIDPipe) quoteId: string,
+    @Body() body: RejectFinalQuoteBodyDto,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.rejectFinalQuote({
+      actor,
+      orderId,
+      quoteId,
+      reason: body.reason,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-015 Part A] GET /api/v1/orders/:orderId/final-confirmations
+  // ---------------------------------------------------------------------------
+  @Get(':orderId/final-confirmations')
+  @ApiGetOrderFinalConfirmationsDocs()
+  async getOrderFinalConfirmations(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.getOrderFinalConfirmations({
+      actor,
+      orderId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-017] GET /api/v1/orders/:orderId/payments
+  // ---------------------------------------------------------------------------
+  @Get(':orderId/payments')
+  @ApiListOrderPaymentsDocs()
+  async listOrderPayments(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.listOrderPayments({
+      actor,
+      orderId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-018] GET /api/v1/orders/:orderId/payments/:transactionId
+  // ---------------------------------------------------------------------------
+  @Get(':orderId/payments/:transactionId')
+  @ApiGetOrderPaymentByIdDocs()
+  async getOrderPaymentById(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Param('transactionId', ParseUUIDPipe) transactionId: string,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.getOrderPaymentById({
+      actor,
+      orderId,
+      transactionId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-021] GET /api/v1/orders/:orderId/payments/:transactionId/receipt
+  // ---------------------------------------------------------------------------
+  @Get(':orderId/payments/:transactionId/receipt')
+  @ApiGetPaymentReceiptDocs()
+  async getPaymentReceipt(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Param('transactionId', ParseUUIDPipe) transactionId: string,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.getPaymentReceipt({
+      actor,
+      orderId,
+      transactionId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [ORDER-022] GET /api/v1/orders/:orderId/invoice
+  // ---------------------------------------------------------------------------
+  @Get(':orderId/invoice')
+  @ApiGetOrderInvoiceDocs()
+  async getOrderInvoice(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+  ) {
+    const actor = toVerifiedActor(principal);
+    return this.orderingClient.getOrderInvoice({
       actor,
       orderId,
     });

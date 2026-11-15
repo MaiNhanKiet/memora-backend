@@ -1,8 +1,8 @@
-# MEMORA — Commerce Inventory Allocations & Stock Lifecycle Plan (PROPOSED)
+# MEMORA — Commerce Inventory Allocations & Stock Lifecycle Plan (APPROVED)
 
-> **Mục đích:** Kế hoạch chi tiết triển khai 5 API/RPCs vòng đời cấp phát vật tư **Inventory Allocations & Stock Lifecycle** (`INVEN-007..011`) thuộc `commerce-service` (schema `inventory`) trên nhánh `DuyPQ` theo `.cursor/skills/plan-api`.
+> **Mục đích:** Kế hoạch chi tiết triển khai 5 API/RPCs vòng đời cấp phát vật tư **Inventory Allocations & Stock Lifecycle** (`INVEN-007..011`) thuộc `commerce-service` (schema `inventory`) trên nhánh `DuyPQ` theo `.agents/rules/13-business-service-structure.md`, `implement-api`.
 >
-> **Trạng thái:** `AWAITING_APPROVAL` — Chờ Tech Lead/User xem xét và phê duyệt.
+> **Trạng thái:** `APPROVED` — Đã cập nhật đồng bộ các quy chuẩn kiến trúc mới nhất (D-P-03 `memora.common.v1.VerifiedActor`, `INVENTORY_ALLOCATE` permission, package `memora.commerce.v1`).
 
 ---
 
@@ -16,14 +16,15 @@
 | HTTP Owner | `apps/api-gateway` (`src/modules/inventory/`) |
 | Business / DB Owner | `apps/commerce-service` (PostgreSQL schema `inventory`, `ordering`) |
 | File path trong repo | `docs/plans/active/commerce-inventory-allocations.md` |
-| Plan status | `AWAITING_APPROVAL` |
-| Proposed API IDs | `INVEN-007`, `INVEN-008`, `INVEN-009`, `INVEN-010`, `INVEN-011` |
+| Plan status | `APPROVED` |
+| Approved API IDs | `INVEN-007`, `INVEN-008`, `INVEN-009`, `INVEN-010`, `INVEN-011` |
 | Author | Antigravity AI |
 
 ### Invariants cam kết theo kiến trúc MEMORA & Inventory Allocations
 
-1. **Ranh giới Gateway vs Service:**
-   - Gateway nhận HTTP requests quản trị phân bổ vật tư (`/api/v1/admin/inventory/allocations/**`), xác thực JWT, kiểm tra `@Roles('MANAGER', 'ADMIN')`, validate DTOs và gọi gRPC nội bộ sang `commerce-service`.
+1. **Ranh giới Gateway vs Service & Quyền hạn (RBAC):**
+   - Gateway nhận HTTP requests quản trị phân bổ vật tư (`/api/v1/admin/inventory/allocations/**`), xác thực JWT, kiểm tra `@RequirePermissions(PERMISSIONS.INVENTORY_ALLOCATE)` (hoặc `@Roles('MANAGER', 'ADMIN')`), trích xuất danh tính Actor qua `toVerifiedActor(principal)`.
+   - `commerce-service` tiếp nhận qua gRPC với `memora.common.v1.VerifiedActor actor = 1`, kiểm tra bằng `parseVerifiedActor(request.actor)` và `requireUserActor(actor)`.
    - `commerce-service` sở hữu logic quản lý bảng `allocations`, tính toán số dư `stock_lots` (`quantity_on_hand`, `quantity_reserved`), cập nhật trạng thái `certified_gemstones` và ghi sổ cái bất biến `inventory_movements`.
 2. **Quy tắc Vòng đời Cấp phát (Allocation State Machine Invariant):**
    - Trạng thái hợp lệ: `HOLD` $\rightarrow$ `RESERVED` $\rightarrow$ `ALLOCATED` $\rightarrow$ `CONSUMED`.
@@ -41,31 +42,31 @@
 
 | API ID | Method | Endpoint / RPC | Auth / Vai trò | Mục đích & Nghiệp vụ | Trạng thái |
 | --- | --- | --- | --- | --- | --- |
-| **INVEN-007** | `POST` | `/api/v1/admin/inventory/allocations/hold` & gRPC `HoldInventory` | `MANAGER`, `ADMIN` / Internal gRPC | Giữ tạm stock (phôi nhẫn hoặc viên đá) cho một chiếc nhẫn với TTL (`expires_at`), status = `HOLD`. | `PROPOSED` |
-| **INVEN-008** | `POST` | `/api/v1/admin/inventory/allocations/reserve` & gRPC `ReserveInventory` | `MANAGER`, `ADMIN` / Internal gRPC | Chốt giữ stock cho đơn hàng sau khi hoàn tất cọc (status chuyển từ `HOLD` $\rightarrow$ `RESERVED`, xoá TTL). | `PROPOSED` |
-| **INVEN-009** | `POST` | `/api/v1/admin/inventory/allocations/allocate` & gRPC `AllocateInventory` | `MANAGER`, `ADMIN` / Internal gRPC | Cấp phát vật tư cụ thể cho lượt chế tác (`production_attempt_id`), status = `ALLOCATED`. | `PROPOSED` |
-| **INVEN-010** | `POST` | `/api/v1/admin/inventory/allocations/consume` & gRPC `ConsumeInventory` | `MANAGER`, `ADMIN` / Internal gRPC | Ghi nhận tiêu hao vật tư sau khi chế tác hoàn tất (trừ tồn kho on-hand, status = `CONSUMED`, ghi `OUTBOUND` movement). | `PROPOSED` |
-| **INVEN-011** | `POST` | `/api/v1/admin/inventory/allocations/release` & gRPC `ReleaseInventory` | `MANAGER`, `ADMIN` / Internal gRPC | Giải phóng stock đã giữ hoặc cấp phát (giảm reserved, trả vật tư về khả dụng, status = `RELEASED`). | `PROPOSED` |
+| **INVEN-007** | `POST` | `/api/v1/admin/inventory/allocations/hold` & gRPC `HoldInventory` | `INVENTORY_ALLOCATE` / `MANAGER`, `ADMIN` | Giữ tạm stock (phôi nhẫn hoặc viên đá) cho một chiếc nhẫn với TTL (`expires_at`), status = `HOLD`. | `APPROVED` |
+| **INVEN-008** | `POST` | `/api/v1/admin/inventory/allocations/reserve` & gRPC `ReserveInventory` | `INVENTORY_ALLOCATE` / `MANAGER`, `ADMIN` | Chốt giữ stock cho đơn hàng sau khi hoàn tất cọc (status chuyển từ `HOLD` $\rightarrow$ `RESERVED`, xoá TTL). | `APPROVED` |
+| **INVEN-009** | `POST` | `/api/v1/admin/inventory/allocations/allocate` & gRPC `AllocateInventory` | `INVENTORY_ALLOCATE` / `MANAGER`, `ADMIN` | Cấp phát vật tư cụ thể cho lượt chế tác (`production_attempt_id`), status = `ALLOCATED`. | `APPROVED` |
+| **INVEN-010** | `POST` | `/api/v1/admin/inventory/allocations/consume` & gRPC `ConsumeInventory` | `INVENTORY_ALLOCATE` / `MANAGER`, `ADMIN` | Ghi nhận tiêu hao vật tư sau khi chế tác hoàn tất (trừ tồn kho on-hand, status = `CONSUMED`, ghi `OUTBOUND` movement). | `APPROVED` |
+| **INVEN-011** | `POST` | `/api/v1/admin/inventory/allocations/release` & gRPC `ReleaseInventory` | `INVENTORY_ALLOCATE` / `MANAGER`, `ADMIN` | Giải phóng stock đã giữ hoặc cấp phát (giảm reserved, trả vật tư về khả dụng, status = `RELEASED`). | `APPROVED` |
 
 ---
 
-## 3. Implementation Sequence
+## 3. Danh sách file dự kiến tạo / sửa đổi (Pre-execution Gate)
 
-1. **Phase 1: Protobuf & Handwritten Contracts**
-   - Mở rộng `proto/commerce/v1/inventory.proto`: Thêm 5 RPCs: `HoldInventory`, `ReserveInventory`, `AllocateInventory`, `ConsumeInventory`, `ReleaseInventory`.
-   - Cập nhật `libs/contracts/src/commerce/inventory.grpc.ts`.
-   - Chạy `npm run proto:check`.
-2. **Phase 2: Commerce Service Core (`inventory`)**
-   - Mở rộng `InventoryRepository` (`apps/commerce-service/src/repositories/inventory.repository.ts`): Thêm các transactions thao tác bảng `allocations`, cập nhật `stock_lots`, `certified_gemstones` và `inventory_movements`.
-   - Mở rộng `InventoryService` (`apps/commerce-service/src/application/inventory/inventory.service.ts`): Áp dụng state machine và kiểm tra số dư.
-   - Đăng ký gRPC handlers trong `InventoryGrpcController`.
-3. **Phase 3: API Gateway Layer (`inventory`)**
-   - Cập nhật `InventoryGrpcClient`.
-   - Thêm endpoints vào `AdminInventoryController` (`apps/api-gateway/src/modules/inventory/controllers/admin-inventory.controller.ts`).
-   - Thêm DTOs và Swagger documentation.
-4. **Phase 4: Tests & Verification**
-   - Viết bổ sung unit tests trong `inventory.service.spec.ts`.
-   - Chạy kiểm tra: `npm run proto:check`, `npm run boundaries`, `npm run typecheck`, `npm run lint:check`, jest tests, webpack build.
+1. **Protobuf Wire:**
+   - `proto/commerce/v1/inventory.proto`: Thêm `import "common/v1/actor.proto";`, thêm 5 RPCs `HoldInventory`, `ReserveInventory`, `AllocateInventory`, `ConsumeInventory`, `ReleaseInventory` kèm message requests mang `memora.common.v1.VerifiedActor actor = 1`.
+2. **Handwritten TypeScript Contracts:**
+   - `libs/contracts/src/commerce/inventory.grpc.ts`: Thêm request/response interfaces, cập nhật `InventoryServiceClient` & `InventoryServiceHandler`.
+3. **Commerce Service Core:**
+   - `apps/commerce-service/src/repositories/inventory.repository.ts`: Bổ sung methods giao dịch allocation (`createAllocationTransaction`, `updateAllocationStatusTransaction`, `findAllocationById`).
+   - `apps/commerce-service/src/application/inventory/inventory.service.ts`: Implement logic 5 RPCs, kiểm tra actor bằng `parseVerifiedActor` & `requireUserActor`, kiểm tra trạng thái và số lượng tồn kho.
+   - `apps/commerce-service/src/presentation/grpc/inventory.grpc.controller.ts`: Đăng ký 5 gRPC method handlers.
+4. **API Gateway Layer:**
+   - `apps/api-gateway/src/modules/inventory/clients/inventory-grpc.client.ts`: Expose 5 methods gRPC call.
+   - `apps/api-gateway/src/modules/inventory/controllers/admin-inventory.controller.ts`: Thêm 5 endpoints HTTP tại `/api/v1/admin/inventory/allocations/**`, inject `@CurrentUser()` và chuyển qua `toVerifiedActor(principal)`.
+   - `apps/api-gateway/src/modules/inventory/dto/request/admin-inventory.dto.ts`: Thêm DTOs validation cho allocation requests.
+   - `apps/api-gateway/src/modules/inventory/docs/admin-inventory.swagger.ts`: Thêm Swagger docs decorators.
+5. **Testing & Verification:**
+   - `apps/commerce-service/src/application/inventory/inventory.service.spec.ts`: Bổ sung unit tests cho 5 methods mới.
 
 ---
 
@@ -73,8 +74,7 @@
 
 | Date | Step / Item | Status | Evidence | Checked by |
 | --- | --- | --- | --- | --- |
-| 2026-11-15 | Plan Created | `AWAITING_APPROVAL` | `docs/plans/active/commerce-inventory-allocations.md` | Antigravity AI |
-| | Plan Approved | `PENDING` | Chờ người dùng phê duyệt | |
+| 2026-11-15 | Plan Created & Synchronized | `APPROVED` | Đã sync VerifiedActor, Permissions, Protobuf package | Antigravity AI |
 | | Phase 1 (Proto & Contracts) | `NOT_STARTED` | | |
 | | Phase 2 (Commerce Core) | `NOT_STARTED` | | |
 | | Phase 3 (Gateway HTTP) | `NOT_STARTED` | | |

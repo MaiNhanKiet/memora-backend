@@ -2,8 +2,12 @@ import { Controller, UseGuards } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import type {
   AdjustInventoryRequest,
+  AllocateInventoryRequest,
+  AllocationResponse,
   CertifiedGemstoneResponse,
+  ConsumeInventoryRequest,
   CreateCertifiedGemstoneRequest,
+  HoldInventoryRequest,
   InventoryServiceHandler,
   ListCertifiedGemstoneAvailabilityRequest,
   ListCertifiedGemstoneAvailabilityResponse,
@@ -15,6 +19,8 @@ import type {
   ListRingBlankStocksResponse,
   ReceiveGemstoneBatchRequest,
   ReceiveRingBlankStockRequest,
+  ReleaseInventoryRequest,
+  ReserveInventoryRequest,
   StockLotResponse,
 } from '@app/contracts';
 import { InventoryService } from '../../application/inventory/inventory.service';
@@ -77,5 +83,38 @@ export class InventoryGrpcController implements InventoryServiceHandler {
   @GrpcMethod('InventoryService', 'AdjustInventory')
   adjustInventory(request: AdjustInventoryRequest): Promise<StockLotResponse> {
     return this.inventoryService.adjustInventory(request);
+  }
+
+  @GrpcMethod('InventoryService', 'HoldInventory')
+  holdInventory(request: HoldInventoryRequest): Promise<AllocationResponse> {
+    return this.inventoryService.holdInventory(request);
+  }
+
+  @GrpcMethod('InventoryService', 'ReserveInventory')
+  reserveInventory(
+    request: ReserveInventoryRequest,
+  ): Promise<AllocationResponse> {
+    return this.inventoryService.reserveInventory(request);
+  }
+
+  @GrpcMethod('InventoryService', 'AllocateInventory')
+  allocateInventory(
+    request: AllocateInventoryRequest,
+  ): Promise<AllocationResponse> {
+    return this.inventoryService.allocateInventory(request);
+  }
+
+  @GrpcMethod('InventoryService', 'ConsumeInventory')
+  consumeInventory(
+    request: ConsumeInventoryRequest,
+  ): Promise<AllocationResponse> {
+    return this.inventoryService.consumeInventory(request);
+  }
+
+  @GrpcMethod('InventoryService', 'ReleaseInventory')
+  releaseInventory(
+    request: ReleaseInventoryRequest,
+  ): Promise<AllocationResponse> {
+    return this.inventoryService.releaseInventory(request);
   }
 }
