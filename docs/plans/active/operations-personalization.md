@@ -321,10 +321,10 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
   - The device signs method, path, timestamp, nonce and body hash. The Gateway verifies the signature, a timestamp window and nonce reuse (Redis).
   - The Gateway then passes the verified `device_code` to Operations. Operations checks that the target capture session is open and bound to that `device_code`.
   - Devices never use `VerifiedActor`. Provisioning and rotation steps are written at implementation time.
-- [x] D-P-08 DECIDED: MinIO on the Mini PC behind an S3-compatible infrastructure port. Local MinIO for dev.
+- [x] D-P-08 DECIDED: self-hosted S3-compatible storage on the Mini PC behind an S3-compatible infrastructure port. Changed 2026-11-13 from MinIO to **Garage v2.5.0** (`dxflrs/garage`), because MinIO no longer publishes community images (Docker Hub repo removed, Quay requires login). Same port/adapter design. Added to `deploy/infra/compose.yaml` as `memora-garage` (no host port; laptop 127.0.0.1:3900).
   - Private bucket, short-lived signed URLs, checksum on every object.
   - Adding the container to `deploy/infra` is an approved direction, but the infra change and deploy still need their own authorization (rule 25).
-- [x] D-P-09 DECIDED: Operations queues a BullMQ job processed inside Operations. The job calls the Python worker over internal HTTP with its own secret and passes object keys only. The worker reads and writes MinIO and returns the vector key and checksum. Job state lives in `personalization_sources.status`.
+- [x] D-P-09 DECIDED: Operations queues a BullMQ job processed inside Operations. The job calls the Python worker over internal HTTP with its own secret and passes object keys only. The worker reads and writes Garage (S3) and returns the vector key and checksum. Job state lives in `personalization_sources.status`.
 - [x] D-P-10 DECIDED: env config with validation.
   - Session TTL defaults to 15 minutes in dev. Max 3 attempts, matching the DDL CHECK.
   - The quality threshold has no production default: startup fails if it is unset outside development. It is set from the AS608 test results.

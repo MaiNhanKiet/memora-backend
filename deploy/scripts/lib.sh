@@ -286,3 +286,7 @@ EOF
 random_secret() {
   openssl rand -base64 48 | tr -d '\n'
 }
+
+random_hex() {
+  openssl rand -hex "$1"
+}

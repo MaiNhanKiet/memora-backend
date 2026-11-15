@@ -43,9 +43,9 @@ memora-backend/
   proto/                  Hợp đồng gRPC
   docker/                 Dockerfile Gateway, IAM, migrate, Commerce, Operations, Experience
   deploy/
-    infra/compose.yaml    Postgres + Redis + cloudflared (Arcane / Mini PC)
-    infra/compose.local.yaml   Chỉ laptop: publish 127.0.0.1:5432/6379, bỏ tunnel
-    infra/.env.example    USER/PASSWORD Postgres + Redis + CLOUDFLARE_TUNNEL_TOKEN
+    infra/compose.yaml    Postgres + Redis + Garage (S3) + cloudflared (Arcane / Mini PC)
+    infra/compose.local.yaml   Chỉ laptop: publish 127.0.0.1:5432/6379/3900, bỏ tunnel
+    infra/.env.example    Postgres + Redis + Garage + CLOUDFLARE_TUNNEL_TOKEN
     backend/compose.yaml  Mặc định Gateway + IAM. Profile domain-services bị helper chặn
     secrets/*.example     Mẫu ghcr/gateway/iam — không commit mật khẩu
     host/                 Cài helper, sudoers, memora-deploy.sh
@@ -96,13 +96,24 @@ Dán `deploy/infra/compose.yaml`. **Không** dán `compose.local.yaml` (file đ�
 
 Tạo:
 
-- Network `memora-network` (DNS: `postgres`, `redis`, `cloudflared`; `api-gateway` sau khi backend up)
-- Container `memora-postgres`, `memora-redis`, `memora-cloudflared`
+- Network `memora-network` (DNS: `postgres`, `redis`, `garage`, `cloudflared`; `api-gateway` sau khi backend up)
+- Container `memora-postgres`, `memora-redis`, `memora-garage`, `memora-cloudflared`
 - Volume `memora-infra_*`
 
 IAM trên Mini PC vẫn kết nối `postgres` / `redis` (Docker DNS), **không** `127.0.0.1` hay `172.x`.
 
 Host publish (Tailscale `100.78.222.34`): Postgres `5432`, Redis `6379`. Gateway thêm `127.0.0.1:3000` (curl trên Mini PC) + Tailscale `:3000`. Cloudflare Tunnel chạy **trong** `memora-infra` và origin `http://api-gateway:3000` trên Docker DNS — không `0.0.0.0`, không `127.0.0.1` từ trong container. Từ laptop (đã Tailscale): `http://100.78.222.34:3000/health/live`. Swagger `/api/docs` tắt trên production.
+
+#### Garage (object storage, D-P-08)
+
+- Image `dxflrs/garage:v2.5.0`. Container dùng `http://garage:3900`. Chỉ cổng S3 3900 publish trên IP Tailscale (`100.78.222.34:3900`) cho backend dev trên laptop; RPC 3901 và admin 3903 không publish. Cấu hình `garage.toml` nằm inline trong `compose.yaml` (`configs.garage_toml`), không cần file riêng.
+- Khởi động bằng `--single-node --default-bucket`: tự tạo layout 1 node, access key `GARAGE_ACCESS_KEY_ID` / `GARAGE_SECRET_ACCESS_KEY` và bucket `GARAGE_BUCKET` (chạy lại không tạo trùng). Bucket private: truy cập ẩn danh bị 403, chỉ key này hoặc URL ký sẵn đọc được.
+- Thêm vào Arcane: dán `compose.yaml` mới, thêm 5 biến `GARAGE_*` vào `.env` của project (sinh bằng `openssl rand -hex 32`; access key id = `GK` + `openssl rand -hex 12`), rồi Redeploy. Compose chỉ tạo `memora-garage`; Postgres, Redis, cloudflared không đổi cấu hình nên không bị tạo lại.
+- Volume `memora-infra_garagemeta` và `memora-infra_garagedata` chứa dữ liệu vân tay/âm thanh: không xóa, chưa nằm trong backup trước deploy (cần bổ sung khi có dữ liệu thật).
+- Operations dùng key này qua biến env riêng khi API upload/capture đầu tiên được làm; chưa thêm vào `operations.env`.
+- Operations đọc `OPERATIONS_OBJECT_STORAGE_*` (endpoint, region, bucket, key) khi có code S3; mẫu trong `.env.example` và `deploy/secrets/operations.env.example`.
+- Web UI: project Arcane riêng `memora-garage-webui` từ `deploy/infra/garage-webui.compose.yaml` (`khairul169/garage-webui:1.1.0`, `100.78.222.34:3909`, bắt buộc `AUTH_USER_PASS`). Nút Share chỉ tạo link cho bucket bật website access (public); không bật cho `memora-personalization`, dùng URL ký sẵn.
+- Domain công khai qua Cloudflare Tunnel: route trỏ Docker DNS (`http://garage:3900`, `http://api-gateway:3000`), không trỏ IP container. Web UI public phải đứng sau Cloudflare Access.
 
 ### C. Secrets (chỉ trên Mini PC, không GitHub Secrets)
 
