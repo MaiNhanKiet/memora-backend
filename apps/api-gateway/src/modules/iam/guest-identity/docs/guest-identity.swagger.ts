@@ -1,6 +1,7 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ApiSuccessResponse } from '../../../../common/docs/api-success-response';
+import { GuestSessionResponseDto } from '../dto/response/guest-verification.response.dto';
 import { GuestVerificationChallengeResponseDto } from '../dto/response/guest-verification.response.dto';
 import { GuestVerificationProofResponseDto } from '../dto/response/guest-verification.response.dto';
 import { LinkedGuestIdentityResponseDto } from '../dto/response/guest-verification.response.dto';
@@ -32,12 +33,29 @@ export function ApiRequestGuestVerificationDocs() {
   );
 }
 
+export function ApiCreateGuestSessionDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Create an anonymous guest session',
+      description:
+        'Issues a server-side guest session token for Guest Cart. Send it as the X-Guest-Session header on routes that accept guests. No user or customer identity is created.',
+    }),
+    ApiSuccessResponse({
+      type: GuestSessionResponseDto,
+      status: 201,
+      description: 'Guest session created',
+    }),
+    ApiResponse({ status: 429, description: 'Rate limit exceeded' }),
+    ApiResponse({ status: 503, description: 'Session store unavailable' }),
+  );
+}
+
 export function ApiConfirmGuestVerificationDocs() {
   return applyDecorators(
     ApiOperation({
       summary: 'Confirm a guest email verification code',
       description:
-        'Creates one verified guest identity and returns a short-lived link-account proof. This is not a login token.',
+        'Creates one verified guest identity and returns a short-lived link-account proof and a 24-hour guest access token. Neither is a login token.',
     }),
     ApiSuccessResponse({ type: GuestVerificationProofResponseDto }),
     ApiResponse({

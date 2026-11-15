@@ -14,6 +14,7 @@ export const AUTH_METADATA = {
   PUBLIC: 'auth:public',
   ROLES: 'auth:roles',
   PERMISSIONS: 'auth:permissions',
+  ALLOW_GUEST: 'auth:allow-guest',
 } as const;
 
 export type AuthMetadataKey =
