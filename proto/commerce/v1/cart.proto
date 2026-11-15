@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package memora.commerce.v1;
 
+import "common/v1/actor.proto";
+
 service CartService {
   rpc GetCart (GetCartRequest) returns (GetCartResponse);
   rpc AddCartItem (AddCartItemRequest) returns (AddCartItemResponse);
@@ -11,11 +13,6 @@ service CartService {
   rpc AbandonCart (AbandonCartRequest) returns (AbandonCartResponse);
   rpc GetDesignDraft (GetDesignDraftRequest) returns (GetDesignDraftResponse);
   rpc DuplicateDesignDraft (DuplicateDesignDraftRequest) returns (DuplicateDesignDraftResponse);
-}
-
-message CartActorIdentity {
-  string user_id = 1;
-  string guest_session_id = 2;
 }
 
 message GemstoneSelectionItem {
@@ -42,7 +39,7 @@ message CartItemDraft {
 }
 
 message GetCartRequest {
-  CartActorIdentity actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
 }
 
 message GetCartResponse {
@@ -56,7 +53,7 @@ message GetCartResponse {
 }
 
 message AddCartItemRequest {
-  CartActorIdentity actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
   string template_variant_id = 2;
   double target_size = 3;
   repeated GemstoneSelectionItem gemstone_selections = 4;
@@ -72,7 +69,7 @@ message AddCartItemResponse {
 }
 
 message UpdateCartItemRequest {
-  CartActorIdentity actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
   string draft_id = 2;
   optional double target_size = 3;
   optional string personalization_package = 4;
@@ -86,7 +83,7 @@ message UpdateCartItemResponse {
 }
 
 message RemoveCartItemRequest {
-  CartActorIdentity actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
   string draft_id = 2;
 }
 
@@ -98,7 +95,7 @@ message RemoveCartItemResponse {
 }
 
 message ValidateCheckoutRequest {
-  CartActorIdentity actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
   repeated string selected_draft_ids = 2;
 }
 
@@ -116,7 +113,7 @@ message ValidateCheckoutResponse {
 }
 
 message AbandonCartRequest {
-  CartActorIdentity actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
 }
 
 message AbandonCartResponse {
@@ -126,7 +123,7 @@ message AbandonCartResponse {
 
 // DESIG-007: Get Design Draft
 message GetDesignDraftRequest {
-  CartActorIdentity actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
   string draft_id = 2;
 }
 
@@ -136,7 +133,7 @@ message GetDesignDraftResponse {
 
 // DESIG-008: Duplicate Design Draft
 message DuplicateDesignDraftRequest {
-  CartActorIdentity actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
   string draft_id = 2;
 }
 

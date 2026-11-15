@@ -2,11 +2,7 @@
 
 import type { Observable } from 'rxjs';
 import type { Metadata } from '@grpc/grpc-js';
-
-export interface CartActorIdentity {
-  userId?: string;
-  guestSessionId?: string;
-}
+import type { VerifiedActor } from '../common/actor';
 
 export interface GemstoneSelectionItem {
   slotNumber: number;
@@ -32,7 +28,7 @@ export interface CartItemDraft {
 }
 
 export interface GetCartRequest {
-  actor: CartActorIdentity;
+  actor: VerifiedActor;
 }
 
 export interface GetCartResponse {
@@ -46,7 +42,7 @@ export interface GetCartResponse {
 }
 
 export interface AddCartItemRequest {
-  actor: CartActorIdentity;
+  actor: VerifiedActor;
   templateVariantId: string;
   targetSize: number;
   gemstoneSelections: GemstoneSelectionItem[];
@@ -62,7 +58,7 @@ export interface AddCartItemResponse {
 }
 
 export interface UpdateCartItemRequest {
-  actor: CartActorIdentity;
+  actor: VerifiedActor;
   draftId: string;
   targetSize?: number;
   personalizationPackage?: string;
@@ -76,7 +72,7 @@ export interface UpdateCartItemResponse {
 }
 
 export interface RemoveCartItemRequest {
-  actor: CartActorIdentity;
+  actor: VerifiedActor;
   draftId: string;
 }
 
@@ -88,7 +84,7 @@ export interface RemoveCartItemResponse {
 }
 
 export interface ValidateCheckoutRequest {
-  actor: CartActorIdentity;
+  actor: VerifiedActor;
   selectedDraftIds: string[];
 }
 
@@ -106,7 +102,7 @@ export interface ValidateCheckoutResponse {
 }
 
 export interface AbandonCartRequest {
-  actor: CartActorIdentity;
+  actor: VerifiedActor;
 }
 
 export interface AbandonCartResponse {
@@ -116,7 +112,7 @@ export interface AbandonCartResponse {
 
 // DESIG-007: Get Design Draft
 export interface GetDesignDraftRequest {
-  actor: CartActorIdentity;
+  actor: VerifiedActor;
   draftId: string;
 }
 
@@ -126,7 +122,7 @@ export interface GetDesignDraftResponse {
 
 // DESIG-008: Duplicate Design Draft
 export interface DuplicateDesignDraftRequest {
-  actor: CartActorIdentity;
+  actor: VerifiedActor;
   draftId: string;
 }
 

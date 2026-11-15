@@ -4,12 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { parseVerifiedActor, type ParsedVerifiedActor } from '@app/common';
 import type {
   AbandonCartRequest,
   AbandonCartResponse,
   AddCartItemRequest,
   AddCartItemResponse,
-  CartActorIdentity,
   CartItemDraft,
   DuplicateDesignDraftRequest,
   DuplicateDesignDraftResponse,
@@ -24,6 +24,7 @@ import type {
   UpdateCartItemResponse,
   ValidateCheckoutRequest,
   ValidateCheckoutResponse,
+  VerifiedActor,
 } from '@app/contracts';
 import {
   CartRepository,
@@ -372,19 +373,19 @@ export class CartService {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
-  private validateActor(actor?: CartActorIdentity): {
+  private validateActor(actor?: VerifiedActor): {
     userId?: string;
     guestSessionId?: string;
   } {
-    const userId = actor?.userId?.trim() || undefined;
-    const guestSessionId = actor?.guestSessionId?.trim() || undefined;
-
-    if (!userId && !guestSessionId) {
-      throw new BadRequestException(
-        'Either userId or guestSessionId must be provided',
-      );
+    const parsed: ParsedVerifiedActor = parseVerifiedActor(actor);
+    if (parsed.kind === 'USER') {
+      return { userId: parsed.userId };
     }
-    return { userId, guestSessionId };
+    if (parsed.kind === 'GUEST_SESSION') {
+      return { guestSessionId: parsed.guestSessionId };
+    }
+    // VERIFIED_GUEST: guest who has customerIdentityId but no userId/guestSessionId
+    throw new BadRequestException('Unsupported actor kind for cart operations');
   }
 
   private assertOwnership(

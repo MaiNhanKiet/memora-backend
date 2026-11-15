@@ -2,13 +2,9 @@
 
 import type { Observable } from 'rxjs';
 import type { Metadata } from '@grpc/grpc-js';
+import type { VerifiedActor } from '../common/actor';
 
 export const COMMERCE_ORDERING_SERVICE_NAME = 'OrderingService';
-
-export interface OrderActorIdentity {
-  userId?: string;
-  guestSessionId?: string;
-}
 
 export interface OrderPreP1Acknowledgement {
   noticeVersion: string;
@@ -17,7 +13,7 @@ export interface OrderPreP1Acknowledgement {
 }
 
 export interface CreateOrderRequest {
-  actor: OrderActorIdentity;
+  actor: VerifiedActor;
   selectedDraftIds: string[];
   fulfillmentMode: string;
   recipientName: string;
@@ -41,7 +37,7 @@ export interface CreateOrderResponse {
 }
 
 export interface ListOrdersRequest {
-  actor: OrderActorIdentity;
+  actor: VerifiedActor;
   page?: number;
   limit?: number;
   status?: string;
@@ -68,7 +64,7 @@ export interface ListOrdersResponse {
 }
 
 export interface GetOrderByIdRequest {
-  actor: OrderActorIdentity;
+  actor: VerifiedActor;
   orderId: string;
 }
 
@@ -116,7 +112,7 @@ export interface GetOrderByIdResponse {
 }
 
 export interface GetOrderTimelineRequest {
-  actor: OrderActorIdentity;
+  actor: VerifiedActor;
   orderId: string;
 }
 
@@ -145,7 +141,7 @@ export interface GetOrderTimelineResponse {
 }
 
 export interface GetRingItemDetailsRequest {
-  actor: OrderActorIdentity;
+  actor: VerifiedActor;
   orderId: string;
   ringItemId: string;
 }
@@ -259,7 +255,7 @@ export interface GetRingItemDetailsResponse {
 }
 
 export interface ListRingItemVersionsRequest {
-  actor: OrderActorIdentity;
+  actor: VerifiedActor;
   orderId: string;
   ringItemId: string;
 }
@@ -292,7 +288,7 @@ export interface RingItemGemstoneInput {
 }
 
 export interface UpdateCurrentRingItemVersionRequest {
-  actor: OrderActorIdentity;
+  actor: VerifiedActor;
   orderId: string;
   ringItemId: string;
   targetSize?: number;
@@ -312,7 +308,7 @@ export interface UpdateCurrentRingItemVersionResponse {
 }
 
 export interface ListOrderQuotesRequest {
-  actor: OrderActorIdentity;
+  actor: VerifiedActor;
   orderId: string;
 }
 

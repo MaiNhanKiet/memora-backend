@@ -11,12 +11,10 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Public } from '@app/common';
+import type { AuthenticatedPrincipal } from '@app/auth';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { OrderingGrpcClient } from '../clients/ordering-grpc.client';
-import {
-  ExtractOrderActor,
-  type OrderActor,
-} from '../decorators/extract-order-actor.decorator';
+import { toVerifiedActor } from '../../../common/grpc/verified-actor';
 import {
   CreateOrderBodyDto,
   ListOrdersQueryDto,
@@ -41,14 +39,14 @@ export class OrdersController {
   // ---------------------------------------------------------------------------
   // [ORDER-001] POST /api/v1/orders
   // ---------------------------------------------------------------------------
-  @Public()
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiCreateOrderDocs()
   async createOrder(
-    @ExtractOrderActor() actor: OrderActor,
+    @CurrentUser() principal: AuthenticatedPrincipal,
     @Body() body: CreateOrderBodyDto,
   ) {
+    const actor = toVerifiedActor(principal);
     return this.orderingClient.createOrder({
       actor,
       selectedDraftIds: body.selectedDraftIds,
@@ -73,13 +71,13 @@ export class OrdersController {
   // ---------------------------------------------------------------------------
   // [ORDER-002] GET /api/v1/orders
   // ---------------------------------------------------------------------------
-  @Public()
   @Get()
   @ApiListOrdersDocs()
   async listOrders(
-    @ExtractOrderActor() actor: OrderActor,
+    @CurrentUser() principal: AuthenticatedPrincipal,
     @Query() query: ListOrdersQueryDto,
   ) {
+    const actor = toVerifiedActor(principal);
     return this.orderingClient.listOrders({
       actor,
       page: query.page,
@@ -91,13 +89,13 @@ export class OrdersController {
   // ---------------------------------------------------------------------------
   // [ORDER-003] GET /api/v1/orders/:orderId
   // ---------------------------------------------------------------------------
-  @Public()
   @Get(':orderId')
   @ApiGetOrderByIdDocs()
   async getOrderById(
-    @ExtractOrderActor() actor: OrderActor,
+    @CurrentUser() principal: AuthenticatedPrincipal,
     @Param('orderId', ParseUUIDPipe) orderId: string,
   ) {
+    const actor = toVerifiedActor(principal);
     return this.orderingClient.getOrderById({
       actor,
       orderId,
@@ -107,13 +105,13 @@ export class OrdersController {
   // ---------------------------------------------------------------------------
   // [ORDER-004] GET /api/v1/orders/:orderId/timeline
   // ---------------------------------------------------------------------------
-  @Public()
   @Get(':orderId/timeline')
   @ApiGetOrderTimelineDocs()
   async getOrderTimeline(
-    @ExtractOrderActor() actor: OrderActor,
+    @CurrentUser() principal: AuthenticatedPrincipal,
     @Param('orderId', ParseUUIDPipe) orderId: string,
   ) {
+    const actor = toVerifiedActor(principal);
     return this.orderingClient.getOrderTimeline({
       actor,
       orderId,
@@ -123,14 +121,14 @@ export class OrdersController {
   // ---------------------------------------------------------------------------
   // [ORDER-007] GET /api/v1/orders/:orderId/items/:ringItemId
   // ---------------------------------------------------------------------------
-  @Public()
   @Get(':orderId/items/:ringItemId')
   @ApiGetRingItemDetailsDocs()
   async getRingItemDetails(
-    @ExtractOrderActor() actor: OrderActor,
+    @CurrentUser() principal: AuthenticatedPrincipal,
     @Param('orderId', ParseUUIDPipe) orderId: string,
     @Param('ringItemId', ParseUUIDPipe) ringItemId: string,
   ) {
+    const actor = toVerifiedActor(principal);
     return this.orderingClient.getRingItemDetails({
       actor,
       orderId,
@@ -141,14 +139,14 @@ export class OrdersController {
   // ---------------------------------------------------------------------------
   // [ORDER-008] GET /api/v1/orders/:orderId/items/:ringItemId/versions
   // ---------------------------------------------------------------------------
-  @Public()
   @Get(':orderId/items/:ringItemId/versions')
   @ApiListRingItemVersionsDocs()
   async listRingItemVersions(
-    @ExtractOrderActor() actor: OrderActor,
+    @CurrentUser() principal: AuthenticatedPrincipal,
     @Param('orderId', ParseUUIDPipe) orderId: string,
     @Param('ringItemId', ParseUUIDPipe) ringItemId: string,
   ) {
+    const actor = toVerifiedActor(principal);
     return this.orderingClient.listRingItemVersions({
       actor,
       orderId,
@@ -159,16 +157,16 @@ export class OrdersController {
   // ---------------------------------------------------------------------------
   // [ORDER-009] PATCH /api/v1/orders/:orderId/items/:ringItemId/versions/current
   // ---------------------------------------------------------------------------
-  @Public()
   @Patch(':orderId/items/:ringItemId/versions/current')
   @HttpCode(HttpStatus.OK)
   @ApiUpdateCurrentRingItemVersionDocs()
   async updateCurrentRingItemVersion(
-    @ExtractOrderActor() actor: OrderActor,
+    @CurrentUser() principal: AuthenticatedPrincipal,
     @Param('orderId', ParseUUIDPipe) orderId: string,
     @Param('ringItemId', ParseUUIDPipe) ringItemId: string,
     @Body() body: UpdateCurrentRingItemVersionBodyDto,
   ) {
+    const actor = toVerifiedActor(principal);
     return this.orderingClient.updateCurrentRingItemVersion({
       actor,
       orderId,
@@ -183,13 +181,13 @@ export class OrdersController {
   // ---------------------------------------------------------------------------
   // [ORDER-010] GET /api/v1/orders/:orderId/quotes
   // ---------------------------------------------------------------------------
-  @Public()
   @Get(':orderId/quotes')
   @ApiListOrderQuotesDocs()
   async listOrderQuotes(
-    @ExtractOrderActor() actor: OrderActor,
+    @CurrentUser() principal: AuthenticatedPrincipal,
     @Param('orderId', ParseUUIDPipe) orderId: string,
   ) {
+    const actor = toVerifiedActor(principal);
     return this.orderingClient.listOrderQuotes({
       actor,
       orderId,

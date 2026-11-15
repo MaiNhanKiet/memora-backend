@@ -10,6 +10,8 @@ import { OrderingRepository } from '../../repositories/ordering.repository';
 
 describe('OrderingService', () => {
   let service: OrderingService;
+  const validUserId = '11111111-1111-4111-8111-111111111111';
+  const validGuestSessionId = '22222222-2222-4222-8222-222222222222';
 
   const mockRepository = {
     findDraftsByIds: jest.fn(),
@@ -61,7 +63,7 @@ describe('OrderingService', () => {
     it('should throw BadRequestException if draft count is not 1 or 2', async () => {
       await expect(
         service.createOrder({
-          actor: { userId: 'u1' },
+          actor: { userId: validUserId },
           selectedDraftIds: [],
           fulfillmentMode: 'DELIVERY',
           recipientName: 'Test',
@@ -73,7 +75,7 @@ describe('OrderingService', () => {
 
       await expect(
         service.createOrder({
-          actor: { userId: 'u1' },
+          actor: { userId: validUserId },
           selectedDraftIds: ['d1', 'd2', 'd3'],
           fulfillmentMode: 'DELIVERY',
           recipientName: 'Test',
@@ -89,7 +91,7 @@ describe('OrderingService', () => {
 
       await expect(
         service.createOrder({
-          actor: { userId: 'u1' },
+          actor: { userId: validUserId },
           selectedDraftIds: ['d1'],
           fulfillmentMode: 'DELIVERY',
           recipientName: 'Test',
@@ -115,7 +117,7 @@ describe('OrderingService', () => {
 
       await expect(
         service.createOrder({
-          actor: { guestSessionId: 'g1' },
+          actor: { guestSessionId: validGuestSessionId },
           selectedDraftIds: ['d1'],
           fulfillmentMode: 'DELIVERY',
           recipientName: 'Guest',
@@ -141,7 +143,7 @@ describe('OrderingService', () => {
 
       await expect(
         service.createOrder({
-          actor: { userId: 'u1' },
+          actor: { userId: validUserId },
           selectedDraftIds: ['d1'],
           fulfillmentMode: 'DELIVERY',
           recipientName: 'User',
@@ -185,7 +187,7 @@ describe('OrderingService', () => {
       });
 
       const res = await service.createOrder({
-        actor: { userId: 'u1' },
+        actor: { userId: validUserId },
         selectedDraftIds: ['d1'],
         fulfillmentMode: 'DELIVERY',
         recipientName: 'Nguyen Van A',
@@ -238,7 +240,7 @@ describe('OrderingService', () => {
       });
 
       const res = await service.createOrder({
-        actor: { guestSessionId: 'g1' },
+        actor: { guestSessionId: validGuestSessionId },
         selectedDraftIds: ['d1'],
         fulfillmentMode: 'DELIVERY',
         recipientName: 'Guest User',
@@ -266,7 +268,7 @@ describe('OrderingService', () => {
       });
 
       const res = await service.getOrderTimeline({
-        actor: { userId: 'u1' },
+        actor: { userId: validUserId },
         orderId: 'order-1',
       });
 
@@ -446,7 +448,7 @@ describe('OrderingService', () => {
 
       await expect(
         service.listRingItemVersions({
-          actor: { userId: 'u1' },
+          actor: { userId: validUserId },
           orderId: 'ord-1',
           ringItemId: 'item-1',
         }),
@@ -474,7 +476,7 @@ describe('OrderingService', () => {
       ]);
 
       const res = await service.listRingItemVersions({
-        actor: { userId: 'u1' },
+        actor: { userId: validUserId },
         orderId: 'ord-1',
         ringItemId: 'item-1',
       });
@@ -491,7 +493,7 @@ describe('OrderingService', () => {
 
       await expect(
         service.updateCurrentRingItemVersion({
-          actor: { userId: 'u1' },
+          actor: { userId: validUserId },
           orderId: 'ord-1',
           ringItemId: 'item-1',
           targetSize: 14.5,
@@ -507,7 +509,7 @@ describe('OrderingService', () => {
 
       await expect(
         service.updateCurrentRingItemVersion({
-          actor: { userId: 'u1' },
+          actor: { userId: validUserId },
           orderId: 'ord-1',
           ringItemId: 'item-1',
           targetSize: 14.5,
@@ -531,7 +533,7 @@ describe('OrderingService', () => {
       });
 
       const res = await service.updateCurrentRingItemVersion({
-        actor: { userId: 'u1' },
+        actor: { userId: validUserId },
         orderId: 'ord-1',
         ringItemId: 'item-1',
         targetSize: 14.5,
@@ -549,7 +551,7 @@ describe('OrderingService', () => {
 
       await expect(
         service.listOrderQuotes({
-          actor: { userId: 'u1' },
+          actor: { userId: validUserId },
           orderId: 'ord-1',
         }),
       ).rejects.toThrow(NotFoundException);
@@ -584,7 +586,7 @@ describe('OrderingService', () => {
       ]);
 
       const res = await service.listOrderQuotes({
-        actor: { userId: 'u1' },
+        actor: { userId: validUserId },
         orderId: 'ord-1',
       });
 

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { parseVerifiedActor, type ParsedVerifiedActor } from '@app/common';
 import type {
   AdminOrderSummaryItem,
   CreateOrderRequest,
@@ -27,7 +28,6 @@ import type {
   ListOrdersResponse,
   ListRingItemVersionsRequest,
   ListRingItemVersionsResponse,
-  OrderActorIdentity,
   PersonalizationRingItem,
   RingItemVersionSummary,
   StageGateItem,
@@ -36,6 +36,7 @@ import type {
   UpdateCurrentRingItemVersionResponse,
   UpdateOrderStatusRequest,
   UpdateOrderStatusResponse,
+  VerifiedActor,
 } from '@app/contracts';
 import { OrderingRepository } from '../../repositories/ordering.repository';
 import type { Prisma } from '../../../generated/prisma/client';
@@ -838,18 +839,20 @@ export class OrderingService {
     };
   }
 
-  private validateActor(actor?: OrderActorIdentity): {
+  private validateActor(actor?: VerifiedActor): {
     userId?: string;
     guestSessionId?: string;
   } {
-    if (!actor || (!actor.userId && !actor.guestSessionId)) {
-      throw new BadRequestException(
-        'Missing actor identity: either userId or guestSessionId must be provided',
-      );
+    const parsed: ParsedVerifiedActor = parseVerifiedActor(actor);
+    if (parsed.kind === 'USER') {
+      return { userId: parsed.userId };
     }
-    return {
-      userId: actor.userId?.trim() || undefined,
-      guestSessionId: actor.guestSessionId?.trim() || undefined,
-    };
+    if (parsed.kind === 'GUEST_SESSION') {
+      return { guestSessionId: parsed.guestSessionId };
+    }
+    if (parsed.kind === 'VERIFIED_GUEST') {
+      return { userId: parsed.customerIdentityId };
+    }
+    throw new BadRequestException('Invalid actor');
   }
 }

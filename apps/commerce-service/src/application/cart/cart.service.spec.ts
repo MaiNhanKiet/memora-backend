@@ -10,6 +10,8 @@ import { PricingService } from '../pricing/pricing.service';
 
 describe('CartService', () => {
   let service: CartService;
+  const validUserId1 = '11111111-1111-4111-8111-111111111111';
+  const validUserId2 = '22222222-2222-4222-8222-222222222222';
 
   const mockRepository = {
     findActiveCartByActor: jest.fn(),
@@ -64,11 +66,11 @@ describe('CartService', () => {
       mockRepository.createActiveCart.mockResolvedValue({ id: 'cart-1' });
 
       const res = await service.getCart({
-        actor: { userId: 'user-1' },
+        actor: { userId: validUserId1 },
       });
 
       expect(mockRepository.createActiveCart).toHaveBeenCalledWith({
-        userId: 'user-1',
+        userId: validUserId1,
         guestSessionId: undefined,
         expiresAt: undefined,
       });
@@ -110,7 +112,7 @@ describe('CartService', () => {
       });
 
       const res = await service.addCartItem({
-        actor: { userId: 'user-1' },
+        actor: { userId: validUserId1 },
         templateVariantId: 'variant-1',
         targetSize: 13.0,
         gemstoneSelections: [{ slotNumber: 1, gemstoneOptionId: 'gem-1' }],
@@ -142,7 +144,7 @@ describe('CartService', () => {
 
       await expect(
         service.updateCartItem({
-          actor: { userId: 'user-1' },
+          actor: { userId: validUserId1 },
           draftId: 'draft-1',
           targetSize: 13.5,
         }),
@@ -159,7 +161,7 @@ describe('CartService', () => {
 
       await expect(
         service.validateCheckout({
-          actor: { userId: 'user-1' },
+          actor: { userId: validUserId1 },
           selectedDraftIds: ['d1', 'd2', 'd3'],
         }),
       ).rejects.toThrow(BadRequestException);
@@ -174,7 +176,7 @@ describe('CartService', () => {
       });
 
       const res = await service.abandonCart({
-        actor: { userId: 'user-1' },
+        actor: { userId: validUserId1 },
       });
 
       expect(mockRepository.updateCartStatus).toHaveBeenCalledWith(
@@ -192,7 +194,7 @@ describe('CartService', () => {
       await expect(
         service.getDesignDraft({
           draftId: 'missing-draft',
-          actor: { userId: 'user-1' },
+          actor: { userId: validUserId1 },
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -201,7 +203,7 @@ describe('CartService', () => {
       mockRepository.findDraftById.mockResolvedValue({
         id: 'draft-1',
         carts: {
-          user_id: 'user-2',
+          user_id: validUserId2,
           guest_session_id: null,
         },
       });
@@ -209,7 +211,7 @@ describe('CartService', () => {
       await expect(
         service.getDesignDraft({
           draftId: 'draft-1',
-          actor: { userId: 'user-1' },
+          actor: { userId: validUserId1 },
         }),
       ).rejects.toThrow(ForbiddenException);
     });
@@ -230,7 +232,7 @@ describe('CartService', () => {
         created_at: new Date('2026-11-14'),
         updated_at: new Date('2026-11-14'),
         carts: {
-          user_id: 'user-1',
+          user_id: validUserId1,
           guest_session_id: null,
         },
         template_variants: {
@@ -242,7 +244,7 @@ describe('CartService', () => {
 
       const res = await service.getDesignDraft({
         draftId: 'draft-1',
-        actor: { userId: 'user-1' },
+        actor: { userId: validUserId1 },
       });
 
       expect(res.draft.draftId).toBe('draft-1');
@@ -259,7 +261,7 @@ describe('CartService', () => {
       await expect(
         service.duplicateDesignDraft({
           draftId: 'missing-draft',
-          actor: { userId: 'user-1' },
+          actor: { userId: validUserId1 },
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -268,7 +270,7 @@ describe('CartService', () => {
       mockRepository.findDraftById.mockResolvedValue({
         id: 'draft-1',
         carts: {
-          user_id: 'user-2',
+          user_id: validUserId2,
           guest_session_id: null,
         },
       });
@@ -276,7 +278,7 @@ describe('CartService', () => {
       await expect(
         service.duplicateDesignDraft({
           draftId: 'draft-1',
-          actor: { userId: 'user-1' },
+          actor: { userId: validUserId1 },
         }),
       ).rejects.toThrow(ForbiddenException);
     });
@@ -290,7 +292,7 @@ describe('CartService', () => {
         memory_enabled: true,
         gemstone_config_json: [{ slotNumber: 1, gemstoneOptionId: 'gem-1' }],
         carts: {
-          user_id: 'user-1',
+          user_id: validUserId1,
           guest_session_id: null,
         },
       });
@@ -327,7 +329,7 @@ describe('CartService', () => {
 
       const res = await service.duplicateDesignDraft({
         draftId: 'draft-1',
-        actor: { userId: 'user-1' },
+        actor: { userId: validUserId1 },
       });
 
       expect(mockPricingService.estimatePrice).toHaveBeenCalledWith({
