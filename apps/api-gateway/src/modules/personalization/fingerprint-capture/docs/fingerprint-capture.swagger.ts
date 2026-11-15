@@ -1,0 +1,126 @@
+import { applyDecorators } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOperation,
+  ApiServiceUnavailableResponse,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { ApiSuccessResponse } from '../../../../common/docs/api-success-response';
+import { CaptureAttemptImageResponseDto } from '../dto/capture-attempt-image.response.dto';
+import { CaptureSessionResponseDto } from '../dto/capture-session.response.dto';
+
+function commonErrors(badRequest: string, notFound: string, conflict: string) {
+  return [
+    ApiBearerAuth(),
+    ApiBadRequestResponse({ description: badRequest }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid credentials' }),
+    ApiForbiddenResponse({ description: 'Missing SOURCE_CAPTURE' }),
+    ApiNotFoundResponse({ description: notFound }),
+    ApiConflictResponse({ description: conflict }),
+    ApiServiceUnavailableResponse({
+      description: 'Operations or Commerce is unavailable',
+    }),
+  ];
+}
+
+export function ApiCreateCaptureSessionDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[PERSO-005] Create a fingerprint capture session (Store Staff)',
+      description:
+        'Requires Bearer auth and permission SOURCE_CAPTURE. Status starts as CREATED; the device is told to start over MQTT.',
+    }),
+    ...commonErrors(
+      'Validation failed, or reason UNKNOWN_DEVICE in the message',
+      'Message carries the reason: ORDER_NOT_FOUND, CONSENT_NOT_FOUND',
+      'Message carries the reason: P1_NOT_PAID, CONSENT_NOT_ACCEPTED, CONSENT_TYPE_MISMATCH, PACKAGE_MISMATCH, SESSION_ALREADY_OPEN, SOURCE_ALREADY_CAPTURED',
+    ),
+    ApiSuccessResponse({
+      type: CaptureSessionResponseDto,
+      status: 201,
+      description: 'Capture session created',
+    }),
+  );
+}
+
+export function ApiGetCaptureSessionDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[PERSO-006] Get a fingerprint capture session (Store Staff)',
+      description:
+        'Requires Bearer auth and permission SOURCE_CAPTURE. Polled by the store tablet; applies lazy expiry. Attempts show result (PENDING_REVIEW while waiting for the staff), qualityScore and a threshold suggestion. Never returns images or biometric data.',
+    }),
+    ...commonErrors(
+      'Validation failed',
+      'Message carries the reason: SESSION_NOT_FOUND',
+      'Conflict',
+    ),
+    ApiSuccessResponse({
+      type: CaptureSessionResponseDto,
+      description: 'Capture session',
+    }),
+  );
+}
+
+export function ApiCompleteCaptureSessionDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary:
+        '[PERSO-008] Complete a fingerprint capture session by choosing an attempt (Store Staff)',
+      description:
+        'Requires Bearer auth and permission SOURCE_CAPTURE. Body attemptNo (1..3) names the PENDING_REVIEW attempt the staff accepts after viewing its image; the quality threshold is only a suggestion. Other PENDING_REVIEW attempts become REJECTED (STAFF_REJECTED). Idempotent with the same attemptNo when already COMPLETED; another attemptNo returns 409 SESSION_NOT_OPEN.',
+    }),
+    ...commonErrors(
+      'Validation failed (attemptNo must be an integer 1..3)',
+      'Message carries the reason: SESSION_NOT_FOUND, ATTEMPT_NOT_FOUND',
+      'Message carries the reason: ATTEMPT_NOT_REVIEWABLE, SESSION_NOT_OPEN, SESSION_EXPIRED, CONSENT_NOT_ACCEPTED',
+    ),
+    ApiSuccessResponse({
+      type: CaptureSessionResponseDto,
+      description: 'Session COMPLETED with acceptedSourceId',
+    }),
+  );
+}
+
+export function ApiGetCaptureAttemptImageDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary:
+        '[PERSO-026] Get a capture attempt image URL for staff review (Store Staff)',
+      description:
+        'Requires Bearer auth and permission SOURCE_CAPTURE. Returns a presigned URL valid 60 seconds for the image of a PENDING_REVIEW attempt (attemptNo 1..3) of an open (IN_PROGRESS, not expired) session. The staff reviews each PENDING_REVIEW image, then rejects it or completes the session with that attemptNo. The response is sent with Cache-Control: no-store; the URL must not be cached or logged.',
+    }),
+    ...commonErrors(
+      'Validation failed (sessionId must be a UUID, attemptNo an integer 1..3)',
+      'Message carries the reason: SESSION_NOT_FOUND, ATTEMPT_NOT_FOUND',
+      'Message carries the reason: ATTEMPT_NOT_REVIEWABLE, SESSION_NOT_OPEN, SESSION_EXPIRED',
+    ),
+    ApiSuccessResponse({
+      type: CaptureAttemptImageResponseDto,
+      description: 'Short-lived image URL (Cache-Control: no-store)',
+    }),
+  );
+}
+
+export function ApiRejectCaptureAttemptDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: '[PERSO-027] Reject a pending capture attempt (Store Staff)',
+      description:
+        'Requires Bearer auth and permission SOURCE_CAPTURE. No body. The PENDING_REVIEW attempt becomes REJECTED (STAFF_REJECTED), its image is deleted and it still counts as used; the session becomes FAILED when no attempts remain, otherwise it stays IN_PROGRESS.',
+    }),
+    ...commonErrors(
+      'Validation failed (sessionId must be a UUID, attemptNo an integer 1..3)',
+      'Message carries the reason: SESSION_NOT_FOUND, ATTEMPT_NOT_FOUND',
+      'Message carries the reason: ATTEMPT_NOT_REVIEWABLE, SESSION_NOT_OPEN, SESSION_EXPIRED',
+    ),
+    ApiSuccessResponse({
+      type: CaptureSessionResponseDto,
+      description: 'Updated capture session',
+    }),
+  );
+}

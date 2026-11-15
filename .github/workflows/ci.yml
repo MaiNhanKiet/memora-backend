@@ -216,6 +216,15 @@ jobs:
               -e COMMERCE_GRPC_URL=commerce-service:50052 \
               -e COMMERCE_INTERNAL_GRPC_SECRET=0123456789abcdef0123456789abcdef \
               -e OPERATIONS_CONSENT_POLICY_VERSION=ci-smoke \
+              -e OPERATIONS_CAPTURE_QUALITY_THRESHOLD=50 \
+              -e OPERATIONS_MQTT_URL=mqtt://127.0.0.1:1883 \
+              -e OPERATIONS_MQTT_USERNAME=ci-smoke \
+              -e OPERATIONS_MQTT_PASSWORD=0123456789abcdef0123456789abcdef \
+              -e OPERATIONS_OBJECT_STORAGE_ENDPOINT=http://127.0.0.1:3900 \
+              -e OPERATIONS_OBJECT_STORAGE_REGION=garage \
+              -e OPERATIONS_OBJECT_STORAGE_BUCKET=ci-smoke \
+              -e OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID=ci-smoke \
+              -e OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY=ci-smoke \
               -p "127.0.0.1:${port}:${port}" \
               "$image")"
             cids+=("$cid")

@@ -13,6 +13,17 @@ service ConsentService {
   rpc RevokeConsent (RevokeConsentRequest) returns (Consent);
 }
 
+// PERSO-005/006/008 (approved 2026-11-15). The Gateway checks SOURCE_CAPTURE.
+// Device attempts (PERSO-007) arrive over MQTT inside Operations, not gRPC.
+service FingerprintCaptureService {
+  rpc CreateCaptureSession (CreateCaptureSessionRequest) returns (CaptureSession);
+  rpc GetCaptureSession (GetCaptureSessionRequest) returns (CaptureSession);
+  rpc CompleteCaptureSession (CompleteCaptureSessionRequest) returns (CaptureSession);
+  // PERSO-026 / PERSO-027: the capture staff reviews each PENDING_REVIEW attempt.
+  rpc GetCaptureAttemptImage (GetCaptureAttemptImageRequest) returns (CaptureAttemptImage);
+  rpc RejectCaptureAttempt (RejectCaptureAttemptRequest) returns (CaptureSession);
+}
+
 message Consent {
   string consent_id = 1;
   string order_id = 2;
@@ -49,4 +60,72 @@ message RevokeConsentRequest {
   memora.common.v1.VerifiedActor actor = 1;
   string order_id = 2;
   string consent_id = 3;
+}
+
+message CaptureAttemptSummary {
+  int32 attempt_no = 1;
+  // PENDING_REVIEW | ACCEPTED | REJECTED | ERROR
+  string result = 2;
+  optional double quality_score = 3;
+  // ISO-8601 UTC.
+  string attempted_at = 4;
+  // PASS | LOW_QUALITY: threshold suggestion only; the staff decides.
+  optional string suggestion = 5;
+}
+
+message CaptureSession {
+  string session_id = 1;
+  string order_id = 2;
+  string consent_id = 3;
+  string device_code = 4;
+  // CREATED | IN_PROGRESS | COMPLETED | FAILED | CANCELLED | EXPIRED
+  string status = 5;
+  int32 attempt_count = 6;
+  int32 max_attempts = 7;
+  // ISO-8601 UTC.
+  string expires_at = 8;
+  string created_at = 9;
+  // Set once COMPLETED.
+  optional string accepted_source_id = 10;
+  repeated CaptureAttemptSummary attempts = 11;
+}
+
+message CreateCaptureSessionRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string consent_id = 3;
+  string device_code = 4;
+}
+
+message GetCaptureSessionRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string session_id = 2;
+}
+
+message CompleteCaptureSessionRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string session_id = 2;
+  // The PENDING_REVIEW attempt the staff accepts.
+  int32 attempt_no = 3;
+}
+
+message GetCaptureAttemptImageRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string session_id = 2;
+  int32 attempt_no = 3;
+}
+
+message CaptureAttemptImage {
+  int32 attempt_no = 1;
+  // Presigned GET URL, valid 60 s. Never log it.
+  string image_url = 2;
+  // ISO-8601 UTC.
+  string expires_at = 3;
+  string content_type = 4;
+}
+
+message RejectCaptureAttemptRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string session_id = 2;
+  int32 attempt_no = 3;
 }

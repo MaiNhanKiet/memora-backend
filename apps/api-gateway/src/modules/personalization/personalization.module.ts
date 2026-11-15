@@ -7,6 +7,7 @@ import {
   PersonalizationGrpcClient,
 } from './clients/personalization-grpc.client';
 import { ConsentController } from './consent/controllers/consent.controller';
+import { FingerprintCaptureController } from './fingerprint-capture/controllers/fingerprint-capture.controller';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { ConsentController } from './consent/controllers/consent.controller';
       }),
     ]),
   ],
-  controllers: [ConsentController],
+  controllers: [ConsentController, FingerprintCaptureController],
   providers: [PersonalizationGrpcClient],
   exports: [PersonalizationGrpcClient],
 })
