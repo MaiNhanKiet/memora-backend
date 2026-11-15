@@ -39,6 +39,7 @@ import { normalizeEmail } from '../auth/identity-input';
 import { SECURITY_AUDIT_ACTION } from '../auth/security-audit';
 import { SecurityAuditService } from '../auth/security-audit.service';
 import { CustomerIdentitiesService } from './customer-identities.service';
+import { GuestAccessService } from './guest-access.service';
 
 const INVALID_CODE = 'Invalid verification code';
 const INVALID_PROOF = 'Invalid guest proof';
@@ -52,6 +53,8 @@ export type GuestVerificationProof = {
   customerIdentityId: string;
   guestProof: string;
   expiresInSeconds: number;
+  guestAccessToken: string;
+  guestAccessExpiresInSeconds: number;
 };
 
 export type LinkedGuestIdentity = {
@@ -71,6 +74,7 @@ export class GuestIdentityService {
   constructor(
     private readonly store: RedisGuestIdentityStore,
     private readonly identities: CustomerIdentitiesService,
+    private readonly guestAccess: GuestAccessService,
     private readonly authentication: AuthenticationService,
     private readonly securityAudit: SecurityAuditService,
     @Inject(EMAIL_SENDER) private readonly emailSender: EmailSender,
@@ -209,6 +213,12 @@ export class GuestIdentityService {
         hashSecret(this.pepper, guestProof),
         proof.customerIdentityId,
       );
+      await this.guestAccess
+        .revokeAccessForIdentity(proof.customerIdentityId)
+        .catch(() => {
+          // Validation also rejects linked identities, so a missed cleanup is not exploitable.
+          this.logger.error('Guest access token revocation failed');
+        });
       return toLinked(linked.identity, principal.user.id);
     }
     if (linked.kind === 'unverified') {
@@ -263,6 +273,7 @@ export class GuestIdentityService {
       identity.id,
       GUEST_PROOF_TTL_SECONDS,
     );
+    const access = await this.guestAccess.issueAccessToken(identity.id);
     await this.store.markReady(challengeId, identity.id).catch(() => {
       this.logger.error('Guest challenge finalize failed');
     });
@@ -270,6 +281,8 @@ export class GuestIdentityService {
       customerIdentityId: identity.id,
       guestProof,
       expiresInSeconds: GUEST_PROOF_TTL_SECONDS,
+      guestAccessToken: access.guestAccessToken,
+      guestAccessExpiresInSeconds: access.guestAccessExpiresInSeconds,
     };
   }
 

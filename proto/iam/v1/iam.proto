@@ -48,6 +48,11 @@ service IamService {
   rpc ConfirmGuestIdentityVerification (ConfirmGuestIdentityVerificationRequest) returns (ConfirmGuestIdentityVerificationResponse);
   rpc GetMyCustomerIdentity (GetMyCustomerIdentityRequest) returns (GetMyCustomerIdentityResponse);
   rpc LinkGuestIdentityToMyAccount (LinkGuestIdentityToMyAccountRequest) returns (LinkGuestIdentityToMyAccountResponse);
+
+  rpc CreateGuestSession (CreateGuestSessionRequest) returns (CreateGuestSessionResponse);
+  rpc ValidateGuestSession (ValidateGuestSessionRequest) returns (ValidateGuestSessionResponse);
+  rpc ValidateGuestAccessToken (ValidateGuestAccessTokenRequest) returns (ValidateGuestAccessTokenResponse);
+  rpc RevokeGuestSession (RevokeGuestSessionRequest) returns (RevokeGuestSessionResponse);
 }
 
 message RegisterRequest {
@@ -398,6 +403,8 @@ message ConfirmGuestIdentityVerificationResponse {
   string customer_identity_id = 1;
   string guest_proof = 2;
   int32 expires_in_seconds = 3;
+  string guest_access_token = 4;
+  int32 guest_access_expires_in_seconds = 5;
 }
 
 message GetMyCustomerIdentityRequest {
@@ -427,4 +434,39 @@ message LinkGuestIdentityToMyAccountResponse {
   string user_id = 2;
   bool is_primary_for_user = 3;
   string account_linked_at = 4;
+}
+
+message CreateGuestSessionRequest {
+  string client_ip = 1;
+}
+
+message CreateGuestSessionResponse {
+  string guest_session_token = 1;
+  string expires_at = 2;
+}
+
+message ValidateGuestSessionRequest {
+  string guest_session_token = 1;
+}
+
+message ValidateGuestSessionResponse {
+  string guest_session_id = 1;
+  string expires_at = 2;
+}
+
+message ValidateGuestAccessTokenRequest {
+  string guest_access_token = 1;
+}
+
+message ValidateGuestAccessTokenResponse {
+  string customer_identity_id = 1;
+  string expires_at = 2;
+}
+
+message RevokeGuestSessionRequest {
+  string guest_session_token = 1;
+}
+
+message RevokeGuestSessionResponse {
+  bool revoked = 1;
 }

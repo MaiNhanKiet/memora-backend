@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, DiscoveryModule } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import {
   AnyPermissionsGuard,
@@ -18,6 +18,7 @@ import { GuestIdentityController } from './guest-identity/controllers/guest-iden
 import { MeController } from './me/controllers/me.controller';
 import { GoogleOAuthController } from './auth/controllers/google-oauth.controller';
 import { GoogleOAuthRedirectFilter } from './auth/filters/google-oauth-redirect.filter';
+import { GuestRoutePolicyCheck } from './auth/guards/guest-route-policy.check';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { HttpPrincipalResolver } from './authorization/http-principal.resolver';
 import { IamGrpcPermissionResolver } from './authorization/iam-grpc-permission.resolver';
@@ -28,6 +29,7 @@ import { UserManagementController } from './user-management/controllers/user-man
 
 @Module({
   imports: [
+    DiscoveryModule,
     IamClientsModule,
     AuthorizationModule.forRoot({
       principalResolver: HttpPrincipalResolver,
@@ -99,6 +101,7 @@ import { UserManagementController } from './user-management/controllers/user-man
     AuthCookieService,
     GoogleOAuthRedirectFilter,
     JwtAuthGuard,
+    GuestRoutePolicyCheck,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
