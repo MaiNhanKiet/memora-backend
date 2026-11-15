@@ -5,6 +5,8 @@ export const CORS_ALLOWED_HEADERS = [
   'Content-Type',
   'x-csrf-token',
   'x-request-id',
+  'X-Guest-Session',
+  'X-Guest-Access',
 ] as const;
 
 export const CORS_EXPOSED_HEADERS = ['x-request-id'] as const;

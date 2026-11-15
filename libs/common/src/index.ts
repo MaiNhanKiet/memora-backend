@@ -1,6 +1,7 @@
 export * from './constants/auth-metadata.constants';
 export * from './constants/internal-grpc.constants';
 export * from './interfaces/api-response.interface';
+export * from './decorators/allow-guest.decorator';
 export * from './decorators/public.decorator';
 export * from './decorators/skip-response-transform.decorator';
 export * from './exceptions/error-codes';

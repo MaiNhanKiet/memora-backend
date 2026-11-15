@@ -33,6 +33,14 @@ import type {
   GetMyCustomerIdentityResponse,
   LinkGuestIdentityToMyAccountRequest,
   LinkGuestIdentityToMyAccountResponse,
+  CreateGuestSessionRequest,
+  CreateGuestSessionResponse,
+  ValidateGuestSessionRequest,
+  ValidateGuestSessionResponse,
+  ValidateGuestAccessTokenRequest,
+  ValidateGuestAccessTokenResponse,
+  RevokeGuestSessionRequest,
+  RevokeGuestSessionResponse,
   AssignUserRoleRequest,
   AssignUserRoleResponse,
   GetUserAuthorizationRequest,
@@ -157,6 +165,22 @@ interface IamServiceClient {
     request: LinkGuestIdentityToMyAccountRequest,
     metadata?: Metadata,
   ): Observable<LinkGuestIdentityToMyAccountResponse>;
+  createGuestSession(
+    request: CreateGuestSessionRequest,
+    metadata?: Metadata,
+  ): Observable<CreateGuestSessionResponse>;
+  validateGuestSession(
+    request: ValidateGuestSessionRequest,
+    metadata?: Metadata,
+  ): Observable<ValidateGuestSessionResponse>;
+  validateGuestAccessToken(
+    request: ValidateGuestAccessTokenRequest,
+    metadata?: Metadata,
+  ): Observable<ValidateGuestAccessTokenResponse>;
+  revokeGuestSession(
+    request: RevokeGuestSessionRequest,
+    metadata?: Metadata,
+  ): Observable<RevokeGuestSessionResponse>;
   getUserById(
     request: GetUserByIdRequest,
     metadata?: Metadata,
@@ -437,6 +461,36 @@ export class IamGrpcClient implements OnModuleInit {
         { accessCredential, guestProof },
         metadata,
       ),
+    );
+  }
+
+  createGuestSession(clientIp: string): Promise<CreateGuestSessionResponse> {
+    return this.unary((metadata) =>
+      this.iamService.createGuestSession({ clientIp }, metadata),
+    );
+  }
+
+  validateGuestSession(
+    guestSessionToken: string,
+  ): Promise<ValidateGuestSessionResponse> {
+    return this.unary((metadata) =>
+      this.iamService.validateGuestSession({ guestSessionToken }, metadata),
+    );
+  }
+
+  validateGuestAccessToken(
+    guestAccessToken: string,
+  ): Promise<ValidateGuestAccessTokenResponse> {
+    return this.unary((metadata) =>
+      this.iamService.validateGuestAccessToken({ guestAccessToken }, metadata),
+    );
+  }
+
+  revokeGuestSession(
+    guestSessionToken: string,
+  ): Promise<RevokeGuestSessionResponse> {
+    return this.unary((metadata) =>
+      this.iamService.revokeGuestSession({ guestSessionToken }, metadata),
     );
   }
 

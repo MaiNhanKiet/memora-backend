@@ -1,6 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '@app/auth';
 import type { VerifiedActor } from '@app/contracts';
+import type { GatewayGuest } from './gateway-guest';
 
 /**
  * Tạo `memora.common.v1.VerifiedActor` cho RPC Commerce/Operations/Experience (D-P-03).
@@ -30,4 +31,27 @@ function readCustomerIdentityId(
   }
   const value: unknown = principal.customerIdentityId;
   return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+/**
+ * Tạo `VerifiedActor` cho khách vãng lai từ `request.guest` (do JwtAuthGuard gắn
+ * sau khi IAM xác thực credential, D-P-17). Chỉ có `customerIdentityId` hoặc
+ * `guestSessionId`, không bao giờ kèm `userId`.
+ */
+export function toGuestVerifiedActor(
+  guest: GatewayGuest | undefined,
+): VerifiedActor {
+  if (guest === undefined) {
+    throw new UnauthorizedException();
+  }
+  if (guest.kind === 'VERIFIED_GUEST') {
+    if (guest.customerIdentityId.trim() === '') {
+      throw new UnauthorizedException();
+    }
+    return { customerIdentityId: guest.customerIdentityId };
+  }
+  if (guest.guestSessionId.trim() === '') {
+    throw new UnauthorizedException();
+  }
+  return { guestSessionId: guest.guestSessionId };
 }
