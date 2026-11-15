@@ -7,6 +7,9 @@ name: memora-infra
 # Cloudflare Zero Trust public hostname origin: http://api-gateway:3000 (Docker DNS).
 # Connector can run before Gateway exists; origin 502 until memora-backend is up.
 # Stop a host systemd cloudflared using the same token (duplicate connector).
+# Garage (S3-compatible object storage, D-P-08) holds fingerprint/audio sources.
+# Containers use http://garage:3900. Only the S3 port is published, on the Tailscale IP
+# (dev backend on a laptop); RPC 3901 and admin 3903 stay inside the container.
 
 networks:
   memora-network:
@@ -18,6 +21,29 @@ volumes:
     name: memora-infra_pgdata
   redisdata:
     name: memora-infra_redisdata
+  garagemeta:
+    name: memora-infra_garagemeta
+  garagedata:
+    name: memora-infra_garagedata
+
+configs:
+  garage_toml:
+    content: |
+      metadata_dir = "/var/lib/garage/meta"
+      data_dir = "/var/lib/garage/data"
+      db_engine = "lmdb"
+      metadata_auto_snapshot_interval = "6h"
+      replication_factor = 1
+      compression_level = 1
+      rpc_bind_addr = "[::]:3901"
+      rpc_public_addr = "127.0.0.1:3901"
+
+      [s3_api]
+      s3_region = "garage"
+      api_bind_addr = "[::]:3900"
+
+      [admin]
+      api_bind_addr = "[::]:3903"
 
 services:
   postgres:
@@ -93,6 +119,54 @@ services:
         limits:
           cpus: '0.5'
           memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+    labels:
+      com.memora.stack: infra
+      com.memora.managed: 'true'
+
+  garage:
+    image: ${GARAGE_IMAGE:-dxflrs/garage:v2.5.0}
+    container_name: memora-garage
+    restart: unless-stopped
+    stop_grace_period: 20s
+    # --single-node builds the one-node layout; --default-bucket creates the bucket and
+    # the access key from GARAGE_DEFAULT_* on start (idempotent).
+    command: ['/garage', 'server', '--single-node', '--default-bucket']
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN}
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_ACCESS_KEY_ID}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_SECRET_ACCESS_KEY}
+      GARAGE_DEFAULT_BUCKET: ${GARAGE_BUCKET:-memora-personalization}
+    configs:
+      - source: garage_toml
+        target: /etc/garage.toml
+    volumes:
+      - garagemeta:/var/lib/garage/meta
+      - garagedata:/var/lib/garage/data
+    ports:
+      - '${TAILSCALE_IPV4:-100.78.222.34}:3900:3900'
+    networks:
+      memora-network:
+        aliases:
+          - garage
+    healthcheck:
+      test: ['CMD', '/garage', 'status']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     logging:
       driver: json-file
       options:
