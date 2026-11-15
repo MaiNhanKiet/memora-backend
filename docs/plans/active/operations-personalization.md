@@ -86,9 +86,9 @@ No approved code for: accepting/listing/revoking Consent, setting the source pla
 
 | API ID | Method | Endpoint | Flow | Permission | gRPC | Status |
 |---|---|---|---|---|---|---|
-| PERSO-001 | POST | /api/v1/orders/{orderId}/consents | WF-01 F-02 | NEEDS_REVIEW | AcceptConsent | NEEDS_REVIEW |
-| PERSO-002 | GET | /api/v1/orders/{orderId}/consents | WF-01 F-02 | NEEDS_REVIEW | ListConsents | NEEDS_REVIEW |
-| PERSO-003 | POST | /api/v1/orders/{orderId}/consents/{consentId}/revoke | WF-01 F-13 | NEEDS_REVIEW | RevokeConsent | NEEDS_REVIEW |
+| PERSO-001 | POST | /api/v1/orders/{orderId}/consents | WF-01 F-02 | CONSENT_MANAGE_OWN | AcceptConsent | APPROVED |
+| PERSO-002 | GET | /api/v1/orders/{orderId}/consents | WF-01 F-02 | CONSENT_MANAGE_OWN | ListConsents | APPROVED |
+| PERSO-003 | POST | /api/v1/orders/{orderId}/consents/{consentId}/revoke | WF-01 F-13 | CONSENT_MANAGE_OWN | RevokeConsent | APPROVED |
 | PERSO-004 | PUT | /api/v1/orders/{orderId}/source-plan | WF-01 F-13 | NEEDS_REVIEW | SetSourcePlan | NEEDS_REVIEW |
 | PERSO-005 | POST | /api/v1/orders/{orderId}/fingerprint/capture-sessions | WF-01 F-02 | SOURCE_CAPTURE | CreateCaptureSession | PROPOSED |
 | PERSO-006 | GET | /api/v1/fingerprint/capture-sessions/{sessionId} | WF-01 F-02 | SOURCE_CAPTURE | GetCaptureSession | PROPOSED |
@@ -112,7 +112,7 @@ No approved code for: accepting/listing/revoking Consent, setting the source pla
 | PERSO-024 | GET | /api/v1/admin/design/change-requests | WF-02 F-12 | DESIGN_CHANGE_APPROVE | ListChangeRequests | PROPOSED |
 | PERSO-025 | POST | /api/v1/admin/design/change-requests/{changeRequestId}/decide | WF-02 F-12 | DESIGN_CHANGE_APPROVE | DecideChangeRequest | PROPOSED |
 
-Count: 0 EXISTING, 11 PROPOSED, 14 NEEDS_REVIEW. gRPC names are candidates, not an approved proto.
+Count: 0 EXISTING, 3 APPROVED, 11 PROPOSED, 11 NEEDS_REVIEW. gRPC names are candidates, not an approved proto.
 
 ## 5. Dependencies and order
 
@@ -134,29 +134,85 @@ The first API that can be built without an unresolved permission is **PERSO-005*
 
 ## 6. API checklists
 
+### Consent slice foundation (shared by PERSO-001..003)
+
+- Proto: new `proto/personalization/v1/personalization.proto`, package `memora.personalization.v1`, service `ConsentService` with `AcceptConsent`, `ListConsents`, `RevokeConsent`. Every request has `memora.common.v1.VerifiedActor actor = 1`. Registered in `apps/operations-service/src/grpc/operations-grpc.registry.ts`.
+- Contracts: `libs/contracts/src/personalization/consent.grpc.ts`, exported from `libs/contracts/src/index.ts`.
+- Operations feature: `apps/operations-service/src/modules/personalization/consent/` (presentation / application / persistence). Use cases call `requireCustomerActor` (FP/SW needs login, D-P-17).
+- Order facts: `OrderPersonalizationContextPort` gets a real adapter that calls Commerce `memora.commerce.v1.OrderingService.GetOrderPersonalizationContext` (already on `dev`). Operations needs `COMMERCE_GRPC_URL` and `COMMERCE_INTERNAL_GRPC_SECRET` (same secret the Commerce guard checks). Commerce `NOT_FOUND` → `undefined`; other errors fail closed (`UNAVAILABLE`).
+- Config: `OPERATIONS_CONSENT_POLICY_VERSION` (string ≤50). Required outside development; dev default `dev-1`.
+- Gateway: new `apps/api-gateway/src/modules/personalization/consent/` feature, Operations gRPC client from the existing domain-client helpers, `OPERATIONS_GRPC_URL` + `OPERATIONS_INTERNAL_GRPC_SECRET`. Routes need Bearer + `@RequirePermissions('CONSENT_MANAGE_OWN')`; no `@AllowGuest`. Actor via `toVerifiedActor(principal)`.
+- Response shape `Consent`: `{ consentId, orderId, consentType, policyVersion, status, acceptedAt, revokedAt|null, ringItemIds[] }`. Never returns `evidence_metadata_json`.
+- Error mapping (gRPC → HTTP): `INVALID_ARGUMENT` 400, `PERMISSION_DENIED` 403, `NOT_FOUND` 404, `FAILED_PRECONDITION`/`ALREADY_EXISTS` 409, `UNAVAILABLE` 503.
+
 ### PERSO-001 — POST /api/v1/orders/{orderId}/consents
 
-- Status: NEEDS_REVIEW
+- Status: APPROVED (user, 2026-11-15)
 - Domain / Feature / Service: personalization / consent / operations-service
-- Main Flow: WF-01 F-02 AC1, F-13 AC1
-- Purpose: record formal, versioned, purpose- and source-type-scoped Consent for 1–2 Ring Items after verified P1.
-- Actor: registered Customer who owns the Order.
-- Permission: NEEDS_REVIEW (no approved code).
-- Request: Params `orderId`. Body (draft) `consentType`, `policyVersion`, `ringItemIds[1..2]`, idempotency key.
-- Response: Success `201 { consentId, status, acceptedAt, ringItemIds }`. Errors 400 validation, 401, 403 not owner, 409 P1 not succeeded / item not FP-SW / scope conflict.
-- Validation and business rules: trusted P1 SUCCEEDED from Commerce; Ring Items belong to the Order and use FP or SW; SHARED scope only for two items of the same type; accepted scope immutable; reading the pre-P1 notice is not Consent.
+- Main Flow: MF01 (WF-01 F-02 AC1, F-13 AC1)
+- Purpose: record versioned, source-type-scoped Consent for 1–2 Ring Items after P1 is paid.
+- Actor: logged-in Customer who owns the Order.
+- Permission: `CONSENT_MANAGE_OWN` (RBAC v1.1).
+- Request:
+  - Params: `orderId` (uuid).
+  - Body: `consentType` (`FINGERPRINT_PROCESSING` | `SOUNDWAVE_PROCESSING`), `policyVersion` (string, the version the FE showed), `ringItemIds` (1–2 unique uuids).
+- Response:
+  - Success: `201 Consent`.
+  - Errors: 400 validation; 401; 403 not the order owner; 404 order not found; 409 `P1_NOT_PAID`, `POLICY_VERSION_MISMATCH`, `RING_ITEM_NOT_IN_ORDER`, `PACKAGE_MISMATCH`, `SHARED_SCOPE_NOT_ALLOWED`, `ITEM_ALREADY_CONSENTED`; 503 Commerce unavailable.
+- Validation and business rules:
+  - Order facts come only from Commerce (`p1Paid`, owner, items). The client never claims payment.
+  - `ownerCustomerIdentityId` must equal the actor's `customerIdentityId`.
+  - `policyVersion` must equal `OPERATIONS_CONSENT_POLICY_VERSION`.
+  - Each item belongs to the order; its package matches the type (`FINGERPRINT` ↔ `FINGERPRINT_PROCESSING`, `SOUNDWAVE` ↔ `SOUNDWAVE_PROCESSING`).
+  - Two items only when the order `sourcePlanMode` is `SHARED`; otherwise exactly one.
+  - Idempotent: an `ACCEPTED` consent with the same customer, order, type and exact item set is returned as is (201, no new row). An item already in another `ACCEPTED` consent of the same type → 409.
+  - Writes `consents` (`status=ACCEPTED`, `accepted_at=now`, `channel='WEB'`, `evidence_metadata_json={}`) and `consent_ring_items` in one transaction.
+- Tables: `personalization.consents`, `personalization.consent_ring_items`.
+- gRPC method: `ConsentService.AcceptConsent`.
+- Existing code: none (port + fake only).
+- Dependencies: Commerce `GetOrderPersonalizationContext` (on dev), RBAC v1.1.
+
+### PERSO-002 — GET /api/v1/orders/{orderId}/consents
+
+- Status: APPROVED (user, 2026-11-15)
+- Main Flow: MF01 (WF-01 F-02)
+- Purpose: let the owner see Consent state per Ring Item before capture/upload.
+- Actor / Permission: logged-in Customer, `CONSENT_MANAGE_OWN`. Staff reads are out of scope.
+- Request: Params `orderId` (uuid). No query.
+- Response: `200 { items: Consent[] }`, newest first, all statuses. Errors 400, 401, 403.
+- Rules: filters by `order_id` and the actor's `customer_identity_id`; no Commerce call. Another customer's order returns an empty list (no existence leak).
 - Tables: `consents`, `consent_ring_items`.
-- gRPC method: AcceptConsent (candidate).
-- Existing code: none.
-- Dependencies: Commerce Order + P1 contract; IAM customer identity; D-P-01, D-P-02.
+- gRPC method: `ConsentService.ListConsents`.
 
-#### implement-api checklist
+### PERSO-003 — POST /api/v1/orders/{orderId}/consents/{consentId}/revoke
 
-- [ ] Approved method, path, request, response, and permission confirmed
-- [ ] No duplicate route, RPC, DTO, or migration
-- [ ] Owning service enforces rules and data ownership
-- [ ] Gateway DTO, auth, error mapping, and Swagger match the contract
-- [ ] Checks recorded with PASS/FAIL/NOT RUN
+- Status: APPROVED (user, 2026-11-15)
+- Main Flow: MF01 (WF-01 F-13)
+- Purpose: let the owner withdraw Consent before the design is submitted.
+- Actor / Permission: logged-in Customer, `CONSENT_MANAGE_OWN`.
+- Request: Params `orderId`, `consentId` (uuid). No body.
+- Response: `200 Consent` (`status=REVOKED`, `revokedAt`). Errors 400, 401, 404 (not found, other order, or not the owner), 409 `CONSENT_LOCKED`, 503.
+- Rules:
+  - Already `REVOKED` → 200 with the same row (idempotent).
+  - D-P-13: if any linked Ring Item's current version status (from Commerce) is `SUBMITTED` or `MANAGER_APPROVED`, return 409 `CONSENT_LOCKED`.
+  - Update is conditional (`WHERE status='ACCEPTED'`) so parallel revokes write once.
+  - Revoke only changes the consent row. Effects on sources and sessions belong to later APIs; retention (D-OPS-08) stays open.
+- Tables: `consents`, `consent_ring_items`.
+- gRPC method: `ConsentService.RevokeConsent`.
+
+#### implement-api checklist (each of PERSO-001..003)
+
+- [x] Approved method, path, request, response, and permission confirmed
+- [x] No duplicate route, RPC, DTO, or migration
+- [x] Owning service enforces rules and data ownership
+- [x] Gateway DTO, auth, error mapping, and Swagger match the contract
+- [x] Checks recorded with PASS/FAIL/NOT RUN
+
+Implementation notes (2026-11-15):
+- Reason codes travel as the gRPC error message (`details`); the Gateway consent client maps `FAILED_PRECONDITION` to 409 (the shared mapper uses 412) and exposes the reason as `message`.
+- Parallel accepts for one order are serialized with `pg_advisory_xact_lock` inside the insert transaction (no DB unique on item + type).
+- The Gateway Operations target is optional (`domainGrpcClientOptions({ optional: true })`): unset → 503, boot does not fail.
+- Operations now requires `COMMERCE_GRPC_URL`, `COMMERCE_INTERNAL_GRPC_SECRET`, and `OPERATIONS_CONSENT_POLICY_VERSION` (outside development). The server `deploy/secrets/operations.env` must have them before the next `main` deploy.
 
 ### PERSO-005 — POST /api/v1/orders/{orderId}/fingerprint/capture-sessions
 
@@ -258,8 +314,6 @@ The first API that can be built without an unresolved permission is **PERSO-005*
 
 | API ID | Status | Key rules | Tables | Blockers |
 |---|---|---|---|---|
-| PERSO-002 | NEEDS_REVIEW | Owner or authorized Staff only | consents, consent_ring_items | D-P-01 |
-| PERSO-003 | NEEDS_REVIEW | Revoke blocks new processing; retention and in-flight production effect | consents | D-P-01, D-P-13 |
 | PERSO-004 | NEEDS_REVIEW | SHARED only for two items of the same type; change after collection forces re-consent / relink | (ordering.orders.source_plan_mode is Commerce) | D-P-05 |
 | PERSO-009/010 | PROPOSED | Supported codec, upload or in-app ≤30 s, P1 + Consent first | personalization_sources | D-P-08, D-P-14 |
 | PERSO-011 | NEEDS_REVIEW | Owner only, no raw asset | personalization_sources, source_bindings | D-P-01 |
@@ -354,3 +408,4 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
 | Date | API ID | Result | Evidence |
 | --- | --- | --- | --- |
 | 2026-11-13 | Phase 0 audit | PLAN ONLY | Files read listed in §2; no code, schema, RBAC or server change |
+| 2026-11-15 | PERSO-001..003 | IMPLEMENTED (not deployed) | Builds gateway/operations/commerce PASS; jest 161 PASS (task-added specs then removed per rule); eslint, proto:check, boundaries, guardrails PASS. Local smoke: 401 without token, Swagger paths, gRPC UNAUTHENTICATED without secret, INVALID_ARGUMENT, list empty, Operations→Commerce NOT_FOUND→404, Commerce down→503. NOT RUN: accept/revoke against a real paid order (would write server DB), Postgres race path |

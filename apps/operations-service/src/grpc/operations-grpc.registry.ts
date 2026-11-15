@@ -5,4 +5,8 @@
  */
 export const OPERATIONS_GRPC_PROTOS = [
   { package: 'grpc.health.v1', file: 'grpc/health/v1/health.proto' },
+  {
+    package: 'memora.personalization.v1',
+    file: 'personalization/v1/personalization.proto',
+  },
 ] as const;

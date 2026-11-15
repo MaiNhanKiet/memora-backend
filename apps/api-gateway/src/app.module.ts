@@ -18,6 +18,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { DesignModule } from './modules/design/design.module';
 import { OrderingModule } from './modules/ordering/ordering.module';
+import { PersonalizationModule } from './modules/personalization/personalization.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { OrderingModule } from './modules/ordering/ordering.module';
     InventoryModule,
     DesignModule,
     OrderingModule,
+    PersonalizationModule,
   ],
   providers: [
     {
