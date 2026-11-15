@@ -5,8 +5,9 @@
  */
 export const COMMERCE_GRPC_PROTOS = [
   { package: 'grpc.health.v1', file: 'grpc/health/v1/health.proto' },
-  { package: 'commerce.v1', file: 'commerce/v1/catalog.proto' },
-  { package: 'commerce.v1', file: 'commerce/v1/pricing.proto' },
-  { package: 'commerce.v1', file: 'commerce/v1/cart.proto' },
-  { package: 'commerce.v1', file: 'commerce/v1/ordering.proto' },
+  { package: 'memora.commerce.v1', file: 'commerce/v1/catalog.proto' },
+  { package: 'memora.commerce.v1', file: 'commerce/v1/pricing.proto' },
+  { package: 'memora.commerce.v1', file: 'commerce/v1/cart.proto' },
+  { package: 'memora.commerce.v1', file: 'commerce/v1/ordering.proto' },
+  { package: 'memora.commerce.v1', file: 'commerce/v1/inventory.proto' },
 ] as const;

@@ -14,7 +14,7 @@ import {
       domainGrpcClientOptions({
         name: COMMERCE_ORDERING_GRPC_CLIENT,
         urlConfigKey: 'apiGateway.commerceGrpcUrl',
-        protoPackage: 'commerce.v1',
+        protoPackage: 'memora.commerce.v1',
         protoFile: 'commerce/v1/ordering.proto',
       }),
     ]),

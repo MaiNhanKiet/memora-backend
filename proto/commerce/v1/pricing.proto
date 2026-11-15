@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package commerce.v1;
+package memora.commerce.v1;
 
 service PricingService {
   rpc EstimatePrice (EstimatePriceRequest) returns (EstimatePriceResponse);

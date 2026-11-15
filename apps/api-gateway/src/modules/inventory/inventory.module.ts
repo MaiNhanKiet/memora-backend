@@ -14,7 +14,7 @@ import {
       domainGrpcClientOptions({
         name: COMMERCE_INVENTORY_GRPC_CLIENT,
         urlConfigKey: 'apiGateway.commerceGrpcUrl',
-        protoPackage: 'commerce.v1',
+        protoPackage: 'memora.commerce.v1',
         protoFile: 'commerce/v1/inventory.proto',
       }),
     ]),
