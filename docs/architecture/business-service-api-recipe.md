@@ -128,10 +128,24 @@ syntax = "proto3";
 package memora.common.v1;
 
 message VerifiedActor {
-  string user_id = 1;               // IAM user id (UUID), always set
-  string customer_identity_id = 2;  // empty when the user has no customer identity
+  string user_id = 1;               // IAM user id (UUID); empty for guests
+  string customer_identity_id = 2;  // empty when there is none
+  string guest_session_id = 3;      // anonymous guest only (D-P-17)
 }
 ```
+
+Valid combinations (D-P-17, 2026-11-15). Anything else is `INVALID_ARGUMENT`:
+
+| `kind` after parsing | Fields set | Who | Example RPCs |
+|---|---|---|---|
+| `USER` | `user_id` [+ `customer_identity_id`] | Signed-in user | Everything that needs login: Consent, capture, FP/SW orders, staff and admin actions |
+| `VERIFIED_GUEST` | `customer_identity_id` only | Guest who verified an email with IAM OTP | All-NONE guest order (MF01 AF02) |
+| `GUEST_SESSION` | `guest_session_id` only | Anonymous guest with an IAM-issued session | Guest Cart (MF01 AF01) |
+
+Guest actors exist only after IAM verifies the guest credential at the Gateway. The IAM
+guest session and guest access token are **not built yet** (separate IAM plan). Until
+then, no RPC may accept a guest actor, and nobody fills guest fields from a client
+header such as `x-guest-session-id`.
 
 Each request message of a user-scoped RPC has `memora.common.v1.VerifiedActor actor = 1;`
 (`import "common/v1/actor.proto";`). The TypeScript mirror lives in
@@ -141,8 +155,10 @@ Both files exist. Reuse them; nobody defines a per-domain actor message.
 | Side | Helper | Use |
 |---|---|---|
 | Gateway | `toVerifiedActor(principal)` in `apps/api-gateway/src/common/grpc/verified-actor.ts` | `actor: toVerifiedActor(principal)` where `principal` comes from `@CurrentUser()`. A missing principal throws 401 |
-| Service | `parseVerifiedActor(request.actor)` from `@app/common` | In the gRPC controller. Returns `{ userId, customerIdentityId \| undefined }`, or `INVALID_ARGUMENT` |
-| Service | `requireCustomerActor(actor)` from `@app/common` | For customer-only RPCs. Missing customer identity gives `INVALID_ARGUMENT` |
+| Service | `parseVerifiedActor(request.actor)` from `@app/common` | In the gRPC controller. Returns a `ParsedVerifiedActor` with `kind` `USER`, `VERIFIED_GUEST` or `GUEST_SESSION`, or `INVALID_ARGUMENT` |
+| Service | `requireUserActor(actor)` | Login-only RPCs. A guest gives `PERMISSION_DENIED` |
+| Service | `requireCustomerActor(actor)` | Signed-in customer with a customer identity (Personalization, FP/SW). Guest gives `PERMISSION_DENIED`, missing identity gives `INVALID_ARGUMENT` |
+| Service | `requireCustomerIdentity(actor)` | Owner of a customer identity, signed-in or verified guest (All-NONE orders). Returns the customer identity id |
 
 **Gateway rules**
 
