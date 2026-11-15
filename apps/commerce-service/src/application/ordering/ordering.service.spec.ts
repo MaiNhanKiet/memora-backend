@@ -25,6 +25,7 @@ describe('OrderingService', () => {
     findCurrentRingItemVersion: jest.fn(),
     updateCurrentRingItemVersion: jest.fn(),
     listOrderQuotes: jest.fn(),
+    findOrderPersonalizationContext: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -591,6 +592,85 @@ describe('OrderingService', () => {
       expect(res.quotes[0].quoteNo).toBe('QUO-123');
       expect(res.quotes[0].items).toHaveLength(1);
       expect(res.quotes[0].items[0].lineAmount).toBe(15000000);
+    });
+  });
+
+  describe('getOrderPersonalizationContext', () => {
+    it('should throw BadRequestException if orderId is missing or not a UUID', async () => {
+      await expect(
+        service.getOrderPersonalizationContext({ orderId: '' }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.getOrderPersonalizationContext({ orderId: 'not-a-uuid' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException if order does not exist', async () => {
+      mockRepository.findOrderPersonalizationContext.mockResolvedValue(null);
+
+      await expect(
+        service.getOrderPersonalizationContext({
+          orderId: 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return context with p1Paid = true when completed P1 payment exists', async () => {
+      mockRepository.findOrderPersonalizationContext.mockResolvedValue({
+        id: 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+        order_no: 'ORD-123',
+        owner_customer_identity_id: 'cust-1',
+        status: 'AWAITING_P1',
+        source_plan_mode: 'SHARED',
+        payment_transactions: [{ id: 'tx-1' }],
+        ring_items: [
+          {
+            id: 'item-1',
+            item_no: 1,
+            current_version_id: 'ver-1',
+            ring_item_versions_ring_items_current_version_idToring_item_versions:
+              {
+                id: 'ver-1',
+                version_no: 1,
+                personalization_package: 'SOUNDWAVE',
+                status: 'DRAFT',
+              },
+          },
+        ],
+      });
+
+      const res = await service.getOrderPersonalizationContext({
+        orderId: 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+      });
+
+      expect(res.orderId).toBe('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d');
+      expect(res.ownerCustomerIdentityId).toBe('cust-1');
+      expect(res.p1Paid).toBe(true);
+      expect(res.sourcePlanMode).toBe('SHARED');
+      expect(res.ringItems).toHaveLength(1);
+      expect(res.ringItems[0].personalizationPackage).toBe('SOUNDWAVE');
+      expect(res.ringItems[0].versionStatus).toBe('DRAFT');
+    });
+
+    it('should return context with p1Paid = false when no completed P1 payment exists', async () => {
+      mockRepository.findOrderPersonalizationContext.mockResolvedValue({
+        id: 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+        order_no: 'ORD-123',
+        owner_customer_identity_id: 'cust-1',
+        status: 'PENDING_FINAL_QUOTE',
+        source_plan_mode: 'N/A',
+        payment_transactions: [],
+        ring_items: [],
+      });
+
+      const res = await service.getOrderPersonalizationContext({
+        orderId: 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+      });
+
+      expect(res.p1Paid).toBe(false);
+      expect(res.status).toBe('PENDING_FINAL_QUOTE');
+      expect(res.ringItems).toHaveLength(0);
     });
   });
 });

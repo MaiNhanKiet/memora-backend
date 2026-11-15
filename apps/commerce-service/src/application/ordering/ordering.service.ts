@@ -13,6 +13,8 @@ import type {
   GetAdminOrderDetailsResponse,
   GetOrderByIdRequest,
   GetOrderByIdResponse,
+  GetOrderPersonalizationContextRequest,
+  GetOrderPersonalizationContextResponse,
   GetOrderTimelineRequest,
   GetOrderTimelineResponse,
   GetRingItemDetailsRequest,
@@ -26,6 +28,7 @@ import type {
   ListRingItemVersionsRequest,
   ListRingItemVersionsResponse,
   OrderActorIdentity,
+  RingItemPersonalizationSummary,
   RingItemVersionSummary,
   StageGateItem,
   TimelineEventItem,
@@ -783,6 +786,55 @@ export class OrderingService {
     return {
       orderId: request.orderId,
       quotes: mappedQuotes,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // [Cross-Service] Get Order Personalization Context (for Operations)
+  // ---------------------------------------------------------------------------
+  async getOrderPersonalizationContext(
+    request: GetOrderPersonalizationContextRequest,
+  ): Promise<GetOrderPersonalizationContextResponse> {
+    const orderId = request?.orderId?.trim();
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!orderId || !uuidRegex.test(orderId)) {
+      throw new BadRequestException(
+        `Invalid or missing orderId: '${orderId}' is not a valid UUID`,
+      );
+    }
+
+    const order =
+      await this.repository.findOrderPersonalizationContext(orderId);
+
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found`);
+    }
+
+    const p1Paid = order.payment_transactions.length > 0;
+
+    const ringItems: RingItemPersonalizationSummary[] = order.ring_items.map(
+      (item) => {
+        const ver =
+          item.ring_item_versions_ring_items_current_version_idToring_item_versions;
+        return {
+          ringItemId: item.id,
+          itemNo: item.item_no,
+          currentVersionId: item.current_version_id || ver?.id || '',
+          personalizationPackage: ver?.personalization_package || 'NONE',
+          versionStatus: ver?.status || 'DRAFT',
+        };
+      },
+    );
+
+    return {
+      orderId: order.id,
+      ownerCustomerIdentityId: order.owner_customer_identity_id,
+      status: order.status,
+      p1Paid,
+      sourcePlanMode: order.source_plan_mode,
+      ringItems,
     };
   }
 

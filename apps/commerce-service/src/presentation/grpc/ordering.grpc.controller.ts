@@ -7,6 +7,8 @@ import type {
   GetAdminOrderDetailsResponse,
   GetOrderByIdRequest,
   GetOrderByIdResponse,
+  GetOrderPersonalizationContextRequest,
+  GetOrderPersonalizationContextResponse,
   GetOrderTimelineRequest,
   GetOrderTimelineResponse,
   GetRingItemDetailsRequest,
@@ -102,5 +104,12 @@ export class OrderingGrpcController implements OrderingServiceHandler {
     request: ListOrderQuotesRequest,
   ): Promise<ListOrderQuotesResponse> {
     return this.orderingService.listOrderQuotes(request);
+  }
+
+  @GrpcMethod('OrderingService', 'GetOrderPersonalizationContext')
+  getOrderPersonalizationContext(
+    request: GetOrderPersonalizationContextRequest,
+  ): Promise<GetOrderPersonalizationContextResponse> {
+    return this.orderingService.getOrderPersonalizationContext(request);
   }
 }

@@ -628,4 +628,41 @@ export class OrderingRepository {
       },
     });
   }
+
+  async findOrderPersonalizationContext(orderId: string) {
+    return this.prisma.orders.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        order_no: true,
+        owner_customer_identity_id: true,
+        status: true,
+        source_plan_mode: true,
+        payment_transactions: {
+          where: {
+            payment_stage: 'P1',
+            status: 'COMPLETED',
+          },
+          select: { id: true },
+        },
+        ring_items: {
+          orderBy: { item_no: 'asc' },
+          select: {
+            id: true,
+            item_no: true,
+            current_version_id: true,
+            ring_item_versions_ring_items_current_version_idToring_item_versions:
+              {
+                select: {
+                  id: true,
+                  version_no: true,
+                  personalization_package: true,
+                  status: true,
+                },
+              },
+          },
+        },
+      },
+    });
+  }
 }

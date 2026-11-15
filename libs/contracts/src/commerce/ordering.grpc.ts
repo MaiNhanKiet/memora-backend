@@ -346,6 +346,27 @@ export interface ListOrderQuotesResponse {
   quotes: FullQuoteDetail[];
 }
 
+export interface GetOrderPersonalizationContextRequest {
+  orderId: string;
+}
+
+export interface RingItemPersonalizationSummary {
+  ringItemId: string;
+  itemNo: number;
+  currentVersionId: string;
+  personalizationPackage: string;
+  versionStatus: string;
+}
+
+export interface GetOrderPersonalizationContextResponse {
+  orderId: string;
+  ownerCustomerIdentityId: string;
+  status: string;
+  p1Paid: boolean;
+  sourcePlanMode: string;
+  ringItems: RingItemPersonalizationSummary[];
+}
+
 export interface OrderingServiceHandler {
   createOrder(request: CreateOrderRequest): Promise<CreateOrderResponse>;
   listOrders(request: ListOrdersRequest): Promise<ListOrdersResponse>;
@@ -374,6 +395,9 @@ export interface OrderingServiceHandler {
   listOrderQuotes(
     request: ListOrderQuotesRequest,
   ): Promise<ListOrderQuotesResponse>;
+  getOrderPersonalizationContext(
+    request: GetOrderPersonalizationContextRequest,
+  ): Promise<GetOrderPersonalizationContextResponse>;
 }
 
 export interface CommerceOrderingServiceClient {
@@ -421,4 +445,8 @@ export interface CommerceOrderingServiceClient {
     request: ListOrderQuotesRequest,
     metadata?: Metadata,
   ): Observable<ListOrderQuotesResponse>;
+  getOrderPersonalizationContext(
+    request: GetOrderPersonalizationContextRequest,
+    metadata?: Metadata,
+  ): Observable<GetOrderPersonalizationContextResponse>;
 }
