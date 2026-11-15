@@ -165,6 +165,7 @@
   - Decorator `@CurrentGuest()` to read `request.guest` (mirrors `@CurrentUser()`).
   - A route with RBAC metadata (`@RequirePermissions`, `@Roles`) never admits a guest: Roles/Permissions guards keep requiring `request.user` (401). Add a startup or unit check that `@AllowGuest` is not combined with RBAC metadata.
   - CORS: allow request headers `X-Guest-Session`, `X-Guest-Access`.
+  - Swagger (added 2026-11-15): security schemes `guest-session` (`X-Guest-Session`) and `guest-access` (`X-Guest-Access`) in `swagger.config.ts`; routes use `@ApiAllowGuest(...)` (`common/docs/api-allow-guest.ts`), which applies `@AllowGuest` and the matching `@ApiSecurity`.
 - Tables: none
 
 #### implement-api checklist
