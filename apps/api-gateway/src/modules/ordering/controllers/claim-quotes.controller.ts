@@ -18,7 +18,7 @@ import type {
   ListClaimQuotesResponseDto,
 } from '../dto/claim-quotes.dto';
 
-@Controller('api/v1/claims')
+@Controller('claims')
 export class ClaimQuotesController {
   constructor(private readonly orderingGrpcClient: OrderingGrpcClient) {}
 
