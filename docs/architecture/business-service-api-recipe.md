@@ -155,6 +155,7 @@ Both files exist. Reuse them; nobody defines a per-domain actor message.
 | Side | Helper | Use |
 |---|---|---|
 | Gateway | `toVerifiedActor(principal)` in `apps/api-gateway/src/common/grpc/verified-actor.ts` | `actor: toVerifiedActor(principal)` where `principal` comes from `@CurrentUser()`. A missing principal throws 401 |
+| Gateway | `@ApiAllowGuest({ session?, verified? })` in `apps/api-gateway/src/common/docs/api-allow-guest.ts` and `toGuestVerifiedActor(guest)` with `@CurrentGuest()` | Guest routes only (D-P-17). Applies `@AllowGuest` plus Swagger security `bearer` + `guest-session`/`guest-access`. Never add RBAC metadata to the same route |
 | Service | `parseVerifiedActor(request.actor)` from `@app/common` | In the gRPC controller. Returns a `ParsedVerifiedActor` with `kind` `USER`, `VERIFIED_GUEST` or `GUEST_SESSION`, or `INVALID_ARGUMENT` |
 | Service | `requireUserActor(actor)` | Login-only RPCs. A guest gives `PERMISSION_DENIED` |
 | Service | `requireCustomerActor(actor)` | Signed-in customer with a customer identity (Personalization, FP/SW). Guest gives `PERMISSION_DENIED`, missing identity gives `INVALID_ARGUMENT` |
