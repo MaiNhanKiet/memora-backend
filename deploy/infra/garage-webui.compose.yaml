@@ -1,0 +1,48 @@
+name: memora-garage-webui
+
+# Arcane: separate project `memora-garage-webui` (not part of memora-infra, so updating the
+# UI never restarts Postgres/Redis). Requires memora-infra (network + garage) to be up.
+# .env of this project:
+#   TAILSCALE_IPV4=100.78.222.34
+#   GARAGE_ADMIN_TOKEN=<same value as GARAGE_ADMIN_TOKEN in memora-infra>
+#   WEBUI_AUTH_USER_PASS='<user>:<bcrypt hash>'   # keep the single quotes ($ in the hash)
+# Hash on the server: docker run --rm -it httpd:2.4-alpine htpasswd -nBC 10 <user>
+# AUTH_USER_PASS is mandatory: the UI has full Garage admin rights (keys, buckets, objects).
+# Published on the Tailscale IP only. A public hostname must sit behind Cloudflare Access.
+# "Share" in this UI makes links only for buckets with website access (public bucket);
+# never enable website access on memora-personalization. Use presigned URLs instead.
+
+services:
+  garage-webui:
+    image: ${GARAGE_WEBUI_IMAGE:-khairul169/garage-webui:1.1.0}
+    container_name: memora-garage-webui
+    restart: unless-stopped
+    ports:
+      - '${TAILSCALE_IPV4:-100.78.222.34}:3909:3909'
+    environment:
+      API_BASE_URL: http://garage:3903
+      API_ADMIN_KEY: ${GARAGE_ADMIN_TOKEN}
+      S3_ENDPOINT_URL: http://garage:3900
+      S3_REGION: garage
+      AUTH_USER_PASS: ${WEBUI_AUTH_USER_PASS}
+    networks:
+      - memora-network
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    labels:
+      com.memora.stack: infra
+      com.memora.managed: 'true'
+
+networks:
+  memora-network:
+    external: true

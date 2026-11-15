@@ -115,6 +115,11 @@ POSTGRES_USER=memora
 POSTGRES_PASSWORD=${pg_pass}
 POSTGRES_DB=memora
 REDIS_PASSWORD=${redis_pass}
+GARAGE_RPC_SECRET=$(random_hex 32)
+GARAGE_ADMIN_TOKEN=$(random_hex 32)
+GARAGE_ACCESS_KEY_ID=GK$(random_hex 12)
+GARAGE_SECRET_ACCESS_KEY=$(random_hex 32)
+GARAGE_BUCKET=memora-personalization
 EOF
     chmod 600 "${MEMORA_SECRETS_DIR}/infra.env"
     log "wrote infra.env (generated once)"
@@ -124,6 +129,9 @@ EOF
 
   load_env_file "${MEMORA_SECRETS_DIR}/infra.env"
   [[ ${#REDIS_PASSWORD} -ge 16 ]] || die "REDIS_PASSWORD must be at least 16 characters"
+  if [[ -z "${GARAGE_RPC_SECRET:-}" || -z "${GARAGE_ACCESS_KEY_ID:-}" || -z "${GARAGE_SECRET_ACCESS_KEY:-}" ]]; then
+    err "WARN: infra.env has no GARAGE_* values; memora-garage cannot start. See deploy/infra/.env.example."
+  fi
 
   if [[ ! -f "${MEMORA_SECRETS_DIR}/iam.env" ]]; then
     die "create ${MEMORA_SECRETS_DIR}/iam.env from iam.env.example (JWT/peppers/email URL required)"
@@ -143,11 +151,15 @@ cmd_bootstrap_infra() {
   assert_managed_or_absent memora-postgres infra
   assert_managed_or_absent memora-redis infra
   assert_managed_or_absent memora-cloudflared infra
+  assert_managed_or_absent memora-garage infra
   export MEMORA_SECRETS_DIR
   load_env_file "${MEMORA_SECRETS_DIR}/infra.env"
   compose_infra up -d --no-recreate
   wait_healthy memora-postgres
   wait_healthy memora-redis
+  if [[ -n "${GARAGE_RPC_SECRET:-}" ]]; then
+    wait_healthy memora-garage
+  fi
   touch "${MEMORA_STATE_DIR}/infra-ready"
   log "infra ready"
 }
