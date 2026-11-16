@@ -1,17 +1,58 @@
 import { applyDecorators } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
   ApiBearerAuth,
-  ApiCreatedResponse,
-  ApiForbiddenResponse,
   ApiHeader,
-  ApiNotFoundResponse,
-  ApiOkResponse,
   ApiOperation,
+  ApiParam,
+  ApiResponse,
 } from '@nestjs/swagger';
+import { ApiSuccessResponse } from '../../../common/docs/api-success-response';
+import {
+  AdminOrderDetailsResponseDto,
+  AdminOrderSummaryDto,
+  CancelOrderResponseDto,
+  ConfirmFinalQuoteResponseDto,
+  FinalConfirmationDetailDto,
+  FullQuoteDetailDto,
+  OrderInvoiceDetailDto,
+  PaymentReceiptDetailDto,
+  PaymentTransactionDetailDto,
+  PaymentTransactionSummaryDto,
+  RejectFinalQuoteResponseDto,
+  RingItemVersionSummaryDto,
+  UpdateCurrentRingItemVersionResponseDto,
+  UpdateOrderStatusResponseDto,
+} from '../dto/ordering.dto';
+
+const bearer = ApiBearerAuth('bearer');
+const guestSessionHeader = ApiHeader({
+  name: 'x-guest-session-id',
+  description: 'Anonymous guest session UUID',
+  required: false,
+});
+const unauthorized = ApiResponse({
+  status: 401,
+  description: 'Missing or invalid access token',
+});
+const forbidden = (reason?: string) =>
+  ApiResponse({
+    status: 403,
+    description: reason ?? 'Caller lacks required role or ownership',
+  });
+const notFound = (resource: string) =>
+  ApiResponse({
+    status: 404,
+    description: `${resource} not found`,
+  });
+
+// ---------------------------------------------------------------------------
+// Customer Order Endpoints
+// ---------------------------------------------------------------------------
 
 export function ApiCreateOrderDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
       summary: '[ORDER-001] Create Order from selected ring design drafts',
       description:
@@ -19,506 +60,503 @@ export function ApiCreateOrderDocs() {
         'Sets initial status to AWAITING_P1 (for FP/SW rings) or PENDING_FINAL_QUOTE (for All-NONE rings). ' +
         'Selected drafts are converted and detached from active cart upon success.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID (only permitted for All-NONE orders)',
-      required: false,
-    }),
-    ApiCreatedResponse({
+    ApiSuccessResponse({
+      type: AdminOrderDetailsResponseDto,
+      status: 201,
       description: 'Order created successfully with provisional quote',
     }),
-    ApiBadRequestResponse({
+    ApiResponse({
+      status: 400,
       description:
         'Invalid payload, invalid draft count, or missing Pre-P1 consent for personalized items',
     }),
-    ApiForbiddenResponse({
-      description: 'Guest checkout is not permitted for personalized rings',
-    }),
-    ApiNotFoundResponse({
-      description: 'One or more selected drafts not found or not in cart',
-    }),
+    unauthorized,
+    forbidden('Guest checkout is not permitted for personalized rings'),
+    notFound('One or more selected drafts not found or not in cart'),
   );
 }
 
 export function ApiListOrdersDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
       summary: '[ORDER-002] List customer orders',
       description:
         'Returns paginated list of orders owned by the current customer or verified guest.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiSuccessResponse({
+      type: AdminOrderSummaryDto,
+      isArray: true,
+      paginated: true,
+      description: 'List of orders returned successfully',
     }),
-    ApiOkResponse({ description: 'List of orders returned successfully' }),
+    ApiResponse({ status: 400, description: 'Invalid pagination query parameters' }),
+    unauthorized,
   );
 }
 
 export function ApiGetOrderByIdDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-003] Get Order details and tracking info',
+      summary: '[ORDER-003] Get Order Details by ID',
       description:
-        'Retrieves order status, recipient info, current provisional/final quote, and ring items.',
+        'Returns complete order details including ring items, pricing, current quote, and active stage.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: AdminOrderDetailsResponseDto,
+      description: 'Order details returned successfully',
     }),
-    ApiOkResponse({ description: 'Order details returned successfully' }),
-    ApiNotFoundResponse({
-      description: 'Order not found or not owned by actor',
-    }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Order'),
   );
 }
 
 export function ApiGetOrderTimelineDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-004] Get Order status timeline & stage gates',
+      summary: '[ORDER-004] Get Order Timeline & Production Stage-Gates',
       description:
-        'Returns chronologically ordered events and stage gate progress (Deposit P1, Sourcing, Final Quote, Production, Delivery).',
+        'Returns sequential production milestones (Deposit P1, Sourcing, Design Approval, Milestone P2, Manufacturing, Delivery P3) and historical events.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
-    }),
-    ApiOkResponse({
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: AdminOrderDetailsResponseDto,
       description: 'Order timeline and stage gates returned successfully',
     }),
-    ApiNotFoundResponse({
-      description: 'Order not found or not owned by actor',
-    }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Order'),
   );
 }
 
 export function ApiGetRingItemDetailsDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-007] Get Ring Item details and configuration in order',
+      summary: '[ORDER-006] Get Ring Item Details in Order',
       description:
-        'Retrieves detailed specifications of a ring item inside an order, including size, metal, package, and gemstone placements.',
+        'Returns specifications, gemstone slot assignments, target size, and current design version of a specific ring item.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiParam({ name: 'itemId', description: 'Ring Item UUID', type: String }),
+    ApiSuccessResponse({
+      type: RingItemVersionSummaryDto,
+      description: 'Ring item details returned successfully',
     }),
-    ApiOkResponse({ description: 'Ring item details returned successfully' }),
-    ApiNotFoundResponse({
-      description: 'Ring item or order not found or not owned by actor',
-    }),
-  );
-}
-
-export function ApiListAdminOrdersDocs() {
-  return applyDecorators(
-    ApiOperation({
-      summary: '[ORDER-006] Admin: List all orders with filters',
-      description:
-        'Returns paginated list of system-wide orders with status, date range, and keyword search filters. Requires ORDER_READ_OPERATIONS permission.',
-    }),
-    ApiBearerAuth(),
-    ApiOkResponse({ description: 'Admin orders list returned successfully' }),
-    ApiForbiddenResponse({
-      description: 'Insufficient permissions (requires ORDER_READ_OPERATIONS)',
-    }),
-  );
-}
-
-export function ApiGetAdminOrderDetailsDocs() {
-  return applyDecorators(
-    ApiOperation({
-      summary: '[ORDER-ADMIN-01] Admin: Get full order details',
-      description:
-        'Retrieves comprehensive order details for staff/manager, including customer identity, ring items, quotes, and pre-P1 evidence.',
-    }),
-    ApiBearerAuth(),
-    ApiOkResponse({
-      description: 'Admin order details returned successfully',
-    }),
-    ApiForbiddenResponse({
-      description: 'Insufficient permissions (requires ORDER_READ_OPERATIONS)',
-    }),
-    ApiNotFoundResponse({ description: 'Order not found' }),
-  );
-}
-
-export function ApiUpdateOrderStatusDocs() {
-  return applyDecorators(
-    ApiOperation({
-      summary: '[ORDER-ADMIN-02] Admin: Update order status transition',
-      description:
-        'Transitions order to a valid next lifecycle status or CANCELLED with reason. Requires ORDER_READ_OPERATIONS permission.',
-    }),
-    ApiBearerAuth(),
-    ApiOkResponse({
-      description: 'Order status transitioned successfully',
-    }),
-    ApiBadRequestResponse({
-      description: 'Invalid status transition according to state machine rules',
-    }),
-    ApiForbiddenResponse({
-      description: 'Insufficient permissions (requires ORDER_READ_OPERATIONS)',
-    }),
-    ApiNotFoundResponse({ description: 'Order not found' }),
+    unauthorized,
+    forbidden('Caller does not own this order item'),
+    notFound('Order or ring item'),
   );
 }
 
 export function ApiListRingItemVersionsDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-008] List all versions of a ring item in order',
+      summary: '[ORDER-010] List Design Iteration Versions for a Ring Item',
       description:
-        'Retrieves the chronological history of configuration versions for a ring item. Available to the order owner.',
+        'Returns version history (V1, V2, V3...) showing 3D model status, CAD render keys, and customer approval history.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiParam({ name: 'ringItemId', description: 'Ring Item UUID', type: String }),
+    ApiSuccessResponse({
+      type: RingItemVersionSummaryDto,
+      isArray: true,
+      description: 'List of ring item versions returned successfully',
     }),
-    ApiOkResponse({
-      description: 'Ring item versions returned successfully',
-    }),
-    ApiNotFoundResponse({
-      description: 'Order or ring item not found or not owned by actor',
-    }),
+    unauthorized,
+    forbidden('Caller does not own this order item'),
+    notFound('Order or ring item'),
   );
 }
 
 export function ApiUpdateCurrentRingItemVersionDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-009] Update current draft design version of ring item',
+      summary: '[ORDER-010 Update] Customer updates current version draft specs',
       description:
-        'Allows adjusting size, reason, or memory flag while the ring item version is in DRAFT or SUBMITTED status.',
+        'Allows customer to adjust target size, engraving notes, or slot configurations while current version is in DRAFT.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiParam({ name: 'ringItemId', description: 'Ring Item UUID', type: String }),
+    ApiSuccessResponse({
+      type: UpdateCurrentRingItemVersionResponseDto,
+      description: 'Version updated successfully',
     }),
-    ApiOkResponse({
-      description: 'Current ring item version updated successfully',
-    }),
-    ApiBadRequestResponse({
-      description: 'Cannot update locked or manufacturing version',
-    }),
-    ApiNotFoundResponse({
-      description: 'Ring item or current version not found',
-    }),
+    ApiResponse({ status: 400, description: 'Version is locked or already approved' }),
+    unauthorized,
+    forbidden('Caller does not own this order item'),
+    notFound('Current version draft not found'),
   );
 }
 
 export function ApiListOrderQuotesDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-010] List all quotes of an order',
+      summary: '[ORDER-003 Sub] List Quotes associated with Order',
       description:
-        'Retrieves list of provisional and final quotes with detailed itemized cost breakdowns.',
+        'Returns provisional quote and any subsequent final quotes with price version references.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: FullQuoteDetailDto,
+      isArray: true,
+      description: 'List of quotes returned successfully',
     }),
-    ApiOkResponse({
-      description: 'Order quotes returned successfully',
-    }),
-    ApiNotFoundResponse({
-      description: 'Order not found or not owned by actor',
-    }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Order'),
   );
 }
 
 export function ApiCancelOrderDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-005] Cancel Order (Pre-production)',
+      summary: '[ORDER-005] Customer cancels order',
       description:
-        'Allows customer or staff to cancel an order prior to production authorization (status must be AWAITING_P1, PENDING_FINAL_QUOTE, or AWAITING_CUSTOMER_CONFIRMATION). Releases all active inventory allocations.',
+        'Cancels order if in cancellable status (AWAITING_P1, PENDING_FINAL_QUOTE, AWAITING_CUSTOMER_CONFIRMATION) and releases inventory allocations.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: CancelOrderResponseDto,
+      description: 'Order cancelled successfully and allocations released',
     }),
-    ApiOkResponse({
-      description: 'Order successfully cancelled and allocations released',
+    ApiResponse({
+      status: 400,
+      description: 'Order cannot be cancelled in current status (e.g. already manufacturing)',
     }),
-    ApiBadRequestResponse({
-      description: 'Order is not in a cancellable status',
-    }),
-    ApiNotFoundResponse({
-      description: 'Order not found or not owned by actor',
-    }),
-  );
-}
-
-export function ApiCreateFinalQuoteDocs() {
-  return applyDecorators(
-    ApiOperation({
-      summary: '[ORDER-011] Create Final Quote for Order (Staff / Manager)',
-      description:
-        'Allows staff to generate a formal Final Quote (quote_type = FINAL, status = DRAFT) with itemized cost components (gold weight, stone costs, custom labor).',
-    }),
-    ApiBearerAuth(),
-    ApiCreatedResponse({
-      description: 'Final quote draft created successfully',
-    }),
-    ApiBadRequestResponse({
-      description: 'Invalid quote line items or amounts',
-    }),
-    ApiNotFoundResponse({
-      description: 'Order not found',
-    }),
-  );
-}
-
-export function ApiUpdateFinalQuoteDocs() {
-  return applyDecorators(
-    ApiOperation({
-      summary: '[ORDER-012] Update Draft Final Quote (Staff / Manager)',
-      description:
-        'Allows staff to modify line items, discounts, delivery fees, or valid date while the quote is still in DRAFT status.',
-    }),
-    ApiBearerAuth(),
-    ApiOkResponse({
-      description: 'Final quote updated successfully',
-    }),
-    ApiBadRequestResponse({
-      description: 'Quote cannot be edited because it is not in DRAFT status',
-    }),
-    ApiNotFoundResponse({
-      description: 'Quote not found for order',
-    }),
-  );
-}
-
-export function ApiPublishFinalQuoteDocs() {
-  return applyDecorators(
-    ApiOperation({
-      summary: '[ORDER-013] Publish Final Quote to Customer (Staff / Manager)',
-      description:
-        'Publishes the final quote: status transitions to ISSUED, valid_until is set (default +7 days), order current_quote_id is updated, and order status transitions to AWAITING_CUSTOMER_CONFIRMATION.',
-    }),
-    ApiBearerAuth(),
-    ApiOkResponse({
-      description: 'Quote published successfully and order ready for confirmation',
-    }),
-    ApiBadRequestResponse({
-      description: 'Quote is not in DRAFT status',
-    }),
-    ApiNotFoundResponse({
-      description: 'Quote not found for order',
-    }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Order'),
   );
 }
 
 export function ApiGetOrderQuoteByIdDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-013 Part B] Get specific Quote details',
+      summary: '[ORDER-011 View] Get specific quote details',
       description:
-        'Retrieves comprehensive breakdown of a single quote (provisional or final) including all line items and validity dates.',
+        'Retrieves quote line items, adjustments, delivery amount, and total breakdown.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiParam({ name: 'quoteId', description: 'Quote UUID', type: String }),
+    ApiSuccessResponse({
+      type: FullQuoteDetailDto,
+      description: 'Quote details returned successfully',
     }),
-    ApiOkResponse({
-      description: 'Quote details retrieved successfully',
-    }),
-    ApiNotFoundResponse({
-      description: 'Quote or order not found',
-    }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Quote or order'),
   );
 }
 
 export function ApiConfirmFinalQuoteDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-014] Confirm Final Quote and Ring Item Versions (Customer)',
+      summary: '[ORDER-014] Customer confirms Final Quote',
       description:
-        'Customer accepts the ISSUED final quote and locks all ring item versions. Creates an immutable record in final_confirmations and final_confirmation_items. Order advances to AWAITING_P2 (or PRODUCTION_AUTHORIZED if All-NONE).',
+        'Customer accepts the ISSUED final quote, snapshots confirmed items, and advances order to AWAITING_P2.',
     }),
-    ApiBearerAuth(),
-    ApiOkResponse({
-      description: 'Final quote and versions successfully confirmed',
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: ConfirmFinalQuoteResponseDto,
+      description: 'Final quote confirmed successfully',
     }),
-    ApiBadRequestResponse({
-      description: 'Quote is expired or not in ISSUED status',
-    }),
-    ApiNotFoundResponse({
-      description: 'Order or quote not found',
-    }),
+    ApiResponse({ status: 400, description: 'Quote is not in ISSUED status or has expired' }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Quote or order'),
   );
 }
 
 export function ApiRejectFinalQuoteDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-015 Part B] Reject Final Quote (Customer)',
+      summary: '[ORDER-015] Customer rejects Final Quote',
       description:
-        'Customer rejects the current ISSUED final quote with a reason. Quote status changes to REJECTED, and order reverts to PENDING_FINAL_QUOTE for staff revision.',
+        'Customer rejects the final quote with a mandatory reason, reverting order to PENDING_FINAL_QUOTE.',
     }),
-    ApiBearerAuth(),
-    ApiOkResponse({
-      description: 'Quote rejected successfully',
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: RejectFinalQuoteResponseDto,
+      description: 'Final quote rejected and order reverted for revision',
     }),
-    ApiBadRequestResponse({
-      description: 'Quote is not in ISSUED status or rejection reason is empty',
-    }),
-    ApiNotFoundResponse({
-      description: 'Order or quote not found',
-    }),
+    ApiResponse({ status: 400, description: 'Rejection reason is required' }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Quote or order'),
   );
 }
 
 export function ApiGetOrderFinalConfirmationsDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-015 Part A] Get Order Final Confirmations History',
+      summary: '[ORDER-015 Part A] List Final Confirmations for Order',
       description:
-        'Retrieves confirmation records and locked version snapshots for the order.',
+        'Returns immutable confirmation audit records showing exactly what customer approved.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: FinalConfirmationDetailDto,
+      isArray: true,
+      description: 'Confirmations list returned successfully',
     }),
-    ApiOkResponse({
-      description: 'Confirmations history retrieved successfully',
-    }),
-    ApiNotFoundResponse({
-      description: 'Order not found',
-    }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Order'),
   );
 }
 
 export function ApiListOrderPaymentsDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-017] List all payments of an order',
+      summary: '[ORDER-017] List Order Payment Transactions',
       description:
-        'Retrieves list of payment attempts, stages (P1/P2/P3), amounts, and total amount paid for the order.',
+        'Returns all payment transactions, stages (P1/P2/P3/REFUND), statuses, and calculated total paid amount.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: PaymentTransactionSummaryDto,
+      isArray: true,
+      description: 'Payment transactions returned successfully',
     }),
-    ApiOkResponse({
-      description: 'List of order payments returned successfully',
-    }),
-    ApiNotFoundResponse({
-      description: 'Order not found or not owned by actor',
-    }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Order'),
   );
 }
 
 export function ApiGetOrderPaymentByIdDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-018] Get Payment Transaction by ID',
+      summary: '[ORDER-018] Get Payment Transaction Attempt Details',
       description:
-        'Retrieves full details of a payment transaction (provider info, timing, status, failure reasons).',
+        'Retrieves single payment transaction detail with PayOS provider status, references, and timestamps.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
-    }),
-    ApiOkResponse({
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiParam({ name: 'transactionId', description: 'Transaction UUID', type: String }),
+    ApiSuccessResponse({
+      type: PaymentTransactionDetailDto,
       description: 'Payment transaction details returned successfully',
     }),
-    ApiNotFoundResponse({
-      description: 'Payment transaction or order not found',
-    }),
+    unauthorized,
+    forbidden('Caller does not own this order transaction'),
+    notFound('Payment transaction or order'),
   );
 }
 
 export function ApiGetPaymentReceiptDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
       summary: '[ORDER-021] Get Immutable Payment Receipt',
       description:
         'Retrieves official electronic payment receipt with immutable receipt_no for a completed payment.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
-    }),
-    ApiOkResponse({
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiParam({ name: 'transactionId', description: 'Transaction UUID', type: String }),
+    ApiSuccessResponse({
+      type: PaymentReceiptDetailDto,
       description: 'Payment receipt returned successfully',
     }),
-    ApiBadRequestResponse({
-      description: 'Receipt is only available for SUCCEEDED transactions',
-    }),
-    ApiNotFoundResponse({
-      description: 'Payment transaction or order not found',
-    }),
+    ApiResponse({ status: 400, description: 'Receipt is only available for SUCCEEDED transactions' }),
+    unauthorized,
+    forbidden('Caller does not own this receipt'),
+    notFound('Payment transaction or order'),
   );
 }
 
 export function ApiGetOrderInvoiceDocs() {
   return applyDecorators(
+    bearer,
+    guestSessionHeader,
     ApiOperation({
       summary: '[ORDER-022] Get Order Invoice / Summary',
       description:
         'Retrieves comprehensive order invoice breakdown with invoice_no, total, totalPaid, remaining, and items.',
     }),
-    ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-guest-session-id',
-      description: 'Guest session UUID',
-      required: false,
-    }),
-    ApiOkResponse({
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: OrderInvoiceDetailDto,
       description: 'Order invoice returned successfully',
     }),
-    ApiNotFoundResponse({
-      description: 'Order not found or invoice unavailable',
+    unauthorized,
+    forbidden('Caller does not own this order invoice'),
+    notFound('Order'),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Admin / Staff Order Endpoints
+// ---------------------------------------------------------------------------
+
+export function ApiListAdminOrdersDocs() {
+  return applyDecorators(
+    bearer,
+    ApiOperation({
+      summary: '[ORDER-007] List Orders for Administration',
+      description:
+        'Requires roles: `STORE_MANAGER`, `STORE_STAFF`, `SUPER_ADMIN`, `ADMIN`, `MANAGER`. Supports filters by status, dates, search, and pagination.',
     }),
+    ApiSuccessResponse({
+      type: AdminOrderSummaryDto,
+      isArray: true,
+      paginated: true,
+      description: 'Admin order list returned successfully',
+    }),
+    ApiResponse({ status: 400, description: 'Invalid query filters' }),
+    unauthorized,
+    forbidden('Caller lacks staff/admin role'),
+  );
+}
+
+export function ApiGetAdminOrderDetailsDocs() {
+  return applyDecorators(
+    bearer,
+    ApiOperation({
+      summary: '[ORDER-008] Get Admin Order Details',
+      description:
+        'Requires roles: `STORE_MANAGER`, `STORE_STAFF`, `SUPER_ADMIN`, `ADMIN`, `MANAGER`. Returns complete operational details, customer identity info, and payment records.',
+    }),
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: AdminOrderDetailsResponseDto,
+      description: 'Admin order details returned successfully',
+    }),
+    unauthorized,
+    forbidden('Caller lacks staff/admin role'),
+    notFound('Order'),
+  );
+}
+
+export function ApiUpdateOrderStatusDocs() {
+  return applyDecorators(
+    bearer,
+    ApiOperation({
+      summary: '[ORDER-009] Update Order Production Status',
+      description:
+        'Requires roles: `STORE_MANAGER`, `STORE_STAFF`, `SUPER_ADMIN`, `ADMIN`, `MANAGER`. Validates state transition machine.',
+    }),
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: UpdateOrderStatusResponseDto,
+      description: 'Order status updated successfully',
+    }),
+    ApiResponse({ status: 400, description: 'Invalid state machine transition' }),
+    unauthorized,
+    forbidden('Caller lacks staff/admin role'),
+    notFound('Order'),
+  );
+}
+
+export function ApiCreateFinalQuoteDocs() {
+  return applyDecorators(
+    bearer,
+    ApiOperation({
+      summary: '[ORDER-011] Create Final Quote Draft (Staff)',
+      description:
+        'Allows staff to create a DRAFT final quote with exact prices, components, and validity date for an order in PENDING_FINAL_QUOTE.',
+    }),
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiSuccessResponse({
+      type: FullQuoteDetailDto,
+      status: 201,
+      description: 'Final quote draft created successfully',
+    }),
+    ApiResponse({ status: 400, description: 'Line items cannot be empty or invalid amounts' }),
+    unauthorized,
+    forbidden('Caller lacks staff/admin role'),
+    notFound('Order'),
+  );
+}
+
+export function ApiUpdateFinalQuoteDocs() {
+  return applyDecorators(
+    bearer,
+    ApiOperation({
+      summary: '[ORDER-012] Update Final Quote Draft (Staff)',
+      description:
+        'Allows staff to modify line items and amounts of a DRAFT quote before publishing.',
+    }),
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiParam({ name: 'quoteId', description: 'Quote UUID', type: String }),
+    ApiSuccessResponse({
+      type: FullQuoteDetailDto,
+      description: 'Final quote updated successfully',
+    }),
+    ApiResponse({ status: 400, description: 'Only DRAFT quotes can be edited' }),
+    unauthorized,
+    forbidden('Caller lacks staff/admin role'),
+    notFound('Quote or order'),
+  );
+}
+
+export function ApiPublishFinalQuoteDocs() {
+  return applyDecorators(
+    bearer,
+    ApiOperation({
+      summary: '[ORDER-013] Publish Final Quote to Customer (Staff)',
+      description:
+        'Transitions quote status from DRAFT to ISSUED, locks items, and advances order to AWAITING_CUSTOMER_CONFIRMATION.',
+    }),
+    ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
+    ApiParam({ name: 'quoteId', description: 'Quote UUID', type: String }),
+    ApiSuccessResponse({
+      type: FullQuoteDetailDto,
+      description: 'Final quote published to customer successfully',
+    }),
+    ApiResponse({ status: 400, description: 'Quote is not in DRAFT status' }),
+    unauthorized,
+    forbidden('Caller lacks staff/admin role'),
+    notFound('Quote or order'),
   );
 }
 
 export function ApiCreateRefundRequestDocs() {
   return applyDecorators(
+    bearer,
     ApiOperation({
       summary: '[ORDER-023] Create Refund Request (Staff / Admin)',
       description:
         'Allows staff to create an audited refund request linked to an existing successful transaction.',
     }),
-    ApiBearerAuth(),
-    ApiCreatedResponse({
+    ApiParam({ name: 'transactionId', description: 'Transaction UUID', type: String }),
+    ApiSuccessResponse({
+      type: PaymentTransactionDetailDto,
+      status: 201,
       description: 'Refund request created successfully with PENDING status',
     }),
-    ApiBadRequestResponse({
-      description: 'Invalid refund amount or missing reason',
-    }),
-    ApiNotFoundResponse({
-      description: 'Original payment transaction not found',
-    }),
+    ApiResponse({ status: 400, description: 'Invalid refund amount or missing reason' }),
+    unauthorized,
+    forbidden('Caller lacks staff/admin role'),
+    notFound('Original payment transaction'),
   );
 }

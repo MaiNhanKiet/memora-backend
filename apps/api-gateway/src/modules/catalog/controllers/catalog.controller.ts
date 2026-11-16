@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '@app/common';
+import { toPaginatedSuccessResponse } from '../../../common/mappers/paginated-success.mapper';
 import { CatalogGrpcClient } from '../clients/catalog-grpc.client';
 import { ListTemplatesQueryDto } from '../dto/request/list-templates.query.dto';
 import { ListGemstoneOptionsQueryDto } from '../dto/request/list-gemstone-options.query.dto';
@@ -29,7 +30,7 @@ import {
   ApiValidateConfigurationDocs,
 } from '../docs/catalog.swagger';
 
-@ApiTags('catalog')
+@ApiTags('commerce-catalog')
 @Controller('catalog')
 export class CatalogController {
   constructor(private readonly catalogClient: CatalogGrpcClient) {}
@@ -49,10 +50,10 @@ export class CatalogController {
       gender: query.gender,
       search: query.search,
     });
-    return {
-      data: res.data,
-      meta: res.pagination,
-    };
+    return toPaginatedSuccessResponse({
+      data: res.data ?? [],
+      pagination: res.pagination,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -63,7 +64,7 @@ export class CatalogController {
   @ApiListMaterialsDocs()
   async listMaterials() {
     const res = await this.catalogClient.listMaterials({ status: 'ACTIVE' });
-    return res.data;
+    return res.data ?? [];
   }
 
   // ---------------------------------------------------------------------------
@@ -82,10 +83,10 @@ export class CatalogController {
       shape: query.shape,
       isCertified: query.isCertified,
     });
-    return {
-      data: res.data,
-      meta: res.pagination,
-    };
+    return toPaginatedSuccessResponse({
+      data: res.data ?? [],
+      pagination: res.pagination,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -170,7 +171,7 @@ export class CatalogController {
       templateId,
       materialId: query.materialId,
     });
-    return res.data;
+    return res.data ?? [];
   }
 
   // ---------------------------------------------------------------------------
@@ -183,7 +184,7 @@ export class CatalogController {
     @Param('templateId', ParseUUIDPipe) templateId: string,
   ) {
     const res = await this.catalogClient.listGemstoneSlots({ templateId });
-    return res.data;
+    return res.data ?? [];
   }
 
   // ---------------------------------------------------------------------------
@@ -199,6 +200,6 @@ export class CatalogController {
       templateVariantId,
       templateId,
     });
-    return res.data;
+    return res.data ?? [];
   }
 }

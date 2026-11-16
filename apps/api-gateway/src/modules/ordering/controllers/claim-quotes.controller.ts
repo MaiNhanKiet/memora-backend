@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedPrincipal } from '@app/auth';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { toVerifiedActor } from '../../../common/grpc/verified-actor';
@@ -26,6 +27,7 @@ import {
   PaymentLinkResponseDto,
 } from '../dto/payos-payments.dto';
 
+@ApiTags('commerce-claims')
 @Controller('claims')
 export class ClaimQuotesController {
   constructor(private readonly orderingGrpcClient: OrderingGrpcClient) {}

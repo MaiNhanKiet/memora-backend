@@ -36,7 +36,7 @@ import {
   ApiRejectPriceVersionDocs,
 } from '../docs/admin-pricing.swagger';
 
-@ApiTags('Admin Pricing')
+@ApiTags('commerce-admin-pricing')
 @Controller('admin/pricing')
 @Roles('MANAGER', 'ADMIN')
 export class AdminPricingController {

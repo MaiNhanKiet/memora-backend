@@ -32,7 +32,7 @@ import {
   ApiValidateCheckoutDocs,
 } from '../docs/cart.swagger';
 
-@ApiTags('cart')
+@ApiTags('commerce-cart')
 @Controller('cart')
 export class CartController {
   constructor(private readonly designClient: DesignGrpcClient) {}

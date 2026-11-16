@@ -42,7 +42,7 @@ import {
   ApiReserveInventoryDocs,
 } from '../docs/admin-inventory.swagger';
 
-@ApiTags('Admin Inventory')
+@ApiTags('commerce-admin-inventory')
 @Controller('admin/inventory')
 @Roles('MANAGER', 'ADMIN')
 export class AdminInventoryController {

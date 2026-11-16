@@ -31,7 +31,7 @@ import {
   RevokeDesignShareLinkResponseDto,
 } from '../dto/design-share.dto';
 
-@ApiTags('design-drafts')
+@ApiTags('commerce-design-drafts')
 @Controller('design/drafts')
 export class DesignDraftController {
   constructor(private readonly designClient: DesignGrpcClient) {}

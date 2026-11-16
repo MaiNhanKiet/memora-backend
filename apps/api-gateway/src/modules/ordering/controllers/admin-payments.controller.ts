@@ -17,7 +17,7 @@ import { ApiCreateRefundRequestDocs } from '../docs/ordering.swagger';
 import { ApiReconcilePaymentTransaction } from '../docs/payos-payments.swagger';
 import { toVerifiedActor } from '../../../common/grpc/verified-actor';
 
-@ApiTags('Admin Payments')
+@ApiTags('commerce-admin-payments')
 @Controller('admin/payments')
 @Roles('STORE_MANAGER', 'STORE_STAFF', 'SUPER_ADMIN', 'ADMIN', 'MANAGER')
 export class AdminPaymentsController {

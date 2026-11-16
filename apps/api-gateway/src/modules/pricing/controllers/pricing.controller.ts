@@ -5,7 +5,7 @@ import { PricingGrpcClient } from '../clients/pricing-grpc.client';
 import { EstimatePriceBodyDto } from '../dto/estimate-price.dto';
 import { ApiEstimatePriceDocs } from '../docs/pricing.swagger';
 
-@ApiTags('pricing')
+@ApiTags('commerce-pricing')
 @Controller('pricing')
 export class PricingController {
   constructor(private readonly pricingClient: PricingGrpcClient) {}

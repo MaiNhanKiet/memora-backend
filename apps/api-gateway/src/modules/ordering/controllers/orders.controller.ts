@@ -13,6 +13,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedPrincipal } from '@app/auth';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { toPaginatedSuccessResponse } from '../../../common/mappers/paginated-success.mapper';
 import { OrderingGrpcClient } from '../clients/ordering-grpc.client';
 import { toVerifiedActor } from '../../../common/grpc/verified-actor';
 import {
@@ -45,7 +46,7 @@ import {
   ApiUpdateCurrentRingItemVersionDocs,
 } from '../docs/ordering.swagger';
 
-@ApiTags('orders')
+@ApiTags('commerce-orders')
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly orderingClient: OrderingGrpcClient) {}
@@ -92,11 +93,25 @@ export class OrdersController {
     @Query() query: ListOrdersQueryDto,
   ) {
     const actor = toVerifiedActor(principal);
-    return this.orderingClient.listOrders({
+    const res = await this.orderingClient.listOrders({
       actor,
       page: query.page,
       limit: query.limit,
       status: query.status,
+    });
+    const page = res.page ?? query.page ?? 1;
+    const limit = res.limit ?? query.limit ?? 20;
+    const total = res.total ?? 0;
+    const totalPages = total <= 0 ? 0 : Math.ceil(total / limit);
+
+    return toPaginatedSuccessResponse({
+      data: res.items ?? [],
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
     });
   }
 

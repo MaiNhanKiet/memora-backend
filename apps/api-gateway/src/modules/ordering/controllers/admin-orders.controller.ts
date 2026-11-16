@@ -14,6 +14,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Roles } from '@app/auth';
 import type { AuthenticatedPrincipal } from '@app/auth';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { toPaginatedSuccessResponse } from '../../../common/mappers/paginated-success.mapper';
 import { OrderingGrpcClient } from '../clients/ordering-grpc.client';
 import {
   CreateFinalQuoteBodyDto,
@@ -30,7 +31,7 @@ import {
   ApiUpdateOrderStatusDocs,
 } from '../docs/ordering.swagger';
 
-@ApiTags('Admin Orders')
+@ApiTags('commerce-admin-orders')
 @Controller('admin/orders')
 @Roles('STORE_MANAGER', 'STORE_STAFF', 'SUPER_ADMIN', 'ADMIN', 'MANAGER')
 export class AdminOrdersController {
@@ -43,13 +44,27 @@ export class AdminOrdersController {
   @HttpCode(HttpStatus.OK)
   @ApiListAdminOrdersDocs()
   async listAdminOrders(@Query() query: ListAdminOrdersQueryDto) {
-    return this.orderingClient.listAdminOrders({
+    const res = await this.orderingClient.listAdminOrders({
       page: query.page,
       limit: query.limit,
       status: query.status,
       search: query.search,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
+    });
+    const page = res.page ?? query.page ?? 1;
+    const limit = res.limit ?? query.limit ?? 20;
+    const total = res.total ?? 0;
+    const totalPages = total <= 0 ? 0 : Math.ceil(total / limit);
+
+    return toPaginatedSuccessResponse({
+      data: res.items ?? [],
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
     });
   }
 

@@ -74,7 +74,7 @@ export class CatalogService {
     });
 
     const data = rows.map((item) => this.mapper.toTemplateResponse(item));
-    const totalPages = Math.ceil(total / limit) || 1;
+    const totalPages = total <= 0 ? 0 : Math.ceil(total / limit);
 
     return {
       data,
@@ -220,7 +220,7 @@ export class CatalogService {
     });
 
     const data = rows.map((g) => this.mapper.toGemstoneOptionResponse(g));
-    const totalPages = Math.ceil(total / limit) || 1;
+    const totalPages = total <= 0 ? 0 : Math.ceil(total / limit);
 
     return {
       data,

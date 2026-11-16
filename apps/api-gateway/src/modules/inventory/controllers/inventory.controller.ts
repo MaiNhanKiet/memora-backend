@@ -5,7 +5,7 @@ import { InventoryGrpcClient } from '../clients/inventory-grpc.client';
 import { ListCertifiedGemstoneAvailabilityQueryDto } from '../dto/request/admin-inventory.dto';
 import { ApiListCertifiedGemstoneAvailabilityDocs } from '../docs/admin-inventory.swagger';
 
-@ApiTags('Inventory')
+@ApiTags('commerce-inventory')
 @Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryClient: InventoryGrpcClient) {}

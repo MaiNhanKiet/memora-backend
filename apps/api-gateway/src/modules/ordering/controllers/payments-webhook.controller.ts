@@ -1,4 +1,5 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { OrderingGrpcClient } from '../clients/ordering-grpc.client';
 import { ApiProcessPayosWebhook } from '../docs/payos-payments.swagger';
 import {
@@ -6,6 +7,7 @@ import {
   PayosWebhookResponseDto,
 } from '../dto/payos-payments.dto';
 
+@ApiTags('commerce-payments')
 @Controller('payments')
 export class PaymentsWebhookController {
   constructor(private readonly orderingClient: OrderingGrpcClient) {}

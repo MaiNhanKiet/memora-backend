@@ -40,7 +40,7 @@ import {
   ApiUpdateVariantDocs,
 } from '../docs/admin-catalog.swagger';
 
-@ApiTags('Admin Catalog')
+@ApiTags('commerce-admin-catalog')
 @Controller('admin/catalog')
 export class AdminCatalogController {
   constructor(private readonly catalogClient: CatalogGrpcClient) {}
