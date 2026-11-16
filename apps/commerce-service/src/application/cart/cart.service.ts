@@ -497,7 +497,11 @@ export class CartService {
     }
 
     // Ownership check
-    if (actor.userId && draft.owner_user_id && draft.owner_user_id !== actor.userId) {
+    if (
+      actor.userId &&
+      draft.owner_user_id &&
+      draft.owner_user_id !== actor.userId
+    ) {
       throw new ForbiddenException('You do not own this design draft');
     }
     if (
@@ -508,7 +512,10 @@ export class CartService {
       throw new ForbiddenException('You do not own this design draft');
     }
 
-    const days = request.expiresInDays && request.expiresInDays > 0 ? request.expiresInDays : 7;
+    const days =
+      request.expiresInDays && request.expiresInDays > 0
+        ? request.expiresInDays
+        : 7;
     const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
     const rawCode = `MMR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -541,7 +548,11 @@ export class CartService {
       throw new NotFoundException(`Draft ${request.draftId} not found`);
     }
 
-    if (actor.userId && draft.owner_user_id && draft.owner_user_id !== actor.userId) {
+    if (
+      actor.userId &&
+      draft.owner_user_id &&
+      draft.owner_user_id !== actor.userId
+    ) {
       throw new ForbiddenException('You do not own this design draft');
     }
 
@@ -550,7 +561,9 @@ export class CartService {
       request.draftId,
     );
     if (!designCode) {
-      throw new NotFoundException(`Share link ${request.linkId} not found for this draft`);
+      throw new NotFoundException(
+        `Share link ${request.linkId} not found for this draft`,
+      );
     }
 
     if (designCode.status === 'REVOKED') {

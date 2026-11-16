@@ -37,7 +37,9 @@ export class PricingRuleResponseDto {
   @ApiPropertyOptional({ example: 'RECIPIENT_UNAVAILABLE' })
   redeliveryReason?: string;
 
-  @ApiPropertyOptional({ example: '{"baseFee": 200000, "perSizeDeltaFee": 50000}' })
+  @ApiPropertyOptional({
+    example: '{"baseFee": 200000, "perSizeDeltaFee": 50000}',
+  })
   configJson?: string;
 
   @ApiProperty({ enum: ['DRAFT', 'ACTIVE', 'INACTIVE'], example: 'ACTIVE' })

@@ -1,10 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { OrderingGrpcClient } from '../../clients/ordering-grpc.client';
-import {
-  PayosWebhookBodyDto,
-  PayosWebhookResponseDto,
-} from '../dto';
+import { PayosWebhookBodyDto, PayosWebhookResponseDto } from '../dto';
 import { ApiProcessPayosWebhook } from '../docs/payments.swagger';
 import { toProcessPayosWebhookGrpcRequest } from '../mappers/payments-http.mapper';
 

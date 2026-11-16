@@ -169,7 +169,12 @@ export class CheckoutOrdersController {
   ) {
     const actor = toVerifiedActor(principal);
     return this.orderingClient.updateCurrentRingItemVersion(
-      toUpdateCurrentRingItemVersionGrpcRequest(actor, orderId, ringItemId, body),
+      toUpdateCurrentRingItemVersionGrpcRequest(
+        actor,
+        orderId,
+        ringItemId,
+        body,
+      ),
     );
   }
 

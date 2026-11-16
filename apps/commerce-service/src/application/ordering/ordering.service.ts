@@ -1083,13 +1083,12 @@ export class OrderingService {
         ? 'PRODUCTION_AUTHORIZED'
         : 'AWAITING_P2';
 
-    const { confirmation, ringItems } =
-      await this.repository.confirmFinalQuote(
-        request.orderId,
-        quote.id,
-        actor.userId,
-        nextOrderStatus,
-      );
+    const { confirmation, ringItems } = await this.repository.confirmFinalQuote(
+      request.orderId,
+      quote.id,
+      actor.userId,
+      nextOrderStatus,
+    );
 
     return {
       confirmationId: confirmation.id,
@@ -1247,9 +1246,13 @@ export class OrderingService {
       totalAmount: Number(quote.total_amount),
       currency: quote.currency,
       createdAt: quote.created_at.toISOString(),
-      validUntil: quote.valid_until ? quote.valid_until.toISOString() : undefined,
+      validUntil: quote.valid_until
+        ? quote.valid_until.toISOString()
+        : undefined,
       issuedAt: quote.issued_at ? quote.issued_at.toISOString() : undefined,
-      acceptedAt: quote.accepted_at ? quote.accepted_at.toISOString() : undefined,
+      acceptedAt: quote.accepted_at
+        ? quote.accepted_at.toISOString()
+        : undefined,
       items: quote.quote_items.map((i) => ({
         id: i.id,
         ringItemId: i.ring_item_id ?? undefined,
@@ -1499,7 +1502,8 @@ export class OrderingService {
 
     return {
       refundTransactionId: refund.id,
-      originalTransactionId: refund.related_transaction_id || request.transactionId,
+      originalTransactionId:
+        refund.related_transaction_id || request.transactionId,
       orderId: refund.order_id || '',
       refundAmount: Number(refund.amount),
       currency: refund.currency,
@@ -1539,16 +1543,25 @@ export class OrderingService {
     const actor = this.validateActor(request.actor);
     const customerIdentityId = actor.userId ?? actor.guestSessionId;
     if (!customerIdentityId) {
-      throw new ForbiddenException('A valid customer identity is required to accept a service quote');
+      throw new ForbiddenException(
+        'A valid customer identity is required to accept a service quote',
+      );
     }
 
-    const quote = await this.repository.findClaimQuoteById(request.claimId, request.quoteId);
+    const quote = await this.repository.findClaimQuoteById(
+      request.claimId,
+      request.quoteId,
+    );
     if (!quote) {
-      throw new NotFoundException(`Service quote ${request.quoteId} for claim ${request.claimId} not found`);
+      throw new NotFoundException(
+        `Service quote ${request.quoteId} for claim ${request.claimId} not found`,
+      );
     }
 
     if (quote.quote_type !== 'SERVICE') {
-      throw new BadRequestException(`Quote is not a SERVICE quote (type: '${quote.quote_type}')`);
+      throw new BadRequestException(
+        `Quote is not a SERVICE quote (type: '${quote.quote_type}')`,
+      );
     }
 
     if (quote.status === 'ACCEPTED') {
@@ -1556,7 +1569,9 @@ export class OrderingService {
         success: true,
         quoteId: quote.id,
         status: quote.status,
-        acceptedAt: quote.accepted_at ? quote.accepted_at.toISOString() : new Date().toISOString(),
+        acceptedAt: quote.accepted_at
+          ? quote.accepted_at.toISOString()
+          : new Date().toISOString(),
       };
     }
 
@@ -1581,7 +1596,9 @@ export class OrderingService {
       success: true,
       quoteId: updated.id,
       status: updated.status,
-      acceptedAt: updated.accepted_at ? updated.accepted_at.toISOString() : new Date().toISOString(),
+      acceptedAt: updated.accepted_at
+        ? updated.accepted_at.toISOString()
+        : new Date().toISOString(),
     };
   }
 
@@ -1606,7 +1623,10 @@ export class OrderingService {
         stage = 'DEPOSIT_P1';
       } else if (order.status === 'AWAITING_P2') {
         stage = 'MILESTONE_P2';
-      } else if (order.status === 'AWAITING_P3' || order.status === 'READY_FOR_DELIVERY') {
+      } else if (
+        order.status === 'AWAITING_P3' ||
+        order.status === 'READY_FOR_DELIVERY'
+      ) {
         stage = 'FINAL_P3';
       } else if (order.status === 'PENDING_FINAL_QUOTE') {
         stage = 'FULL_PAYMENT';
@@ -1628,9 +1648,13 @@ export class OrderingService {
     } else if (stage === 'MILESTONE_P2') {
       amount = Math.round(totalAmount * 0.4);
     } else if (stage === 'FINAL_P3') {
-      const existingPayments = await this.repository.findOrderPayments(order.id);
+      const existingPayments = await this.repository.findOrderPayments(
+        order.id,
+      );
       const paid = existingPayments
-        .filter((p) => p.status === 'SUCCEEDED' && p.transaction_type === 'PAYMENT')
+        .filter(
+          (p) => p.status === 'SUCCEEDED' && p.transaction_type === 'PAYMENT',
+        )
         .reduce((sum, p) => sum + Number(p.amount), 0);
       amount = Math.max(0, totalAmount - paid);
     } else {
@@ -1642,8 +1666,10 @@ export class OrderingService {
     }
 
     const orderCode = this.payosProvider.generateOrderCode();
-    const returnUrl = request.returnUrl || 'https://memora.vn/orders/' + order.id;
-    const cancelUrl = request.cancelUrl || 'https://memora.vn/orders/' + order.id;
+    const returnUrl =
+      request.returnUrl || 'https://memora.vn/orders/' + order.id;
+    const cancelUrl =
+      request.cancelUrl || 'https://memora.vn/orders/' + order.id;
 
     const paymentLink = await this.payosProvider.createPaymentLink({
       orderCode,
@@ -1688,9 +1714,10 @@ export class OrderingService {
   ): Promise<PayosWebhookResponse> {
     let payloadData: any;
     try {
-      payloadData = typeof request.dataJson === 'string'
-        ? JSON.parse(request.dataJson)
-        : request.dataJson;
+      payloadData =
+        typeof request.dataJson === 'string'
+          ? JSON.parse(request.dataJson)
+          : request.dataJson;
     } catch {
       throw new BadRequestException('Invalid dataJson in PayOS webhook');
     }
@@ -1732,8 +1759,12 @@ export class OrderingService {
         nextOrderStatus = 'PENDING_FINAL_QUOTE';
       } else if (tx.payment_stage === 'MILESTONE_P2') {
         nextOrderStatus = 'MANUFACTURING';
-      } else if (tx.payment_stage === 'FINAL_P3' || tx.payment_stage === 'FULL_PAYMENT') {
-        nextOrderStatus = tx.orders.status === 'READY_FOR_DELIVERY' ? 'DELIVERING' : undefined;
+      } else if (
+        tx.payment_stage === 'FINAL_P3' ||
+        tx.payment_stage === 'FULL_PAYMENT'
+      ) {
+        nextOrderStatus =
+          tx.orders.status === 'READY_FOR_DELIVERY' ? 'DELIVERING' : undefined;
       }
     }
 
@@ -1761,9 +1792,13 @@ export class OrderingService {
   async reconcilePaymentTransaction(
     request: ReconcilePaymentTransactionRequest,
   ): Promise<PaymentTransactionDetail> {
-    const tx = await this.repository.findPaymentTransactionById(request.transactionId);
+    const tx = await this.repository.findPaymentTransactionById(
+      request.transactionId,
+    );
     if (!tx) {
-      throw new NotFoundException(`Transaction ${request.transactionId} not found`);
+      throw new NotFoundException(
+        `Transaction ${request.transactionId} not found`,
+      );
     }
 
     if (tx.status === 'SUCCEEDED') {
@@ -1771,7 +1806,9 @@ export class OrderingService {
     }
 
     if (!tx.provider_order_code) {
-      throw new BadRequestException('Transaction has no provider_order_code to reconcile');
+      throw new BadRequestException(
+        'Transaction has no provider_order_code to reconcile',
+      );
     }
 
     const info = await this.payosProvider.getPaymentInformation(
@@ -1852,12 +1889,16 @@ export class OrderingService {
 
     const amount = Number(acceptedQuote.total_amount);
     if (amount <= 0) {
-      throw new BadRequestException('Accepted quote amount must be greater than 0');
+      throw new BadRequestException(
+        'Accepted quote amount must be greater than 0',
+      );
     }
 
     const orderCode = this.payosProvider.generateOrderCode();
-    const returnUrl = request.returnUrl || 'https://memora.vn/claims/' + request.claimId;
-    const cancelUrl = request.cancelUrl || 'https://memora.vn/claims/' + request.claimId;
+    const returnUrl =
+      request.returnUrl || 'https://memora.vn/claims/' + request.claimId;
+    const cancelUrl =
+      request.cancelUrl || 'https://memora.vn/claims/' + request.claimId;
 
     const paymentLink = await this.payosProvider.createPaymentLink({
       orderCode,

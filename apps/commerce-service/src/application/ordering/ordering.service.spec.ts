@@ -1641,7 +1641,9 @@ describe('OrderingService', () => {
 
       expect(res.success).toBe(true);
       expect(res.status).toBe('SUCCEEDED');
-      expect(mockRepository.markPaymentTransactionSucceeded).toHaveBeenCalledWith(
+      expect(
+        mockRepository.markPaymentTransactionSucceeded,
+      ).toHaveBeenCalledWith(
         expect.objectContaining({
           transactionId: 'tx-p1',
           nextOrderStatus: 'PENDING_FINAL_QUOTE',
@@ -1687,7 +1689,11 @@ describe('OrderingService', () => {
   describe('createClaimPaymentLink (ORDER-026)', () => {
     it('should throw BadRequestException if no ACCEPTED quote found', async () => {
       mockRepository.findClaimQuotes.mockResolvedValue([
-        { id: 'quo-1', status: 'ISSUED', total_amount: new Prisma.Decimal(500000) },
+        {
+          id: 'quo-1',
+          status: 'ISSUED',
+          total_amount: new Prisma.Decimal(500000),
+        },
       ]);
 
       await expect(

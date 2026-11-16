@@ -152,16 +152,12 @@ export class OrderingGrpcController implements OrderingServiceHandler {
   }
 
   @GrpcMethod('OrderingService', 'CreateFinalQuote')
-  createFinalQuote(
-    request: CreateFinalQuoteRequest,
-  ): Promise<FullQuoteDetail> {
+  createFinalQuote(request: CreateFinalQuoteRequest): Promise<FullQuoteDetail> {
     return this.orderingService.createFinalQuote(request);
   }
 
   @GrpcMethod('OrderingService', 'UpdateFinalQuote')
-  updateFinalQuote(
-    request: UpdateFinalQuoteRequest,
-  ): Promise<FullQuoteDetail> {
+  updateFinalQuote(request: UpdateFinalQuoteRequest): Promise<FullQuoteDetail> {
     return this.orderingService.updateFinalQuote(request);
   }
 

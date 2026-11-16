@@ -14,10 +14,7 @@ import { PERMISSIONS } from '@app/contracts';
 import type { AuthenticatedPrincipal } from '@app/auth';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { CatalogGrpcClient } from '../../clients/catalog-grpc.client';
-import {
-  CreateTemplateBodyDto,
-  UpdateTemplateBodyDto,
-} from '../dto';
+import { CreateTemplateBodyDto, UpdateTemplateBodyDto } from '../dto';
 import {
   ApiArchiveTemplateDocs,
   ApiPublishTemplateDocs,

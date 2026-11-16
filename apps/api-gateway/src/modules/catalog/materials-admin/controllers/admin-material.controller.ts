@@ -56,9 +56,7 @@ export class AdminMaterialController {
   @RequirePermissions(PERMISSIONS.CATALOG_OPTION_MANAGE)
   @ApiCreateMaterialDocs()
   async createMaterial(@Body() body: CreateMaterialBodyDto) {
-    return this.catalogClient.createMaterial(
-      toCreateMaterialGrpcRequest(body),
-    );
+    return this.catalogClient.createMaterial(toCreateMaterialGrpcRequest(body));
   }
 
   // ---------------------------------------------------------------------------

@@ -20,7 +20,9 @@ export class PayosProvider {
     this.clientId = this.configService.get<string>('PAYOS_CLIENT_ID');
     this.apiKey = this.configService.get<string>('PAYOS_API_KEY');
     this.checksumKey = this.configService.get<string>('PAYOS_CHECKSUM_KEY');
-    this.isConfigured = Boolean(this.clientId && this.apiKey && this.checksumKey);
+    this.isConfigured = Boolean(
+      this.clientId && this.apiKey && this.checksumKey,
+    );
 
     if (!this.isConfigured) {
       this.logger.warn(
@@ -31,7 +33,9 @@ export class PayosProvider {
 
   generateOrderCode(): number {
     // PayOS requires a positive integer <= 9007199254740991
-    return Math.floor(Date.now() / 1000) * 1000 + Math.floor(Math.random() * 1000);
+    return (
+      Math.floor(Date.now() / 1000) * 1000 + Math.floor(Math.random() * 1000)
+    );
   }
 
   async createPaymentLink(
@@ -78,15 +82,18 @@ export class PayosProvider {
         signature,
       };
 
-      const response = await fetch('https://api-merchant.payos.vn/v2/payment-requests', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-id': this.clientId!,
-          'x-api-key': this.apiKey!,
+      const response = await fetch(
+        'https://api-merchant.payos.vn/v2/payment-requests',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-client-id': this.clientId!,
+            'x-api-key': this.apiKey!,
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+      );
 
       const resData = (await response.json()) as {
         code: string;
@@ -100,7 +107,10 @@ export class PayosProvider {
 
       return resData.data;
     } catch (err) {
-      this.logger.error('Failed to create PayOS payment link via live API', err);
+      this.logger.error(
+        'Failed to create PayOS payment link via live API',
+        err,
+      );
       throw err;
     }
   }
@@ -120,7 +130,9 @@ export class PayosProvider {
     // amount, cancelUrl (if any), description, orderCode, returnUrl, etc.
     const sortedKeys = Object.keys(data).sort();
     const signString = sortedKeys
-      .map((k) => `${k}=${(data as unknown as Record<string, unknown>)[k] ?? ''}`)
+      .map(
+        (k) => `${k}=${(data as unknown as Record<string, unknown>)[k] ?? ''}`,
+      )
       .join('&');
 
     const expectedSignature = crypto
@@ -135,7 +147,9 @@ export class PayosProvider {
     orderCode: number,
   ): Promise<{ status: string; amount: number; orderCode: number } | null> {
     if (!this.isConfigured) {
-      this.logger.log(`[MOCK PayOS] Fetching payment info for orderCode: ${orderCode}`);
+      this.logger.log(
+        `[MOCK PayOS] Fetching payment info for orderCode: ${orderCode}`,
+      );
       return {
         status: 'PAID',
         amount: 1000000,
@@ -171,7 +185,10 @@ export class PayosProvider {
 
       return resData.data;
     } catch (err) {
-      this.logger.error(`Failed to get PayOS payment information for ${orderCode}`, err);
+      this.logger.error(
+        `Failed to get PayOS payment information for ${orderCode}`,
+        err,
+      );
       return null;
     }
   }

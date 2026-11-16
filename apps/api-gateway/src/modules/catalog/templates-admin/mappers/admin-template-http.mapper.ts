@@ -4,10 +4,7 @@ import type {
   PublishTemplateRequest,
   UpdateTemplateRequest,
 } from '@app/contracts';
-import type {
-  CreateTemplateBodyDto,
-  UpdateTemplateBodyDto,
-} from '../dto';
+import type { CreateTemplateBodyDto, UpdateTemplateBodyDto } from '../dto';
 
 export function toCreateTemplateGrpcRequest(
   body: CreateTemplateBodyDto,

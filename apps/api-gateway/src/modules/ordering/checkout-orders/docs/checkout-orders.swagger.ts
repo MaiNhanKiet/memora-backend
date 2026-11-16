@@ -78,7 +78,10 @@ export function ApiListOrdersDocs() {
       paginated: true,
       description: 'List of orders returned successfully',
     }),
-    ApiResponse({ status: 400, description: 'Invalid pagination query parameters' }),
+    ApiResponse({
+      status: 400,
+      description: 'Invalid pagination query parameters',
+    }),
     unauthorized,
   );
 }
@@ -133,7 +136,11 @@ export function ApiGetRingItemDetailsDocs() {
         'Returns specifications, gemstone slot assignments, target size, and current design version of a specific ring item.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
-    ApiParam({ name: 'ringItemId', description: 'Ring Item UUID', type: String }),
+    ApiParam({
+      name: 'ringItemId',
+      description: 'Ring Item UUID',
+      type: String,
+    }),
     ApiSuccessResponse({
       type: RingItemVersionSummaryDto,
       description: 'Ring item details returned successfully',
@@ -154,7 +161,11 @@ export function ApiListRingItemVersionsDocs() {
         'Returns version history (V1, V2, V3...) showing 3D model status, CAD render keys, and customer approval history.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
-    ApiParam({ name: 'ringItemId', description: 'Ring Item UUID', type: String }),
+    ApiParam({
+      name: 'ringItemId',
+      description: 'Ring Item UUID',
+      type: String,
+    }),
     ApiSuccessResponse({
       type: RingItemVersionSummaryDto,
       isArray: true,
@@ -176,12 +187,19 @@ export function ApiUpdateCurrentRingItemVersionDocs() {
         'Allows customer to adjust target size, engraving notes, or slot configurations while current version is in DRAFT.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
-    ApiParam({ name: 'ringItemId', description: 'Ring Item UUID', type: String }),
+    ApiParam({
+      name: 'ringItemId',
+      description: 'Ring Item UUID',
+      type: String,
+    }),
     ApiSuccessResponse({
       type: UpdateCurrentRingItemVersionResponseDto,
       description: 'Version updated successfully',
     }),
-    ApiResponse({ status: 400, description: 'Version is locked or already approved' }),
+    ApiResponse({
+      status: 400,
+      description: 'Version is locked or already approved',
+    }),
     unauthorized,
     forbidden('Caller does not own this order item'),
     notFound('Current version draft not found'),
@@ -204,7 +222,8 @@ export function ApiCancelOrderDocs() {
     }),
     ApiResponse({
       status: 400,
-      description: 'Order cannot be cancelled in current status (e.g. already manufacturing)',
+      description:
+        'Order cannot be cancelled in current status (e.g. already manufacturing)',
     }),
     unauthorized,
     forbidden('Caller does not own this order'),

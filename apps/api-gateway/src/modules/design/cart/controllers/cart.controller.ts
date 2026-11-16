@@ -69,9 +69,7 @@ export class CartController {
     @Body() body: AddCartItemBodyDto,
   ) {
     const actor = toActorFromUserOrGuest(user, guest);
-    return this.designClient.addCartItem(
-      toAddCartItemGrpcRequest(actor, body),
-    );
+    return this.designClient.addCartItem(toAddCartItemGrpcRequest(actor, body));
   }
 
   // ---------------------------------------------------------------------------

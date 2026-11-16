@@ -451,7 +451,9 @@ describe('CartService', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(mockRepository.revokeDesignShareCode).toHaveBeenCalledWith('link-1');
+      expect(mockRepository.revokeDesignShareCode).toHaveBeenCalledWith(
+        'link-1',
+      );
     });
   });
 });

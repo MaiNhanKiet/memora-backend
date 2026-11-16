@@ -552,7 +552,10 @@ export class InventoryRepository {
         include: { stock_lots: true, certified_gemstones: true },
       });
       if (!allocation) throw new Error('ALLOCATION_NOT_FOUND');
-      if (allocation.status === 'CONSUMED' || allocation.status === 'RELEASED') {
+      if (
+        allocation.status === 'CONSUMED' ||
+        allocation.status === 'RELEASED'
+      ) {
         throw new Error('INVALID_ALLOCATION_STATUS');
       }
 

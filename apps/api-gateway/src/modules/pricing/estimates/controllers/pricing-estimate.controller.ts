@@ -16,8 +16,6 @@ export class PricingEstimateController {
   @HttpCode(HttpStatus.OK)
   @ApiEstimatePriceDocs()
   async estimatePrice(@Body() body: EstimatePriceBodyDto) {
-    return this.pricingClient.estimatePrice(
-      toEstimatePriceGrpcRequest(body),
-    );
+    return this.pricingClient.estimatePrice(toEstimatePriceGrpcRequest(body));
   }
 }

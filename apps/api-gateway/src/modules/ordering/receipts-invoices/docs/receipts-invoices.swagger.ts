@@ -7,10 +7,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { ApiSuccessResponse } from '../../../../common/docs/api-success-response';
-import {
-  OrderInvoiceDetailDto,
-  PaymentReceiptDetailDto,
-} from '../dto';
+import { OrderInvoiceDetailDto, PaymentReceiptDetailDto } from '../dto';
 
 const bearer = ApiBearerAuth('bearer');
 const guestSessionHeader = ApiHeader({
@@ -43,12 +40,19 @@ export function ApiGetPaymentReceiptDocs() {
         'Retrieves official electronic payment receipt with immutable receipt_no for a completed payment.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
-    ApiParam({ name: 'transactionId', description: 'Transaction UUID', type: String }),
+    ApiParam({
+      name: 'transactionId',
+      description: 'Transaction UUID',
+      type: String,
+    }),
     ApiSuccessResponse({
       type: PaymentReceiptDetailDto,
       description: 'Payment receipt returned successfully',
     }),
-    ApiResponse({ status: 400, description: 'Receipt is only available for SUCCEEDED transactions' }),
+    ApiResponse({
+      status: 400,
+      description: 'Receipt is only available for SUCCEEDED transactions',
+    }),
     unauthorized,
     forbidden('Caller does not own this receipt'),
     notFound('Payment transaction or order'),

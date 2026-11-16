@@ -13,9 +13,11 @@ export class PayosWebhookBodyDto {
   @ApiProperty({ description: 'Success flag', example: true })
   success!: boolean;
 
-  @ApiProperty({ description: 'Webhook data object containing orderCode, amount, reference' })
+  @ApiProperty({
+    description: 'Webhook data object containing orderCode, amount, reference',
+  })
   @IsNotEmpty()
-  data!: any;
+  data!: Record<string, unknown> | string;
 
   @ApiProperty({ description: 'HMAC_SHA256 signature for verification' })
   @IsNotEmpty()
@@ -26,12 +28,18 @@ export class PayosWebhookResponseDto {
   @ApiProperty({ description: 'Result flag', example: true })
   success!: boolean;
 
-  @ApiProperty({ description: 'Message', example: 'Payment processed successfully' })
+  @ApiProperty({
+    description: 'Message',
+    example: 'Payment processed successfully',
+  })
   message!: string;
 
   @ApiPropertyOptional({ description: 'Transaction UUID' })
   transactionId?: string;
 
-  @ApiPropertyOptional({ description: 'Updated transaction status', example: 'SUCCEEDED' })
+  @ApiPropertyOptional({
+    description: 'Updated transaction status',
+    example: 'SUCCEEDED',
+  })
   status?: string;
 }

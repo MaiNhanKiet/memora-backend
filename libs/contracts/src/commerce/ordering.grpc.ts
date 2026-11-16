@@ -759,9 +759,7 @@ export interface OrderingServiceHandler {
   getPaymentReceipt(
     request: GetPaymentReceiptRequest,
   ): Promise<PaymentReceiptDetail>;
-  getOrderInvoice(
-    request: GetOrderInvoiceRequest,
-  ): Promise<OrderInvoiceDetail>;
+  getOrderInvoice(request: GetOrderInvoiceRequest): Promise<OrderInvoiceDetail>;
   createRefundRequest(
     request: CreateRefundRequestMessage,
   ): Promise<CreateRefundResponse>;

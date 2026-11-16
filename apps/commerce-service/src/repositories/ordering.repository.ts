@@ -869,8 +869,7 @@ export class OrderingRepository {
         where: { id: quoteId },
       });
       const validUntil =
-        existing?.valid_until ??
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        existing?.valid_until ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       const quote = await tx.quotes.update({
         where: { id: quoteId },

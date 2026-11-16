@@ -3,7 +3,10 @@ import type {
   CreatePricingRuleRequest,
   ListPricingRulesRequest,
 } from '@app/contracts';
-import type { CreatePricingRuleBodyDto, ListPricingRulesQueryDto } from '../dto';
+import type {
+  CreatePricingRuleBodyDto,
+  ListPricingRulesQueryDto,
+} from '../dto';
 
 export function toListPricingRulesGrpcRequest(
   query: ListPricingRulesQueryDto,

@@ -14,10 +14,7 @@ import { Roles } from '@app/auth';
 import type { AuthenticatedPrincipal } from '@app/auth';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { PricingGrpcClient } from '../../clients/pricing-grpc.client';
-import {
-  CreatePricingRuleBodyDto,
-  ListPricingRulesQueryDto,
-} from '../dto';
+import { CreatePricingRuleBodyDto, ListPricingRulesQueryDto } from '../dto';
 import {
   ApiActivatePricingRuleDocs,
   ApiCreatePricingRuleDocs,

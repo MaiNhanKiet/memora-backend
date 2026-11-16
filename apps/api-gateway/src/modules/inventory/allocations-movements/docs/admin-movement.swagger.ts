@@ -1,9 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ApiSuccessResponse } from '../../../../common/docs/api-success-response';
 import {
   InventoryMovementListResponseDto,
@@ -31,7 +27,8 @@ export function ApiListInventoryMovementsDocs() {
     ApiSuccessResponse({
       type: InventoryMovementListResponseDto,
       status: 200,
-      description: 'Audit ledger of inventory movements retrieved successfully.',
+      description:
+        'Audit ledger of inventory movements retrieved successfully.',
     }),
     unauthorized,
     forbidden,

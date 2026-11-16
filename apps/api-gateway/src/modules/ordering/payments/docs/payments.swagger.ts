@@ -95,7 +95,11 @@ export function ApiGetOrderPaymentByIdDocs() {
         'Retrieves single payment transaction detail with PayOS provider status, references, and timestamps.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
-    ApiParam({ name: 'transactionId', description: 'Transaction UUID', type: String }),
+    ApiParam({
+      name: 'transactionId',
+      description: 'Transaction UUID',
+      type: String,
+    }),
     ApiSuccessResponse({
       type: PaymentTransactionDetailDto,
       description: 'Payment transaction details returned successfully',
@@ -114,13 +118,20 @@ export function ApiCreateRefundRequestDocs() {
       description:
         'Allows staff to create an audited refund request linked to an existing successful transaction.',
     }),
-    ApiParam({ name: 'transactionId', description: 'Transaction UUID', type: String }),
+    ApiParam({
+      name: 'transactionId',
+      description: 'Transaction UUID',
+      type: String,
+    }),
     ApiSuccessResponse({
       type: PaymentTransactionDetailDto,
       status: 201,
       description: 'Refund request created successfully with PENDING status',
     }),
-    ApiResponse({ status: 400, description: 'Invalid refund amount or missing reason' }),
+    ApiResponse({
+      status: 400,
+      description: 'Invalid refund amount or missing reason',
+    }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
     notFound('Original payment transaction'),

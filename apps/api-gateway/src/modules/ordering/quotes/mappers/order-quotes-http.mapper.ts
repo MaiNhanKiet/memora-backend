@@ -6,10 +6,7 @@ import type {
   RejectFinalQuoteRequest,
   VerifiedActor,
 } from '@app/contracts';
-import type {
-  ConfirmFinalQuoteBodyDto,
-  RejectFinalQuoteBodyDto,
-} from '../dto';
+import type { ConfirmFinalQuoteBodyDto, RejectFinalQuoteBodyDto } from '../dto';
 
 export function toListOrderQuotesGrpcRequest(
   actor: VerifiedActor,

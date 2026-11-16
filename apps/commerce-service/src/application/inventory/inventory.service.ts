@@ -261,7 +261,8 @@ export class InventoryService {
       );
     }
 
-    const quantity = request.quantity && request.quantity > 0 ? request.quantity : 1;
+    const quantity =
+      request.quantity && request.quantity > 0 ? request.quantity : 1;
     const ttlMinutes =
       request.ttlMinutes && request.ttlMinutes > 0 ? request.ttlMinutes : 60;
     const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);

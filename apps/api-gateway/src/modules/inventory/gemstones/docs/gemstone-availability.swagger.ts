@@ -13,7 +13,8 @@ export function ApiListCertifiedGemstoneAvailabilityDocs() {
     ApiSuccessResponse({
       type: CertifiedGemstoneListResponseDto,
       status: 200,
-      description: 'List of available certified gemstones retrieved successfully.',
+      description:
+        'List of available certified gemstones retrieved successfully.',
     }),
   );
 }

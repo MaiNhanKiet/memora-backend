@@ -60,7 +60,8 @@ export function ApiAcceptServiceQuote() {
   return applyDecorators(
     bearer,
     ApiOperation({
-      summary: '[ORDER-025] Customer accepts a service quote for a post-purchase claim',
+      summary:
+        '[ORDER-025] Customer accepts a service quote for a post-purchase claim',
       description:
         'Accepts an ISSUED service quote linked to the specified claimId. Changes status to ACCEPTED and records customer acceptance timestamp.',
     }),

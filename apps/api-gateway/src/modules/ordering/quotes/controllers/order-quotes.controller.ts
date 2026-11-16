@@ -13,10 +13,7 @@ import type { AuthenticatedPrincipal } from '@app/auth';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { toVerifiedActor } from '../../../../common/grpc/verified-actor';
 import { OrderingGrpcClient } from '../../clients/ordering-grpc.client';
-import {
-  ConfirmFinalQuoteBodyDto,
-  RejectFinalQuoteBodyDto,
-} from '../dto';
+import { ConfirmFinalQuoteBodyDto, RejectFinalQuoteBodyDto } from '../dto';
 import {
   ApiConfirmFinalQuoteDocs,
   ApiGetOrderFinalConfirmationsDocs,

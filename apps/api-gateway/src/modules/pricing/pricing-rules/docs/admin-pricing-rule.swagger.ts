@@ -6,10 +6,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { ApiSuccessResponse } from '../../../../common/docs/api-success-response';
-import {
-  PricingRuleListResponseDto,
-  PricingRuleResponseDto,
-} from '../dto';
+import { PricingRuleListResponseDto, PricingRuleResponseDto } from '../dto';
 
 const bearer = ApiBearerAuth('bearer');
 const unauthorized = ApiResponse({

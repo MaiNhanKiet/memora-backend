@@ -3,7 +3,8 @@ import { IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class CreateOrderPaymentLinkBodyDto {
   @ApiPropertyOptional({
-    description: 'Payment stage: DEPOSIT_P1, MILESTONE_P2, FINAL_P3, FULL_PAYMENT',
+    description:
+      'Payment stage: DEPOSIT_P1, MILESTONE_P2, FINAL_P3, FULL_PAYMENT',
     example: 'DEPOSIT_P1',
   })
   @IsOptional()
@@ -31,10 +32,16 @@ export class PaymentLinkResponseDto {
   @ApiProperty({ description: 'Payment Transaction UUID' })
   transactionId!: string;
 
-  @ApiProperty({ description: 'Unique integer orderCode for PayOS', example: 1715001234 })
+  @ApiProperty({
+    description: 'Unique integer orderCode for PayOS',
+    example: 1715001234,
+  })
   orderCode!: number | string;
 
-  @ApiProperty({ description: 'Hosted PayOS Checkout Web URL', example: 'https://pay.payos.vn/web/pl_123' })
+  @ApiProperty({
+    description: 'Hosted PayOS Checkout Web URL',
+    example: 'https://pay.payos.vn/web/pl_123',
+  })
   checkoutUrl!: string;
 
   @ApiProperty({ description: 'Raw VietQR string to render barcode/QR code' })
@@ -46,7 +53,10 @@ export class PaymentLinkResponseDto {
   @ApiProperty({ description: 'Currency', example: 'VND' })
   currency!: string;
 
-  @ApiProperty({ description: 'Stage code: DEPOSIT_P1, MILESTONE_P2, FINAL_P3, SERVICE_FEE', example: 'DEPOSIT_P1' })
+  @ApiProperty({
+    description: 'Stage code: DEPOSIT_P1, MILESTONE_P2, FINAL_P3, SERVICE_FEE',
+    example: 'DEPOSIT_P1',
+  })
   paymentStage!: string;
 
   @ApiProperty({ description: 'Transaction status', example: 'PENDING' })

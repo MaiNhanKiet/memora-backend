@@ -1,9 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ApiSuccessResponse } from '../../../../common/docs/api-success-response';
 import {
   CertifiedGemstoneResponseDto,
@@ -72,7 +68,8 @@ export function ApiCreateCertifiedGemstoneDocs() {
     ApiSuccessResponse({
       type: CertifiedGemstoneResponseDto,
       status: 201,
-      description: 'Certified gemstone registered successfully in AVAILABLE state.',
+      description:
+        'Certified gemstone registered successfully in AVAILABLE state.',
     }),
     ApiResponse({
       status: 409,

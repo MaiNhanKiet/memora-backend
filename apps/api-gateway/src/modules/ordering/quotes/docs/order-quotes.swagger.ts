@@ -91,7 +91,10 @@ export function ApiConfirmFinalQuoteDocs() {
       type: ConfirmFinalQuoteResponseDto,
       description: 'Final quote confirmed successfully',
     }),
-    ApiResponse({ status: 400, description: 'Quote is not in ISSUED status or has expired' }),
+    ApiResponse({
+      status: 400,
+      description: 'Quote is not in ISSUED status or has expired',
+    }),
     unauthorized,
     forbidden('Caller does not own this order'),
     notFound('Quote or order'),

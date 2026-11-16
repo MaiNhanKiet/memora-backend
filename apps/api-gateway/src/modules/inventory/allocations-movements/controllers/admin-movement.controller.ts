@@ -12,10 +12,7 @@ import { Roles } from '@app/auth';
 import type { AuthenticatedPrincipal } from '@app/auth';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { InventoryGrpcClient } from '../../clients/inventory-grpc.client';
-import {
-  AdjustInventoryBodyDto,
-  ListInventoryMovementsQueryDto,
-} from '../dto';
+import { AdjustInventoryBodyDto, ListInventoryMovementsQueryDto } from '../dto';
 import {
   ApiAdjustInventoryDocs,
   ApiListInventoryMovementsDocs,

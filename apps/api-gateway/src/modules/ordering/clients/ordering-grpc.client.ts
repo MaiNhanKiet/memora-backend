@@ -173,17 +173,13 @@ export class OrderingGrpcClient
     );
   }
 
-  createFinalQuote(
-    request: CreateFinalQuoteRequest,
-  ): Promise<FullQuoteDetail> {
+  createFinalQuote(request: CreateFinalQuoteRequest): Promise<FullQuoteDetail> {
     return this.unary((metadata) =>
       this.orderingService.createFinalQuote(request, metadata),
     );
   }
 
-  updateFinalQuote(
-    request: UpdateFinalQuoteRequest,
-  ): Promise<FullQuoteDetail> {
+  updateFinalQuote(request: UpdateFinalQuoteRequest): Promise<FullQuoteDetail> {
     return this.unary((metadata) =>
       this.orderingService.updateFinalQuote(request, metadata),
     );
