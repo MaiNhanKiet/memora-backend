@@ -18,11 +18,20 @@ import {
 } from '@app/common';
 import {
   PERSONALIZATION_CONSENT_SERVICE_NAME,
+  PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
   type AcceptConsentRequest,
+  type CaptureAttemptImage,
+  type CaptureSession,
+  type CompleteCaptureSessionRequest,
   type Consent,
+  type CreateCaptureSessionRequest,
+  type GetCaptureAttemptImageRequest,
+  type GetCaptureSessionRequest,
   type ListConsentsRequest,
   type ListConsentsResponse,
   type PersonalizationConsentServiceClient,
+  type PersonalizationFingerprintCaptureServiceClient,
+  type RejectCaptureAttemptRequest,
   type RevokeConsentRequest,
 } from '@app/contracts';
 import { DomainGrpcClient } from '../../../common/grpc/domain-grpc';
@@ -33,7 +42,8 @@ export const OPERATIONS_PERSONALIZATION_GRPC_CLIENT =
 const FAILED_PRECONDITION_MESSAGE = 'Failed precondition';
 
 /**
- * Gateway client for `memora.personalization.v1.ConsentService` (Operations).
+ * Gateway client for `memora.personalization.v1.ConsentService` and
+ * `FingerprintCaptureService` (Operations).
  * The Operations target is optional: when it is not configured every call fails
  * with 503 instead of crashing Gateway startup.
  */
@@ -43,6 +53,7 @@ export class PersonalizationGrpcClient
   implements OnModuleInit
 {
   private consentService!: PersonalizationConsentServiceClient;
+  private captureService!: PersonalizationFingerprintCaptureServiceClient;
 
   constructor(
     @Inject(OPERATIONS_PERSONALIZATION_GRPC_CLIENT)
@@ -58,6 +69,10 @@ export class PersonalizationGrpcClient
     this.consentService =
       this.grpcClient.getService<PersonalizationConsentServiceClient>(
         PERSONALIZATION_CONSENT_SERVICE_NAME,
+      );
+    this.captureService =
+      this.grpcClient.getService<PersonalizationFingerprintCaptureServiceClient>(
+        PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
       );
   }
 
@@ -79,8 +94,48 @@ export class PersonalizationGrpcClient
     );
   }
 
+  createCaptureSession(
+    request: CreateCaptureSessionRequest,
+  ): Promise<CaptureSession> {
+    return this.unary((metadata) =>
+      this.captureService.createCaptureSession(request, metadata),
+    );
+  }
+
+  getCaptureSession(
+    request: GetCaptureSessionRequest,
+  ): Promise<CaptureSession> {
+    return this.unary((metadata) =>
+      this.captureService.getCaptureSession(request, metadata),
+    );
+  }
+
+  completeCaptureSession(
+    request: CompleteCaptureSessionRequest,
+  ): Promise<CaptureSession> {
+    return this.unary((metadata) =>
+      this.captureService.completeCaptureSession(request, metadata),
+    );
+  }
+
+  getCaptureAttemptImage(
+    request: GetCaptureAttemptImageRequest,
+  ): Promise<CaptureAttemptImage> {
+    return this.unary((metadata) =>
+      this.captureService.getCaptureAttemptImage(request, metadata),
+    );
+  }
+
+  rejectCaptureAttempt(
+    request: RejectCaptureAttemptRequest,
+  ): Promise<CaptureSession> {
+    return this.unary((metadata) =>
+      this.captureService.rejectCaptureAttempt(request, metadata),
+    );
+  }
+
   /**
-   * Consent contract: FAILED_PRECONDITION and ALREADY_EXISTS are 409 (the shared
+   * Consent and capture contract: FAILED_PRECONDITION and ALREADY_EXISTS are 409 (the shared
    * mapper turns FAILED_PRECONDITION into 412), deadline is 503. The Operations
    * reason code (for example P1_NOT_PAID) travels in the gRPC details and is
    * exposed as the error `message` only when it passes the shared safe-message
