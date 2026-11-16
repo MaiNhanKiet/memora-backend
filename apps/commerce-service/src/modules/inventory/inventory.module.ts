@@ -1,13 +1,8 @@
 import { Module } from '@nestjs/common';
-import { InventoryGrpcController } from '../../presentation/grpc/inventory.grpc.controller';
-import { InventoryService } from '../../application/inventory/inventory.service';
-import { InventoryMapper } from '../../application/inventory/inventory.mapper';
-import { RepositoriesModule } from '../../repositories/repositories.module';
+import { InventoryCoreModule } from './inventory-core/inventory-core.module';
 
 @Module({
-  imports: [RepositoriesModule],
-  controllers: [InventoryGrpcController],
-  providers: [InventoryService, InventoryMapper],
-  exports: [InventoryService, InventoryMapper],
+  imports: [InventoryCoreModule],
+  exports: [InventoryCoreModule],
 })
 export class InventoryModule {}
