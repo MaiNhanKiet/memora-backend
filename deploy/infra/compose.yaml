@@ -11,8 +11,9 @@ name: memora-infra
 # Containers use http://garage:3900. Only the S3 port is published, on the Tailscale IP
 # (dev backend on a laptop); RPC 3901 and admin 3903 stay inside the container.
 # Mosquitto (MQTT broker, D-P-07) talks to fingerprint capture devices and operations-service.
-# Containers use mqtt://mosquitto:1883. Port 1883 is published only on the Tailscale IP; public TLS is
-# deferred. Users come from this project's .env (MQTT_OPERATIONS_PASSWORD, MQTT_DEVICE_USERS); the
+# Containers use mqtt://mosquitto:1883. Port 1883 is published only on the Tailscale IP. Devices outside the
+# tailnet use MQTT over WebSocket: listener 9001 is NOT published on the host; Cloudflare Tunnel terminates TLS
+# (public hostname e.g. mqtt.memora.style -> origin http://mosquitto:9001). Users come from this project's .env (MQTT_OPERATIONS_PASSWORD, MQTT_DEVICE_USERS); the
 # container hashes them into /mosquitto/passwd on every start, so changing a user = edit .env + redeploy mosquitto.
 
 networks:
@@ -53,6 +54,8 @@ configs:
   mosquitto_conf:
     content: |
       listener 1883
+      listener 9001
+      protocol websockets
       allow_anonymous false
       password_file /mosquitto/passwd
       acl_file /mosquitto/config/acl

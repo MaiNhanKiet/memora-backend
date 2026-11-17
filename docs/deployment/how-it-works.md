@@ -118,7 +118,8 @@ Host publish (Tailscale `100.78.222.34`): Postgres `5432`, Redis `6379`. Gateway
 #### Mosquitto (MQTT broker, D-P-07)
 
 - Image `eclipse-mosquitto:2.0.21` (biến `MOSQUITTO_IMAGE`). Thiết bị lấy vân tay (ESP32-S3 + AS608) nói MQTT với broker này; operations-service subscribe/publish. Trong Docker dùng `mqtt://mosquitto:1883`, user `memora-operations`, mật khẩu `OPERATIONS_MQTT_PASSWORD` trong `operations.env`.
-- Cổng `1883` chỉ publish trên IP Tailscale (`100.78.222.34:1883`), giống Garage; bản local publish `127.0.0.1:1883`. Chưa có TLS công khai (hoãn), không route qua Cloudflare Tunnel.
+- Cổng `1883` chỉ publish trên IP Tailscale (`100.78.222.34:1883`), giống Garage; bản local publish `127.0.0.1:1883` và `127.0.0.1:9001`.
+- Listener `9001` (`protocol websockets`) **không** publish ra host. Thiết bị ngoài tailnet (ESP32 ở cửa hàng) kết nối `wss://mqtt.memora.style` qua Cloudflare Tunnel: Zero Trust → Tunnels → Public Hostname `mqtt.memora.style` → Service `HTTP` `mosquitto:9001`. Cloudflare lo TLS; broker vẫn bắt user/mật khẩu + ACL như cổng 1883.
 - `mosquitto.conf` và ACL nằm inline trong `compose.yaml` (`configs.mosquitto_conf`, `configs.mosquitto_acl`): `allow_anonymous false`, giới hạn gói 262144 byte, log ra stdout không kèm payload, persistence trong volume `memora-infra_mosquittodata`.
 - ACL: `memora-operations` có `readwrite memora/capture/#`. Thiết bị (username = `deviceCode`): ghi `memora/capture/<user>/attempts` và `/hello`, đọc `/commands` và `/results` của chính mình.
 - User broker lấy từ `.env` của project infra (Arcane), không có file passwd trên host:

@@ -11,7 +11,7 @@ The quality threshold on the server is only a **suggestion**. Every usable captu
 | Setting       | Value                                                                                              |
 | ------------- | -------------------------------------------------------------------------------------------------- |
 | Broker        | Eclipse Mosquitto 2, MQTT 3.1.1 (protocol level 4)                                                 |
-| Address       | port 1883 on the Tailscale IP of the Mini PC (the device must be on the tailnet). TLS is deferred. |
+| Address       | Field devices: MQTT over WebSocket + TLS, `wss://<mqtt public hostname>:443/` (Cloudflare Tunnel → `mosquitto:9001`). Tailnet clients: `mqtt://<Tailscale IP>:1883`. |
 | Username      | the device code, for example `ring-01`                                                             |
 | Password      | per-device password issued with the broker user                                                    |
 | Client ID     | any stable unique value, for example the device code                                               |
