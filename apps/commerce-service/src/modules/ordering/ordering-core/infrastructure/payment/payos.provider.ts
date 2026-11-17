@@ -4,7 +4,6 @@ import * as crypto from 'crypto';
 import type {
   PayosCreatePaymentLinkParams,
   PayosPaymentLinkData,
-  PayosWebhookData,
   PayosWebhookPayload,
 } from './payos.interface';
 
@@ -126,13 +125,28 @@ export class PayosProvider {
       return false;
     }
 
+    const formatValue = (val: unknown): string => {
+      if (val === null || val === undefined) {
+        return '';
+      }
+      if (typeof val === 'string') {
+        return val;
+      }
+      if (typeof val === 'number' || typeof val === 'boolean') {
+        return val.toString();
+      }
+      if (Array.isArray(val) || typeof val === 'object') {
+        return JSON.stringify(val);
+      }
+      return '';
+    };
+
     // PayOS sorted key signature calculation:
     // amount, cancelUrl (if any), description, orderCode, returnUrl, etc.
-    const sortedKeys = Object.keys(data).sort();
+    const dataRecord = data as unknown as Record<string, unknown>;
+    const sortedKeys = Object.keys(dataRecord).sort();
     const signString = sortedKeys
-      .map(
-        (k) => `${k}=${(data as unknown as Record<string, unknown>)[k] ?? ''}`,
-      )
+      .map((k) => `${k}=${formatValue(dataRecord[k])}`)
       .join('&');
 
     const expectedSignature = crypto

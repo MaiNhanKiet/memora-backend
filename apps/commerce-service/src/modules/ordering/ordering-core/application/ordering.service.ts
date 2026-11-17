@@ -1718,10 +1718,11 @@ export class OrderingService {
   ): Promise<PayosWebhookResponse> {
     let payloadData: PayosWebhookData;
     try {
-      payloadData =
+      const parsed: unknown =
         typeof request.dataJson === 'string'
-          ? JSON.parse(request.dataJson)
+          ? (JSON.parse(request.dataJson) as unknown)
           : request.dataJson;
+      payloadData = parsed as PayosWebhookData;
     } catch {
       throw new BadRequestException('Invalid dataJson in PayOS webhook');
     }

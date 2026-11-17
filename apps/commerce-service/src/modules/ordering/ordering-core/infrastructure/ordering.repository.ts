@@ -979,7 +979,7 @@ export class OrderingRepository {
   // ---------------------------------------------------------------------------
   // [ORDER-015 Part B] Customer Reject Final Quote
   // ---------------------------------------------------------------------------
-  async rejectFinalQuote(orderId: string, quoteId: string, reason?: string) {
+  async rejectFinalQuote(orderId: string, quoteId: string, _reason?: string) {
     return this.prisma.$transaction(async (tx) => {
       await tx.quotes.update({
         where: { id: quoteId },

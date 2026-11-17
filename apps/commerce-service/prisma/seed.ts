@@ -43,7 +43,9 @@ async function upsertPriceVersion(
 async function main(): Promise<void> {
   const connectionString = process.env.COMMERCE_DATABASE_URL;
   if (!connectionString) {
-    throw new Error('COMMERCE_DATABASE_URL is required to seed Commerce Service');
+    throw new Error(
+      'COMMERCE_DATABASE_URL is required to seed Commerce Service',
+    );
   }
 
   const pool = new Pool({
@@ -216,10 +218,16 @@ async function main(): Promise<void> {
       {
         code: 'T_TEST_BAND',
         name: 'Memora Test Payment Band',
-        description: 'Mẫu nhẫn thử nghiệm giá rẻ ~10k để test toàn trình thanh toán quét QR PayOS',
+        description:
+          'Mẫu nhẫn thử nghiệm giá rẻ ~10k để test toàn trình thanh toán quét QR PayOS',
         glb_asset_key: 'models/minimal_01.glb',
         stone_layout: 'NONE',
-        design_supported_personalization_packages: ['FINGERPRINT', 'SOUNDWAVE', 'INITIALS', 'NONE'],
+        design_supported_personalization_packages: [
+          'FINGERPRINT',
+          'SOUNDWAVE',
+          'INITIALS',
+          'NONE',
+        ],
         theta_min_deg: new Prisma.Decimal(-180.0),
         theta_max_deg: new Prisma.Decimal(180.0),
         v_min_mm: new Prisma.Decimal(-2.0),
@@ -229,10 +237,15 @@ async function main(): Promise<void> {
       {
         code: 'T_SOLITAIRE_01',
         name: 'Classic Solitaire Ring',
-        description: 'Mẫu nhẫn Solitaire kinh điển tôn vinh viên đá chủ trung tâm, hỗ trợ khắc vân tay lòng nhẫn',
+        description:
+          'Mẫu nhẫn Solitaire kinh điển tôn vinh viên đá chủ trung tâm, hỗ trợ khắc vân tay lòng nhẫn',
         glb_asset_key: 'models/solitaire_01.glb',
         stone_layout: 'SOLITAIRE',
-        design_supported_personalization_packages: ['FINGERPRINT', 'INITIALS', 'NONE'],
+        design_supported_personalization_packages: [
+          'FINGERPRINT',
+          'INITIALS',
+          'NONE',
+        ],
         theta_min_deg: new Prisma.Decimal(-90.0),
         theta_max_deg: new Prisma.Decimal(90.0),
         v_min_mm: new Prisma.Decimal(-1.5),
@@ -242,10 +255,15 @@ async function main(): Promise<void> {
       {
         code: 'T_ETERNITY_01',
         name: 'Eternity Pavé Band',
-        description: 'Mẫu nhẫn đính dải kim cương tấm Pavé tinh tế, lưu giữ sóng âm thanh đặc biệt',
+        description:
+          'Mẫu nhẫn đính dải kim cương tấm Pavé tinh tế, lưu giữ sóng âm thanh đặc biệt',
         glb_asset_key: 'models/eternity_01.glb',
         stone_layout: 'PAVE',
-        design_supported_personalization_packages: ['SOUNDWAVE', 'INITIALS', 'NONE'],
+        design_supported_personalization_packages: [
+          'SOUNDWAVE',
+          'INITIALS',
+          'NONE',
+        ],
         theta_min_deg: new Prisma.Decimal(-120.0),
         theta_max_deg: new Prisma.Decimal(120.0),
         v_min_mm: new Prisma.Decimal(-1.8),
@@ -255,10 +273,17 @@ async function main(): Promise<void> {
       {
         code: 'T_MINIMAL_01',
         name: 'Minimalist Signature Band',
-        description: 'Mẫu nhẫn trơn hiện đại, bề mặt hoàn hảo cho việc khắc bản đồ tọa độ, vân tay và sóng âm',
+        description:
+          'Mẫu nhẫn trơn hiện đại, bề mặt hoàn hảo cho việc khắc bản đồ tọa độ, vân tay và sóng âm',
         glb_asset_key: 'models/minimal_01.glb',
         stone_layout: 'NONE',
-        design_supported_personalization_packages: ['FINGERPRINT', 'SOUNDWAVE', 'COORDINATES', 'INITIALS', 'NONE'],
+        design_supported_personalization_packages: [
+          'FINGERPRINT',
+          'SOUNDWAVE',
+          'COORDINATES',
+          'INITIALS',
+          'NONE',
+        ],
         theta_min_deg: new Prisma.Decimal(-180.0),
         theta_max_deg: new Prisma.Decimal(180.0),
         v_min_mm: new Prisma.Decimal(-2.5),
@@ -274,7 +299,8 @@ async function main(): Promise<void> {
         update: {
           name: t.name,
           status: t.status,
-          design_supported_personalization_packages: t.design_supported_personalization_packages,
+          design_supported_personalization_packages:
+            t.design_supported_personalization_packages,
         },
         create: {
           id: randomUUID(),
@@ -333,7 +359,7 @@ async function main(): Promise<void> {
 
     // A. Ring Blanks Price
     const baseMetalPrices: Record<string, number> = {
-      SS925: 5000,       // Test payment rẻ
+      SS925: 5000, // Test payment rẻ
       WG14K: 5500000,
       WG18K: 7200000,
       YG18K: 7200000,
@@ -366,7 +392,7 @@ async function main(): Promise<void> {
 
     // B. Gemstones Price
     const gemstonePrices: Record<string, number> = {
-      CZ_ROUND_020: 2000,            // Test payment rẻ
+      CZ_ROUND_020: 2000, // Test payment rẻ
       DIA_NAT_ROUND_050: 25000000,
       DIA_LAB_ROUND_050: 8500000,
       MOIS_ROUND_050: 2200000,
@@ -413,12 +439,16 @@ async function main(): Promise<void> {
 
       await upsertPriceVersion(prisma, item.id, amount);
     }
-    console.log('  - Seeded Price Items and Active Price Versions successfully');
+    console.log(
+      '  - Seeded Price Items and Active Price Versions successfully',
+    );
 
     // =========================================================================
     // 6. INVENTORY: Stock Lots & Certified Gemstones
     // =========================================================================
-    console.log('[commerce-seed] 6. Seeding Stock Lots & Certified Gemstones...');
+    console.log(
+      '[commerce-seed] 6. Seeding Stock Lots & Certified Gemstones...',
+    );
     const testBandSS925VariantId = variantMap.get('T_TEST_BAND_SS925');
     const solitaireWG18KVariantId = variantMap.get('T_SOLITAIRE_01_WG18K');
     const moisGemId = gemstoneMap.get('MOIS_ROUND_050');
@@ -489,7 +519,7 @@ async function main(): Promise<void> {
 
     // Lô đá Kim cương tự nhiên kèm viên chứng chỉ GIA
     if (natDiaGemId) {
-      const natDiaLot = await prisma.stock_lots.upsert({
+      await prisma.stock_lots.upsert({
         where: { stock_code: 'LOT_GEM_NAT_DIA_GIA' },
         update: { quantity_on_hand: 5 },
         create: {
