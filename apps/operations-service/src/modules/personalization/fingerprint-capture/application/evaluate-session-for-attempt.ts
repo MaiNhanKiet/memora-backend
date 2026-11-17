@@ -53,10 +53,7 @@ export function evaluateSessionForAttempt(
   if (session.attempts.some((attempt) => attempt.result === 'ACCEPTED')) {
     return { kind: 'REFUSED', reason: 'ATTEMPT_ALREADY_ACCEPTED' };
   }
-  // The device waits for the staff while a stored image is undecided.
-  if (session.attempts.some((attempt) => attempt.result === 'PENDING_REVIEW')) {
-    return { kind: 'REFUSED', reason: 'REVIEW_PENDING' };
-  }
+  // Several attempts may be PENDING_REVIEW at once (revision 2026-11-17).
   if (session.attempts.length >= maxAttempts) {
     return { kind: 'REFUSED', reason: 'MAX_ATTEMPTS_REACHED' };
   }

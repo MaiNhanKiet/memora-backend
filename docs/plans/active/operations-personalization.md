@@ -96,6 +96,8 @@ No approved code for: accepting/listing/revoking Consent, setting the source pla
 | PERSO-008 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/complete | WF-01 F-02 | SOURCE_CAPTURE | CompleteCaptureSession | APPROVED |
 | PERSO-026 | GET | /api/v1/fingerprint/capture-sessions/{sessionId}/attempts/{attemptNo}/image | WF-01 F-02 | SOURCE_CAPTURE | GetCaptureAttemptImage | APPROVED |
 | PERSO-027 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/attempts/{attemptNo}/reject | WF-01 F-02 | SOURCE_CAPTURE | RejectCaptureAttempt | APPROVED |
+| PERSO-028 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/next-attempt | WF-01 F-02 | SOURCE_CAPTURE | NextCaptureAttempt | APPROVED |
+| PERSO-029 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/close | WF-01 F-02 | SOURCE_CAPTURE | CloseCaptureSession | APPROVED |
 | PERSO-009 | POST | /api/v1/orders/{orderId}/soundwave/uploads/initiate | WF-01 F-02 | SOURCE_AUDIO_UPLOAD_OWN | InitiateSoundwaveUpload | PROPOSED |
 | PERSO-010 | POST | /api/v1/orders/{orderId}/soundwave/uploads/complete | WF-01 F-02 | SOURCE_AUDIO_UPLOAD_OWN | CompleteSoundwaveUpload | PROPOSED |
 | PERSO-011 | GET | /api/v1/orders/{orderId}/personalization-sources | WF-01 F-02 | NEEDS_REVIEW | ListSources | NEEDS_REVIEW |
@@ -343,6 +345,43 @@ Implementation notes (2026-11-15):
 - A consent revoked during an open session does not stop attempts; `complete` then fails with `CONSENT_NOT_ACCEPTED` and the stored image stays orphaned until retention rules (D-OPS-08) exist.
 - Server steps before the next `main` deploy: Mosquitto in the Arcane `memora-infra` project (`MQTT_OPERATIONS_PASSWORD`, `MQTT_DEVICE_USERS` in its `.env`), and `operations.env` gets `OPERATIONS_MQTT_*`, `OPERATIONS_CAPTURE_*`, `OPERATIONS_OBJECT_STORAGE_*`.
 
+### Revision 2026-11-17: several attempts, the staff picks the best (user-approved)
+
+This section overrides "Revision 2026-11-15" where they differ. Goal: the customer scans up to `maxAttempts`
+(3) times in one session, every stored image stays `PENDING_REVIEW`, and the staff picks the best one at
+the end, or closes the session without picking any. One order item may get several sessions (already
+true: a new session is refused only while one is open or after one is `COMPLETED`). No migration:
+`failure_reason` is free text and session status `CANCELLED` already exists.
+
+- **PERSO-007 (MQTT, changed):** the `REVIEW_PENDING` refusal is removed. A session accepts attempts while
+  `attempts.length < maxAttempts`, no attempt is `ACCEPTED` and the session is open; several attempts may be
+  `PENDING_REVIEW` at once. Decision (user, 2026-11-17): the server does **not** require a PERSO-028 call
+  before the next attempt; the device only captures after `start` / `next` and a button press, so no
+  `requested_attempts` column. `FAILED` rule unchanged (all attempts used, none pending, none accepted).
+- **PERSO-028 `POST /api/v1/fingerprint/capture-sessions/{sessionId}/next-attempt` (new, SOURCE_CAPTURE):**
+  no body. Session must be open and not expired (`SESSION_NOT_OPEN` / `SESSION_EXPIRED` 409), no attempt
+  `ACCEPTED` (`ATTEMPT_ALREADY_ACCEPTED` 409), attempts left (`MAX_ATTEMPTS_REACHED` 409). Nothing is stored;
+  after the checks Operations publishes `commands` `{ "type": "next", "sessionId", "attemptNo": <used + 1> }`
+  (QoS 1). Response: the session view (as PERSO-006). Publish failure is logged, not an error (staff can
+  press again).
+- **PERSO-008 (changed):** the other `PENDING_REVIEW` attempts become `REJECTED` with
+  `failure_reason='NOT_SELECTED'` (was `STAFF_REJECTED`), images deleted after commit. The `end` command gets
+  `acceptedAttemptNo`: `{ "type": "end", "sessionId", "status": "COMPLETED", "acceptedAttemptNo": n }`.
+- **PERSO-029 `POST /api/v1/fingerprint/capture-sessions/{sessionId}/close` (new, SOURCE_CAPTURE):** no body.
+  Ends an open session without picking: session `CANCELLED` (`ended_at` set, no source), every
+  `PENDING_REVIEW` attempt → `REJECTED` / `NOT_SELECTED`, images deleted after commit, device gets
+  `commands` `{ "type": "end", "sessionId", "status": "CANCELLED" }`. Idempotent: closing a `CANCELLED`
+  session returns it; `COMPLETED` / `FAILED` / `EXPIRED` → 409 `SESSION_NOT_OPEN`. Same advisory lock as
+  complete (`capture-session:{id}`).
+- **Expiry (changed):** when lazy expiry marks a session `EXPIRED`, its `PENDING_REVIEW` attempts become
+  `REJECTED` / `EXPIRED` and their images are deleted after commit (previously left in storage).
+- **PERSO-027:** unchanged (reject one image now; it still uses an attempt).
+- **PERSO-006 (approved 2026-11-17):** each attempt also returns `failureReason` (null unless `REJECTED` /
+  `ERROR`): `CAPTURE_FAILED`, `STAFF_REJECTED`, `NOT_SELECTED`, `EXPIRED`. Proto `CaptureAttemptSummary`
+  field 6 `optional string failure_reason`.
+- **Device contract:** new `commands` type `next`; `end` may carry `acceptedAttemptNo` and status
+  `CANCELLED`. The reference firmware already handles both (`memora-firmware`, README section 14).
+
 ### Remaining IDs (summary checklists; expand when the user approves them)
 
 | API ID | Status | Key rules | Tables | Blockers |
@@ -443,3 +482,4 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
 | 2026-11-15 | PERSO-005..008 | IMPLEMENTED (not deployed) | Builds gateway/operations/commerce/iam PASS; jest 220 PASS with task specs (then removed per rule), 112 PASS after; eslint, proto:check, prisma validate, boundaries, guardrails, ci:deploy-layout PASS. Local smoke: throwaway Mosquitto 2.0.21 + Operations: connect/subscribe, unknown session → SESSION_NOT_FOUND result, bad score → INVALID_MESSAGE, bad nonce dropped, other-device topic blocked by ACL; Gateway 3 routes 401 without token, Swagger paths. NOT RUN: session create/attempt/complete against real DB and Garage, Postgres lock paths, ESP32 hardware (D-P-06) |
 | 2026-11-15 | PERSO-026/027 + BMP rule + D-P-07 broker users via Arcane env | IMPLEMENTED (not deployed) | Builds gateway/operations/commerce/iam/experience PASS; jest 134 PASS with task specs (then removed per rule); eslint, tsc, proto:check, prisma validate, boundaries, guardrails, ci:deploy-layout PASS. Server broker (Arcane, user-deployed): anonymous/wrong password refused, both users connect, ACL blocks other-device and own-commands publish, start command delivered (also seen in MQTT Explorer). NOT RUN: presigned URL via public endpoint, reject flow against real DB/Garage |
 | 2026-11-15 | Revision: capture staff decides (PERSO-007/008/026/027) + migration `20261115120000_capture_attempt_pending_review` | IMPLEMENTED (code not deployed; migration APPLIED on server 2026-11-15) | Builds 5 services PASS; jest 152 PASS with task specs (then removed per rule); eslint, tsc, proto:check, prisma validate, boundaries, guardrails, ci:deploy-layout PASS. Migration: user-authorized, applied with `prisma migrate deploy` as owner `memora` on the server DB after a pre-check (capture_attempts and capture_sessions empty, old CHECK definitions saved); `migrate status` up to date; new CHECKs verified; operations_app grants unchanged. NOT RUN: flow against real DB/Garage/broker |
+| 2026-11-17 | PERSO-007 (several pending), 008 (NOT_SELECTED + acceptedAttemptNo), 028, 029, expiry cleanup, 006 failureReason | IMPLEMENTED (not deployed, not committed) | typecheck, proto:check, lint:check, build (gateway) + build:operations PASS; boundaries 0 findings; guardrails 8/8; jest 112 PASS (14 task specs for next/close/complete/expiry/evaluate ran PASS, then removed per rule). NOT RUN: real DB transactions, live MQTT/Garage, HTTP E2E |

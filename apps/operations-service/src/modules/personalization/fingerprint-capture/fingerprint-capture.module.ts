@@ -11,11 +11,13 @@ import {
   type CaptureConfig,
 } from './application/capture.config';
 import { CAPTURE_REPOSITORY } from './application/capture.repository';
+import { CloseCaptureSessionUseCase } from './application/close-capture-session.use-case';
 import { CompleteCaptureSessionUseCase } from './application/complete-capture-session.use-case';
 import { CreateCaptureSessionUseCase } from './application/create-capture-session.use-case';
 import { GetCaptureAttemptImageUseCase } from './application/get-capture-attempt-image.use-case';
 import { GetCaptureSessionUseCase } from './application/get-capture-session.use-case';
 import { HandleDeviceHelloUseCase } from './application/handle-device-hello.use-case';
+import { NextCaptureAttemptUseCase } from './application/next-capture-attempt.use-case';
 import { RejectCaptureAttemptUseCase } from './application/reject-capture-attempt.use-case';
 import { RecordCaptureAttemptUseCase } from './application/record-capture-attempt.use-case';
 import {
@@ -35,6 +37,8 @@ import { CaptureMqttListener } from './presentation/mqtt/capture-mqtt.listener';
     CompleteCaptureSessionUseCase,
     GetCaptureAttemptImageUseCase,
     RejectCaptureAttemptUseCase,
+    NextCaptureAttemptUseCase,
+    CloseCaptureSessionUseCase,
     RecordCaptureAttemptUseCase,
     HandleDeviceHelloUseCase,
     CaptureMqttListener,

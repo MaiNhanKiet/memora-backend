@@ -22,6 +22,9 @@ service FingerprintCaptureService {
   // PERSO-026 / PERSO-027: the capture staff reviews each PENDING_REVIEW attempt.
   rpc GetCaptureAttemptImage (GetCaptureAttemptImageRequest) returns (CaptureAttemptImage);
   rpc RejectCaptureAttempt (RejectCaptureAttemptRequest) returns (CaptureSession);
+  // PERSO-028 / PERSO-029 (2026-11-17): ask the device for another scan, or end without picking.
+  rpc NextCaptureAttempt (NextCaptureAttemptRequest) returns (CaptureSession);
+  rpc CloseCaptureSession (CloseCaptureSessionRequest) returns (CaptureSession);
 }
 
 message Consent {
@@ -71,6 +74,8 @@ message CaptureAttemptSummary {
   string attempted_at = 4;
   // PASS | LOW_QUALITY: threshold suggestion only; the staff decides.
   optional string suggestion = 5;
+  // Only for REJECTED / ERROR: CAPTURE_FAILED | STAFF_REJECTED | NOT_SELECTED | EXPIRED.
+  optional string failure_reason = 6;
 }
 
 message CaptureSession {
@@ -128,4 +133,14 @@ message RejectCaptureAttemptRequest {
   memora.common.v1.VerifiedActor actor = 1;
   string session_id = 2;
   int32 attempt_no = 3;
+}
+
+message NextCaptureAttemptRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string session_id = 2;
+}
+
+message CloseCaptureSessionRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string session_id = 2;
 }

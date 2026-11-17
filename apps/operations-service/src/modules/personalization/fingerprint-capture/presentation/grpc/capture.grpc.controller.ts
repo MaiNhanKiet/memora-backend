@@ -4,14 +4,18 @@ import {
   PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
   type CaptureAttemptImage,
   type CaptureSession,
+  type CloseCaptureSessionRequest,
   type CompleteCaptureSessionRequest,
   type CreateCaptureSessionRequest,
   type FingerprintCaptureServiceHandler,
   type GetCaptureAttemptImageRequest,
   type GetCaptureSessionRequest,
+  type NextCaptureAttemptRequest,
   type RejectCaptureAttemptRequest,
 } from '@app/contracts';
 import { OperationsInternalGrpcAuthGuard } from '../../../../../grpc/operations-internal-grpc-auth.guard';
+import { CloseCaptureSessionUseCase } from '../../application/close-capture-session.use-case';
+import { NextCaptureAttemptUseCase } from '../../application/next-capture-attempt.use-case';
 import { RejectCaptureAttemptUseCase } from '../../application/reject-capture-attempt.use-case';
 import { CompleteCaptureSessionUseCase } from '../../application/complete-capture-session.use-case';
 import { CreateCaptureSessionUseCase } from '../../application/create-capture-session.use-case';
@@ -28,6 +32,8 @@ export class CaptureGrpcController implements FingerprintCaptureServiceHandler {
     private readonly completeUseCase: CompleteCaptureSessionUseCase,
     private readonly imageUseCase: GetCaptureAttemptImageUseCase,
     private readonly rejectUseCase: RejectCaptureAttemptUseCase,
+    private readonly nextUseCase: NextCaptureAttemptUseCase,
+    private readonly closeUseCase: CloseCaptureSessionUseCase,
   ) {}
 
   @GrpcMethod(
@@ -78,5 +84,25 @@ export class CaptureGrpcController implements FingerprintCaptureServiceHandler {
     request: RejectCaptureAttemptRequest,
   ): Promise<CaptureSession> {
     return this.rejectUseCase.execute(request);
+  }
+
+  @GrpcMethod(
+    PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
+    'NextCaptureAttempt',
+  )
+  nextCaptureAttempt(
+    request: NextCaptureAttemptRequest,
+  ): Promise<CaptureSession> {
+    return this.nextUseCase.execute(request);
+  }
+
+  @GrpcMethod(
+    PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
+    'CloseCaptureSession',
+  )
+  closeCaptureSession(
+    request: CloseCaptureSessionRequest,
+  ): Promise<CaptureSession> {
+    return this.closeUseCase.execute(request);
   }
 }

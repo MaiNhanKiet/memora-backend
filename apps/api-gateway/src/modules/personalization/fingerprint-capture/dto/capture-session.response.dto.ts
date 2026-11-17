@@ -31,6 +31,16 @@ export class CaptureAttemptResponseDto {
       'Quality threshold suggestion only; the staff decides. Null when absent',
   })
   suggestion!: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    example: 'NOT_SELECTED',
+    description:
+      'Why a REJECTED / ERROR attempt ended: CAPTURE_FAILED (no usable image), STAFF_REJECTED, ' +
+      'NOT_SELECTED (another attempt was picked or the session was closed), EXPIRED. Null otherwise',
+  })
+  failureReason!: string | null;
 }
 
 export class CaptureSessionResponseDto {

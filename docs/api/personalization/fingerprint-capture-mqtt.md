@@ -28,7 +28,7 @@ All messages are UTF-8 JSON, QoS 1, `retain = false`. Maximum message size is 25
 | Topic                                  | Direction            | Purpose                                                                                         |
 | -------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------- |
 | `memora/capture/{deviceCode}/hello`    | device to Operations | Optional. Publish after every (re)connect.                                                      |
-| `memora/capture/{deviceCode}/commands` | Operations to device | The device subscribes. Carries the `start` and `end` commands.                                  |
+| `memora/capture/{deviceCode}/commands` | Operations to device | The device subscribes. Carries the `start`, `next` and `end` commands.                               |
 | `memora/capture/{deviceCode}/attempts` | device to Operations | One message per capture attempt.                                                                |
 | `memora/capture/{deviceCode}/results`  | Operations to device | The device subscribes. One result per attempt message, plus one when the staff reject an image. |
 
@@ -41,11 +41,12 @@ The device subscribes to `commands` and `results` (QoS 1) on every connect.
 3. On `start`, the device remembers `sessionId` and asks the customer to place the finger. For each capture it publishes one `attempts` message with a fresh `nonce`.
 4. Operations answers every parseable attempt on `results` with the same `sessionId` and `nonce`.
 5. The device shows the outcome. Rules:
-   - `result = PENDING_REVIEW`: the image is stored and the tablet shows it to the staff with the `suggestion` (`PASS` or `LOW_QUALITY`). The device stops capturing and shows "waiting for staff". It does not capture again until a new result arrives.
+   - `result = PENDING_REVIEW`: the image is stored and the tablet shows it to the staff with the `suggestion` (`PASS` or `LOW_QUALITY`). The device shows "waiting for staff". Several attempts can be pending at once (up to 3); the device captures again only after a `next` (or `start`) command and a button press.
    - `result = REJECTED` (no `reason`, the attempt had no image, `CAPTURE_FAILED`): ask for another capture if `remainingAttempts > 0`.
    - `sessionStatus = FAILED`: the session failed; an `end` command follows.
 6. The staff look at the image on the tablet and either:
    - accept it (PERSO-008, with the chosen `attemptNo`): Operations publishes `end` with `status = COMPLETED`;
+   - ask for another scan (PERSO-028): Operations publishes `next`; or close the session without picking (PERSO-029): `end` with `status = CANCELLED`;
    - reject it (PERSO-027): Operations publishes a `STAFF_REJECTED` result (section 4.4). With attempts left the device asks for a new capture. With none left the session is `FAILED` and an `end` command with `status = FAILED` follows.
 7. On `end` the device clears the session and returns to idle.
 
@@ -81,9 +82,14 @@ sequenceDiagram
 | `IDLE`          | boot, `end`, or `SESSION_EXPIRED` / `SESSION_NOT_OPEN` / `SESSION_NOT_FOUND`                                          | `start` command, then `CAPTURING`                                                                                                                                    |
 | `CAPTURING`     | `start`, `STAFF_REJECTED` with `remainingAttempts > 0`, or `REJECTED` (`CAPTURE_FAILED`) with `remainingAttempts > 0` | capture done and `attempts` published, then `SENDING`                                                                                                                |
 | `SENDING`       | an `attempts` message was published                                                                                   | `results` with the same nonce: `PENDING_REVIEW` then `WAITING_STAFF`; `REJECTED` then `CAPTURING` (or `IDLE` if `sessionStatus = FAILED`); `ok: false` per section 6 |
-| `WAITING_STAFF` | `PENDING_REVIEW`                                                                                                      | `STAFF_REJECTED` result then `CAPTURING`; `end` then `IDLE`; time-out by `expiresAt` then `IDLE`                                                                     |
+| `WAITING_STAFF` | `PENDING_REVIEW`                                                                                                      | `STAFF_REJECTED` result then `CAPTURING`; `next` then `CAPTURING`; `end` then `IDLE`; time-out by `expiresAt` then `IDLE`                                                                     |
 
-In `WAITING_STAFF` the device must not publish another attempt (it would get `REVIEW_PENDING`).
+In `WAITING_STAFF` the device does not publish another attempt until a `next` command arrives. The server no longer refuses a new attempt while others are pending (`REVIEW_PENDING` is not sent any more).
+
+Device-local behaviour (no extra messages, Operations is not told): the reference firmware inserts a
+`CONFIRM` step before every `CAPTURING` (after `start` and after a rejection) and only starts capturing
+when a person presses its button. It may also keep its open `sessionId` and attempt count across a
+restart and re-apply them when `start` for the same session arrives again after `hello`.
 
 ## 4. Messages
 
@@ -104,11 +110,22 @@ In `WAITING_STAFF` the device must not publish another attempt (it would get `RE
 {
   "type": "end",
   "sessionId": "9bf6b096-d5e2-494c-b8cb-3e091a16a864",
-  "status": "COMPLETED"
+  "status": "COMPLETED",
+  "acceptedAttemptNo": 2
 }
 ```
 
-`end` tells the device the session is over: `status` is `COMPLETED` (the staff accepted an image) or `FAILED` (no attempts left and nothing pending or accepted). The device shows the outcome, clears `sessionId` and returns to idle. Ignore an `end` for a session that is not the current one. Ignore unknown `type` values.
+```json
+{
+  "type": "next",
+  "sessionId": "9bf6b096-d5e2-494c-b8cb-3e091a16a864",
+  "attemptNo": 2
+}
+```
+
+`next` (PERSO-028, QoS 1) means the staff asked for another scan: the device leaves `WAITING_STAFF` and goes back to `CAPTURING`, then captures after a button press. `attemptNo` is the number the next attempt will get. Nothing is stored for it; a repeated `next` is harmless.
+
+`end` tells the device the session is over: `status` is `COMPLETED` (the staff accepted an image; `acceptedAttemptNo` names it), `FAILED` (no attempts left and nothing pending or accepted) or `CANCELLED` (the staff closed the session without picking, PERSO-029). The device shows the outcome, clears `sessionId` and returns to idle. Ignore an `end` for a session that is not the current one. Ignore unknown `type` values.
 
 ### 4.2 `attempts` (device to Operations)
 
@@ -212,6 +229,9 @@ The firmware computes `qualityScore` (0 to 1000): the AS608 `Img2Tz` conversion 
 
 - QoS 1 is at-least-once. The broker may deliver an `attempts` message twice. Operations stores the nonce with the attempt and, when it sees the same nonce again for the same session, it does not create a second attempt: it answers again with the recorded attempt (its current `result`).
 - If the device sent an attempt and got no `results` message within about 10 seconds, it may publish the same message again with the same nonce. It never causes a double attempt.
+- Keep resending the pending attempt with the same nonce (for example every 10 s, then every 15 s) until a
+  `results` message for it arrives or the session expires; send it at once after a reconnect. Do not
+  replace it with a new capture just because no result came (that would make the customer scan again).
 - For a new capture, always use a new nonce.
 - Match a `results` message to the attempt by `sessionId` and `nonce`. Ignore results for other nonces.
 - A failed attempt message (`ok: false`) is not an attempt: it does not consume one of the 3 attempts.
@@ -227,7 +247,7 @@ The firmware computes `qualityScore` (0 to 1000): the AS608 `Img2Tz` conversion 
 | `SESSION_EXPIRED`          | The session passed its TTL.                                                                                                        | Go to idle; staff must create a new session.                                               |
 | `MAX_ATTEMPTS_REACHED`     | Already 3 attempts (session failed).                                                                                               | Go to idle; staff must create a new session.                                               |
 | `ATTEMPT_ALREADY_ACCEPTED` | An attempt was already accepted in this session.                                                                                   | Stop capturing; wait for `end`.                                                            |
-| `REVIEW_PENDING`           | An earlier image is still waiting for the staff.                                                                                   | Show "waiting for staff"; do not capture until a `STAFF_REJECTED` result or `end` arrives. |
+| `REVIEW_PENDING`           | Not sent since 2026-11-17 (kept for older firmware).                                                                                | Show "waiting for staff"; do not capture until a `STAFF_REJECTED` result or `end` arrives. |
 | `IMAGE_TOO_LARGE`          | Decoded image above 180000 bytes.                                                                                                  | Fix the firmware.                                                                          |
 | `DUPLICATE_NONCE`          | Reserved. A repeated nonce is answered with the recorded attempt instead.                                                          | n/a                                                                                        |
 | `INTERNAL_ERROR`           | Operations could not store the attempt (for example object storage down). Nothing was recorded.                                    | Retry later with a new nonce.                                                              |

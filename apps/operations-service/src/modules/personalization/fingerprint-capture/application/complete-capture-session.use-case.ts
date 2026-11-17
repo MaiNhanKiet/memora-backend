@@ -90,6 +90,7 @@ export class CompleteCaptureSessionUseCase {
           type: 'end',
           sessionId,
           status: 'COMPLETED',
+          acceptedAttemptNo: attemptNo,
         });
       } catch (error) {
         this.logger.error(
