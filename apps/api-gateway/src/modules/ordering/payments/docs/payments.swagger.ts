@@ -4,6 +4,7 @@ import {
   ApiHeader,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiResponse,
 } from '@nestjs/swagger';
 import { ApiSuccessResponse } from '../../../../common/docs/api-success-response';
@@ -186,5 +187,31 @@ export function ApiProcessPayosWebhook() {
       status: 403,
       description: 'Invalid webhook signature',
     }),
+  );
+}
+
+export function ApiPaymentSseStreamDocs() {
+  return applyDecorators(
+    bearer,
+    guestSessionHeader,
+    ApiProduces('text/event-stream'),
+    ApiOperation({
+      summary: '[ORDER-019-SSE] Realtime Server-Sent Events (SSE) payment stream',
+      description:
+        'Opens an HTTP text/event-stream connection to listen for real-time payment status updates. Emits "connected", "ping" (heartbeat every 25s), and "payment.succeeded" immediately when PayOS webhook is processed.',
+    }),
+    ApiParam({
+      name: 'orderId',
+      description: 'Order UUID',
+      type: String,
+      example: 'a1b81e4b-70c1-4ebc-b391-4770ff902222',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'SSE stream connection established (Content-Type: text/event-stream)',
+    }),
+    unauthorized,
+    forbidden('Caller does not own this order'),
+    notFound('Order'),
   );
 }

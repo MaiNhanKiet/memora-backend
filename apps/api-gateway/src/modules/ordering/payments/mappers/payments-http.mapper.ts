@@ -70,12 +70,16 @@ export function toProcessPayosWebhookGrpcRequest(
   body: PayosWebhookBodyDto,
 ): PayosWebhookRequest {
   const dataJson =
-    typeof body.data === 'string' ? body.data : JSON.stringify(body.data);
+    typeof body.data === 'string'
+      ? body.data
+      : body.data !== undefined
+        ? JSON.stringify(body.data)
+        : '{}';
   return {
-    code: body.code,
-    desc: body.desc,
-    success: body.success,
+    code: body.code ?? '00',
+    desc: body.desc ?? '',
+    success: body.success ?? true,
     dataJson,
-    signature: body.signature,
+    signature: body.signature ?? '',
   };
 }

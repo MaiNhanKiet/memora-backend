@@ -78,7 +78,7 @@ export class InventoryRepository {
 
       await tx.inventory_movements.create({
         data: {
-          movement_type: 'RECEIPT',
+          movement_type: 'RECEIVE',
           stock_lot_id: stockLot.id,
           quantity: params.quantity,
           unit_cost_snapshot:
@@ -158,7 +158,7 @@ export class InventoryRepository {
 
       await tx.inventory_movements.create({
         data: {
-          movement_type: 'RECEIPT',
+          movement_type: 'RECEIVE',
           stock_lot_id: stockLot.id,
           quantity: params.quantity,
           unit_cost_snapshot:
@@ -242,7 +242,7 @@ export class InventoryRepository {
 
       await tx.inventory_movements.create({
         data: {
-          movement_type: 'RECEIPT',
+          movement_type: 'RECEIVE',
           certified_gemstone_id: gemstone.id,
           quantity: 1,
           unit_cost_snapshot:
@@ -315,7 +315,7 @@ export class InventoryRepository {
         where: { id: params.stockLotId },
         data: {
           quantity_on_hand: nextOnHand,
-          status: nextOnHand === 0 ? 'EXHAUSTED' : 'AVAILABLE',
+          status: nextOnHand === 0 ? 'INACTIVE' : 'ACTIVE',
           updated_at: now,
         },
       });
@@ -484,19 +484,19 @@ export class InventoryRepository {
           data: {
             quantity_on_hand: Math.max(0, nextOnHand),
             quantity_reserved: Math.max(0, nextReserved),
-            status: nextOnHand <= 0 ? 'EXHAUSTED' : 'AVAILABLE',
+            status: nextOnHand <= 0 ? 'INACTIVE' : 'ACTIVE',
             updated_at: now,
           },
         });
 
         await tx.inventory_movements.create({
           data: {
-            movement_type: 'OUTBOUND',
+            movement_type: 'CONSUME',
             stock_lot_id: allocation.stock_lot_id,
             allocation_id: allocation.id,
             ring_item_id: allocation.ring_item_id,
             production_attempt_id: allocation.production_attempt_id,
-            quantity: -allocation.quantity,
+            quantity: allocation.quantity,
             unit_cost_snapshot: lot.unit_cost,
             reason: 'Consumed for production',
             performed_by_user_id: params.allocatedByUserId,
@@ -517,12 +517,12 @@ export class InventoryRepository {
 
         await tx.inventory_movements.create({
           data: {
-            movement_type: 'OUTBOUND',
+            movement_type: 'CONSUME',
             certified_gemstone_id: allocation.certified_gemstone_id,
             allocation_id: allocation.id,
             ring_item_id: allocation.ring_item_id,
             production_attempt_id: allocation.production_attempt_id,
-            quantity: -1,
+            quantity: 1,
             unit_cost_snapshot: gem.purchase_cost ?? 0,
             reason: 'Mounted gemstone for production',
             performed_by_user_id: params.allocatedByUserId,

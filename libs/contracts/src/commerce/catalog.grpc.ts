@@ -106,15 +106,13 @@ export interface ListGemstoneOptionsRequest {
 export interface GemstoneOptionResponse {
   id: string;
   stoneCode: string;
+  name: string;
   stoneType: string;
   shape: string;
-  cutGrade: string;
   color: string;
   clarity: string;
-  caratWeight: number;
   dimensionLengthMm: number;
   dimensionWidthMm: number;
-  dimensionHeightMm: number;
   isCertified: boolean;
   status: string;
 }

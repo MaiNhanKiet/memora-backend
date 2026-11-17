@@ -743,6 +743,7 @@ message PayosWebhookResponse {
   string message = 2;
   string transaction_id = 3;
   string status = 4;
+  string order_id = 5;
 }
 
 message ReconcilePaymentTransactionRequest {

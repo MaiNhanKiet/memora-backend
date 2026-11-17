@@ -95,15 +95,13 @@ export class CatalogMapper {
     return {
       id: entity.id,
       stoneCode: entity.code,
+      name: entity.name,
       stoneType: entity.stone_type,
       shape: entity.shape,
-      cutGrade: 'EXCELLENT',
-      color: entity.color_grade ?? 'G',
-      clarity: entity.clarity_grade ?? 'VS1',
-      caratWeight: 0.5,
+      color: entity.color_grade ?? '',
+      clarity: entity.clarity_grade ?? '',
       dimensionLengthMm: Number(entity.length_mm),
       dimensionWidthMm: Number(entity.width_mm),
-      dimensionHeightMm: 3.15,
       isCertified: entity.certified_required,
       status: entity.status,
     };
