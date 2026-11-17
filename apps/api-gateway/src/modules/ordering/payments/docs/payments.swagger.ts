@@ -196,7 +196,8 @@ export function ApiPaymentSseStreamDocs() {
     guestSessionHeader,
     ApiProduces('text/event-stream'),
     ApiOperation({
-      summary: '[ORDER-019-SSE] Realtime Server-Sent Events (SSE) payment stream',
+      summary:
+        '[ORDER-019-SSE] Realtime Server-Sent Events (SSE) payment stream',
       description:
         'Opens an HTTP text/event-stream connection to listen for real-time payment status updates. Emits "connected", "ping" (heartbeat every 25s), and "payment.succeeded" immediately when PayOS webhook is processed.',
     }),
@@ -208,7 +209,8 @@ export function ApiPaymentSseStreamDocs() {
     }),
     ApiResponse({
       status: 200,
-      description: 'SSE stream connection established (Content-Type: text/event-stream)',
+      description:
+        'SSE stream connection established (Content-Type: text/event-stream)',
     }),
     unauthorized,
     forbidden('Caller does not own this order'),

@@ -28,7 +28,9 @@ describe('PaymentEventsService', () => {
           expect((event.data as Record<string, unknown>).orderId).toBe(orderId);
           done();
         },
-        error: (err) => done(err),
+        error: (err: unknown) => {
+          done(err);
+        },
       });
   });
 

@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Param,
-  ParseUUIDPipe,
-  Sse,
-} from '@nestjs/common';
+import { Controller, Param, ParseUUIDPipe, Sse } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { MessageEvent } from '@nestjs/common';
 import type { Observable } from 'rxjs';

@@ -44,20 +44,22 @@ export class PaymentEventsService {
     );
 
     // 3. Payment succeeded event filtered specifically for this orderId
-    const payment$: Observable<MessageEvent> = this.paymentSubject.asObservable().pipe(
-      filter((event) => event.orderId === orderId),
-      map((event) => ({
-        type: 'payment.succeeded',
-        data: {
-          orderId: event.orderId,
-          transactionId: event.transactionId,
-          status: event.status,
-          amount: event.amount,
-          paymentStage: event.paymentStage,
-          timestamp: new Date().toISOString(),
-        },
-      })),
-    );
+    const payment$: Observable<MessageEvent> = this.paymentSubject
+      .asObservable()
+      .pipe(
+        filter((event) => event.orderId === orderId),
+        map((event) => ({
+          type: 'payment.succeeded',
+          data: {
+            orderId: event.orderId,
+            transactionId: event.transactionId,
+            status: event.status,
+            amount: event.amount,
+            paymentStage: event.paymentStage,
+            timestamp: new Date().toISOString(),
+          },
+        })),
+      );
 
     return merge(initial$, heartbeat$, payment$);
   }

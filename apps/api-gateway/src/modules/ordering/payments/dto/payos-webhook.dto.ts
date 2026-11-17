@@ -2,7 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class PayosWebhookBodyDto {
-  @ApiPropertyOptional({ description: 'Response code from PayOS', example: '00' })
+  @ApiPropertyOptional({
+    description: 'Response code from PayOS',
+    example: '00',
+  })
   @IsOptional()
   @IsString()
   code?: string;
@@ -23,12 +26,16 @@ export class PayosWebhookBodyDto {
   @IsOptional()
   data?: Record<string, unknown> | string;
 
-  @ApiPropertyOptional({ description: 'HMAC_SHA256 signature for verification' })
+  @ApiPropertyOptional({
+    description: 'HMAC_SHA256 signature for verification',
+  })
   @IsOptional()
   @IsString()
   signature?: string;
 
-  @ApiPropertyOptional({ description: 'Webhook test URL from PayOS confirmation' })
+  @ApiPropertyOptional({
+    description: 'Webhook test URL from PayOS confirmation',
+  })
   @IsOptional()
   @IsString()
   webhookUrl?: string;
