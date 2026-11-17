@@ -133,6 +133,33 @@ export interface DuplicateDesignDraftResponse {
   currency: string;
 }
 
+// DESIG-009: Create Design Share Link
+export interface CreateDesignShareLinkRequest {
+  draftId: string;
+  expiresInDays?: number;
+  actor: VerifiedActor;
+}
+
+export interface CreateDesignShareLinkResponse {
+  linkId: string;
+  code: string;
+  shareUrl: string;
+  status: string;
+  expiresAt: string;
+}
+
+// DESIG-010: Revoke Design Share Link
+export interface RevokeDesignShareLinkRequest {
+  draftId: string;
+  linkId: string;
+  actor: VerifiedActor;
+}
+
+export interface RevokeDesignShareLinkResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface CartServiceClient {
   getCart(
     request: GetCartRequest,
@@ -166,6 +193,14 @@ export interface CartServiceClient {
     request: DuplicateDesignDraftRequest,
     metadata?: Metadata,
   ): Observable<DuplicateDesignDraftResponse>;
+  createDesignShareLink(
+    request: CreateDesignShareLinkRequest,
+    metadata?: Metadata,
+  ): Observable<CreateDesignShareLinkResponse>;
+  revokeDesignShareLink(
+    request: RevokeDesignShareLinkRequest,
+    metadata?: Metadata,
+  ): Observable<RevokeDesignShareLinkResponse>;
 }
 
 export interface CartServiceHandler {
@@ -187,4 +222,10 @@ export interface CartServiceHandler {
   duplicateDesignDraft(
     request: DuplicateDesignDraftRequest,
   ): Promise<DuplicateDesignDraftResponse>;
+  createDesignShareLink(
+    request: CreateDesignShareLinkRequest,
+  ): Promise<CreateDesignShareLinkResponse>;
+  revokeDesignShareLink(
+    request: RevokeDesignShareLinkRequest,
+  ): Promise<RevokeDesignShareLinkResponse>;
 }

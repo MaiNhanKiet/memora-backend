@@ -2,6 +2,7 @@
 
 import type { Observable } from 'rxjs';
 import type { Metadata } from '@grpc/grpc-js';
+import type { VerifiedActor } from '../common/actor';
 
 export interface StockLotResponse {
   id: string;
@@ -149,6 +150,55 @@ export interface AdjustInventoryRequest {
   performedByUserId?: string;
 }
 
+// -----------------------------------------------------------------------------
+// Inventory Allocations & Stock Lifecycle (INVEN-007..011)
+// -----------------------------------------------------------------------------
+
+export interface AllocationResponse {
+  id: string;
+  ringItemId: string;
+  productionAttemptId?: string;
+  stockLotId?: string;
+  certifiedGemstoneId?: string;
+  quantity: number;
+  status: string;
+  expiresAt?: string;
+  allocatedByUserId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HoldInventoryRequest {
+  actor: VerifiedActor;
+  ringItemId: string;
+  stockLotId?: string;
+  certifiedGemstoneId?: string;
+  quantity?: number;
+  ttlMinutes?: number;
+}
+
+export interface ReserveInventoryRequest {
+  actor: VerifiedActor;
+  allocationId: string;
+}
+
+export interface AllocateInventoryRequest {
+  actor: VerifiedActor;
+  allocationId: string;
+  productionAttemptId: string;
+}
+
+export interface ConsumeInventoryRequest {
+  actor: VerifiedActor;
+  allocationId: string;
+}
+
+export interface ReleaseInventoryRequest {
+  actor: VerifiedActor;
+  allocationId: string;
+  reason?: string;
+}
+
 export interface InventoryServiceClient {
   listRingBlankStocks(
     request: ListRingBlankStocksRequest,
@@ -189,6 +239,31 @@ export interface InventoryServiceClient {
     request: AdjustInventoryRequest,
     metadata?: Metadata,
   ): Observable<StockLotResponse>;
+
+  holdInventory(
+    request: HoldInventoryRequest,
+    metadata?: Metadata,
+  ): Observable<AllocationResponse>;
+
+  reserveInventory(
+    request: ReserveInventoryRequest,
+    metadata?: Metadata,
+  ): Observable<AllocationResponse>;
+
+  allocateInventory(
+    request: AllocateInventoryRequest,
+    metadata?: Metadata,
+  ): Observable<AllocationResponse>;
+
+  consumeInventory(
+    request: ConsumeInventoryRequest,
+    metadata?: Metadata,
+  ): Observable<AllocationResponse>;
+
+  releaseInventory(
+    request: ReleaseInventoryRequest,
+    metadata?: Metadata,
+  ): Observable<AllocationResponse>;
 }
 
 export interface InventoryServiceHandler {
@@ -221,4 +296,18 @@ export interface InventoryServiceHandler {
   ): Promise<ListInventoryMovementsResponse>;
 
   adjustInventory(request: AdjustInventoryRequest): Promise<StockLotResponse>;
+
+  holdInventory(request: HoldInventoryRequest): Promise<AllocationResponse>;
+  reserveInventory(
+    request: ReserveInventoryRequest,
+  ): Promise<AllocationResponse>;
+  allocateInventory(
+    request: AllocateInventoryRequest,
+  ): Promise<AllocationResponse>;
+  consumeInventory(
+    request: ConsumeInventoryRequest,
+  ): Promise<AllocationResponse>;
+  releaseInventory(
+    request: ReleaseInventoryRequest,
+  ): Promise<AllocationResponse>;
 }

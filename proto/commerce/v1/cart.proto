@@ -13,6 +13,8 @@ service CartService {
   rpc AbandonCart (AbandonCartRequest) returns (AbandonCartResponse);
   rpc GetDesignDraft (GetDesignDraftRequest) returns (GetDesignDraftResponse);
   rpc DuplicateDesignDraft (DuplicateDesignDraftRequest) returns (DuplicateDesignDraftResponse);
+  rpc CreateDesignShareLink (CreateDesignShareLinkRequest) returns (CreateDesignShareLinkResponse);
+  rpc RevokeDesignShareLink (RevokeDesignShareLinkRequest) returns (RevokeDesignShareLinkResponse);
 }
 
 message GemstoneSelectionItem {
@@ -143,4 +145,32 @@ message DuplicateDesignDraftResponse {
   double total_estimated_price = 3;
   string currency = 4;
 }
+
+// DESIG-009: Create Design Share Link
+message CreateDesignShareLinkRequest {
+  string draft_id = 1;
+  int32 expires_in_days = 2;
+  memora.common.v1.VerifiedActor actor = 3;
+}
+
+message CreateDesignShareLinkResponse {
+  string link_id = 1;
+  string code = 2;
+  string share_url = 3;
+  string status = 4;
+  string expires_at = 5;
+}
+
+// DESIG-010: Revoke Design Share Link
+message RevokeDesignShareLinkRequest {
+  string draft_id = 1;
+  string link_id = 2;
+  memora.common.v1.VerifiedActor actor = 3;
+}
+
+message RevokeDesignShareLinkResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 

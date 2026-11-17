@@ -1,13 +1,8 @@
 import { Module } from '@nestjs/common';
-import { CartGrpcController } from '../../presentation/grpc/cart.grpc.controller';
-import { CartService } from '../../application/cart/cart.service';
-import { RepositoriesModule } from '../../repositories/repositories.module';
-import { PricingModule } from '../pricing/pricing.module';
+import { CartModule } from './cart/cart.module';
 
 @Module({
-  imports: [RepositoriesModule, PricingModule],
-  controllers: [CartGrpcController],
-  providers: [CartService],
-  exports: [CartService],
+  imports: [CartModule],
+  exports: [CartModule],
 })
 export class DesignModule {}

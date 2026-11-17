@@ -1,8 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { domainGrpcClientOptions } from '../../common/grpc/domain-grpc';
-import { AdminOrdersController } from './controllers/admin-orders.controller';
-import { OrdersController } from './controllers/orders.controller';
+import { CheckoutOrdersController } from './checkout-orders/controllers/checkout-orders.controller';
+import { AdminOrdersController } from './order-management/controllers/admin-orders.controller';
+import { OrderQuotesController } from './quotes/controllers/order-quotes.controller';
+import { OrderPaymentsController } from './payments/controllers/order-payments.controller';
+import { AdminPaymentsController } from './payments/controllers/admin-payments.controller';
+import { PaymentsWebhookController } from './payments/controllers/payments-webhook.controller';
+import { ReceiptsInvoicesController } from './receipts-invoices/controllers/receipts-invoices.controller';
+import { ClaimQuotesController } from './claims/controllers/claim-quotes.controller';
 import {
   COMMERCE_ORDERING_GRPC_CLIENT,
   OrderingGrpcClient,
@@ -19,7 +25,16 @@ import {
       }),
     ]),
   ],
-  controllers: [OrdersController, AdminOrdersController],
+  controllers: [
+    CheckoutOrdersController,
+    AdminOrdersController,
+    OrderQuotesController,
+    OrderPaymentsController,
+    AdminPaymentsController,
+    PaymentsWebhookController,
+    ReceiptsInvoicesController,
+    ClaimQuotesController,
+  ],
   providers: [OrderingGrpcClient],
   exports: [OrderingGrpcClient],
 })

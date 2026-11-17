@@ -17,6 +17,25 @@ service OrderingService {
   rpc UpdateCurrentRingItemVersion (UpdateCurrentRingItemVersionRequest) returns (UpdateCurrentRingItemVersionResponse);
   rpc ListOrderQuotes (ListOrderQuotesRequest) returns (ListOrderQuotesResponse);
   rpc GetOrderPersonalizationContext (GetOrderPersonalizationContextRequest) returns (GetOrderPersonalizationContextResponse);
+  rpc CancelOrder (CancelOrderRequest) returns (CancelOrderResponse);
+  rpc CreateFinalQuote (CreateFinalQuoteRequest) returns (FullQuoteDetail);
+  rpc UpdateFinalQuote (UpdateFinalQuoteRequest) returns (FullQuoteDetail);
+  rpc PublishFinalQuote (PublishFinalQuoteRequest) returns (FullQuoteDetail);
+  rpc GetOrderQuoteById (GetOrderQuoteByIdRequest) returns (FullQuoteDetail);
+  rpc ConfirmFinalQuote (ConfirmFinalQuoteRequest) returns (ConfirmFinalQuoteResponse);
+  rpc RejectFinalQuote (RejectFinalQuoteRequest) returns (RejectFinalQuoteResponse);
+  rpc GetOrderFinalConfirmations (GetOrderFinalConfirmationsRequest) returns (GetOrderFinalConfirmationsResponse);
+  rpc ListOrderPayments (ListOrderPaymentsRequest) returns (ListOrderPaymentsResponse);
+  rpc GetOrderPaymentById (GetOrderPaymentByIdRequest) returns (PaymentTransactionDetail);
+  rpc GetPaymentReceipt (GetPaymentReceiptRequest) returns (PaymentReceiptDetail);
+  rpc GetOrderInvoice (GetOrderInvoiceRequest) returns (OrderInvoiceDetail);
+  rpc CreateRefundRequest (CreateRefundRequestMessage) returns (CreateRefundResponse);
+  rpc ListClaimQuotes (ListClaimQuotesRequest) returns (ListClaimQuotesResponse);
+  rpc AcceptServiceQuote (AcceptServiceQuoteRequest) returns (AcceptServiceQuoteResponse);
+  rpc CreateOrderPaymentLink (CreateOrderPaymentLinkRequest) returns (PaymentLinkResponse);
+  rpc ProcessPayosWebhook (PayosWebhookRequest) returns (PayosWebhookResponse);
+  rpc ReconcilePaymentTransaction (ReconcilePaymentTransactionRequest) returns (PaymentTransactionDetail);
+  rpc CreateClaimPaymentLink (CreateClaimPaymentLinkRequest) returns (PaymentLinkResponse);
 }
 
 message OrderPreP1Acknowledgement {
@@ -341,6 +360,7 @@ message QuoteLineItem {
   double unit_amount = 5;
   double line_amount = 6;
   string price_source_type = 7;
+  string ring_item_id = 8;
 }
 
 message FullQuoteDetail {
@@ -356,11 +376,155 @@ message FullQuoteDetail {
   string currency = 10;
   repeated QuoteLineItem items = 11;
   string created_at = 12;
+  string valid_until = 13;
+  string issued_at = 14;
+  string accepted_at = 15;
 }
 
 message ListOrderQuotesResponse {
   string order_id = 1;
   repeated FullQuoteDetail quotes = 2;
+}
+
+// -----------------------------------------------------------------------------
+// Order Cancellation Messages
+// -----------------------------------------------------------------------------
+
+message CancelOrderRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string reason = 3;
+}
+
+message CancelOrderResponse {
+  string order_id = 1;
+  string status = 2;
+  string cancelled_at = 3;
+  string cancellation_reason = 4;
+}
+
+// -----------------------------------------------------------------------------
+// Final Quotes & Management Messages
+// -----------------------------------------------------------------------------
+
+message QuoteLineItemInput {
+  string ring_item_id = 1;
+  string component_type = 2;
+  string description = 3;
+  double quantity = 4;
+  double unit_amount = 5;
+  double line_amount = 6;
+  string price_source_type = 7;
+}
+
+message CreateFinalQuoteRequest {
+  string order_id = 1;
+  double subtotal_amount = 2;
+  double delivery_amount = 3;
+  double adjustment_amount = 4;
+  double total_amount = 5;
+  string currency = 6;
+  string valid_until = 7;
+  string staff_user_id = 8;
+  repeated QuoteLineItemInput items = 9;
+}
+
+message UpdateQuoteLineItemInput {
+  string id = 1;
+  string ring_item_id = 2;
+  string component_type = 3;
+  string description = 4;
+  double quantity = 5;
+  double unit_amount = 6;
+  double line_amount = 7;
+  string price_source_type = 8;
+}
+
+message UpdateFinalQuoteRequest {
+  string order_id = 1;
+  string quote_id = 2;
+  double subtotal_amount = 3;
+  double delivery_amount = 4;
+  double adjustment_amount = 5;
+  double total_amount = 6;
+  string valid_until = 7;
+  string staff_user_id = 8;
+  repeated UpdateQuoteLineItemInput items = 9;
+}
+
+message PublishFinalQuoteRequest {
+  string order_id = 1;
+  string quote_id = 2;
+  string staff_user_id = 3;
+}
+
+message GetOrderQuoteByIdRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string quote_id = 3;
+}
+
+message ConfirmFinalQuoteRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string quote_id = 3;
+  string notes = 4;
+}
+
+message FinalConfirmationItemSummary {
+  string id = 1;
+  string ring_item_id = 2;
+  string ring_item_version_id = 3;
+  int32 version_no = 4;
+}
+
+message ConfirmFinalQuoteResponse {
+  string confirmation_id = 1;
+  string order_id = 2;
+  string quote_id = 3;
+  string status = 4;
+  string confirmed_at = 5;
+  string next_order_status = 6;
+  repeated FinalConfirmationItemSummary items = 7;
+}
+
+message RejectFinalQuoteRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string quote_id = 3;
+  string reason = 4;
+}
+
+message RejectFinalQuoteResponse {
+  string order_id = 1;
+  string quote_id = 2;
+  string status = 3;
+  string reason = 4;
+  string updated_order_status = 5;
+}
+
+message GetOrderFinalConfirmationsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+}
+
+message FinalConfirmationDetail {
+  string id = 1;
+  string order_id = 2;
+  string quote_id = 3;
+  string quote_no = 4;
+  double quote_total_amount = 5;
+  string confirmed_by_customer_identity_id = 6;
+  string status = 7;
+  string confirmed_at = 8;
+  string invalidated_at = 9;
+  string invalidation_reason = 10;
+  repeated FinalConfirmationItemSummary items = 11;
+}
+
+message GetOrderFinalConfirmationsResponse {
+  string order_id = 1;
+  repeated FinalConfirmationDetail confirmations = 2;
 }
 
 // -----------------------------------------------------------------------------
@@ -387,6 +551,213 @@ message GetOrderPersonalizationContextResponse {
   string source_plan_mode = 5;
   repeated PersonalizationRingItem ring_items = 6;
 }
+
+// -----------------------------------------------------------------------------
+// Payment Transactions, Receipts & Invoices Messages
+// -----------------------------------------------------------------------------
+
+message ListOrderPaymentsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+}
+
+message PaymentTransactionSummary {
+  string id = 1;
+  string order_id = 2;
+  string payment_stage = 3;
+  string transaction_type = 4;
+  double amount = 5;
+  string currency = 6;
+  string status = 7;
+  string provider = 8;
+  string payment_method = 9;
+  string requested_at = 10;
+  string completed_at = 11;
+  string receipt_no = 12;
+}
+
+message ListOrderPaymentsResponse {
+  string order_id = 1;
+  double total_paid_amount = 2;
+  string currency = 3;
+  repeated PaymentTransactionSummary payments = 4;
+}
+
+message GetOrderPaymentByIdRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string transaction_id = 3;
+}
+
+message PaymentTransactionDetail {
+  string id = 1;
+  string order_id = 2;
+  string payment_stage = 3;
+  string transaction_type = 4;
+  double amount = 5;
+  string currency = 6;
+  string status = 7;
+  string provider = 8;
+  string payment_method = 9;
+  string provider_order_code = 10;
+  string provider_transaction_id = 11;
+  string provider_reference = 12;
+  string related_transaction_id = 13;
+  string requested_at = 14;
+  string completed_at = 15;
+  string failed_at = 16;
+  string failure_reason = 17;
+  string receipt_no = 18;
+  string receipt_issued_at = 19;
+  string metadata_json = 20;
+}
+
+message GetPaymentReceiptRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string transaction_id = 3;
+}
+
+message PaymentReceiptDetail {
+  string receipt_no = 1;
+  string transaction_id = 2;
+  string order_id = 3;
+  string order_no = 4;
+  string payment_stage = 5;
+  double amount = 6;
+  string currency = 7;
+  string payment_method = 8;
+  string completed_at = 9;
+  string recipient_name = 10;
+  string issued_at = 11;
+}
+
+message GetOrderInvoiceRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+}
+
+message InvoiceItemSummary {
+  string component_type = 1;
+  string description = 2;
+  double quantity = 3;
+  double unit_amount = 4;
+  double line_amount = 5;
+}
+
+message InvoicePaymentRecord {
+  string payment_stage = 1;
+  double amount = 2;
+  string completed_at = 3;
+  string receipt_no = 4;
+}
+
+message OrderInvoiceDetail {
+  string invoice_no = 1;
+  string order_id = 2;
+  string order_no = 3;
+  string status = 4;
+  string issued_at = 5;
+  double total_amount = 6;
+  double total_paid_amount = 7;
+  double remaining_amount = 8;
+  string currency = 9;
+  string recipient_name = 10;
+  string recipient_phone = 11;
+  string delivery_address_json = 12;
+  repeated InvoiceItemSummary items = 13;
+  repeated InvoicePaymentRecord payment_transactions = 14;
+}
+
+message CreateRefundRequestMessage {
+  string transaction_id = 1;
+  double refund_amount = 2;
+  string reason = 3;
+  string notes = 4;
+  string staff_user_id = 5;
+}
+
+message CreateRefundResponse {
+  string refund_transaction_id = 1;
+  string original_transaction_id = 2;
+  string order_id = 3;
+  double refund_amount = 4;
+  string currency = 5;
+  string status = 6;
+  string requested_at = 7;
+  string reason = 8;
+}
+
+message ListClaimQuotesRequest {
+  string claim_id = 1;
+  memora.common.v1.VerifiedActor actor = 2;
+}
+
+message ListClaimQuotesResponse {
+  repeated FullQuoteDetail quotes = 1;
+}
+
+message AcceptServiceQuoteRequest {
+  string claim_id = 1;
+  string quote_id = 2;
+  memora.common.v1.VerifiedActor actor = 3;
+}
+
+message AcceptServiceQuoteResponse {
+  bool success = 1;
+  string quote_id = 2;
+  string status = 3;
+  string accepted_at = 4;
+}
+
+message CreateOrderPaymentLinkRequest {
+  string order_id = 1;
+  string payment_stage = 2;
+  string return_url = 3;
+  string cancel_url = 4;
+  memora.common.v1.VerifiedActor actor = 5;
+}
+
+message PaymentLinkResponse {
+  string transaction_id = 1;
+  int64 order_code = 2;
+  string checkout_url = 3;
+  string qr_code = 4;
+  double amount = 5;
+  string currency = 6;
+  string payment_stage = 7;
+  string status = 8;
+  string expires_at = 9;
+}
+
+message PayosWebhookRequest {
+  string code = 1;
+  string desc = 2;
+  bool success = 3;
+  string data_json = 4;
+  string signature = 5;
+}
+
+message PayosWebhookResponse {
+  bool success = 1;
+  string message = 2;
+  string transaction_id = 3;
+  string status = 4;
+}
+
+message ReconcilePaymentTransactionRequest {
+  string transaction_id = 1;
+  memora.common.v1.VerifiedActor actor = 2;
+}
+
+message CreateClaimPaymentLinkRequest {
+  string claim_id = 1;
+  string return_url = 2;
+  string cancel_url = 3;
+  memora.common.v1.VerifiedActor actor = 4;
+}
+
+
 
 
 
