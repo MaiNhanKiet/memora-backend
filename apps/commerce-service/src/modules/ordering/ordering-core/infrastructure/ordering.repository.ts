@@ -224,12 +224,12 @@ export class OrderingRepository {
           data: {
             quote_id: quote.id,
             ring_item_id: ringItem.id,
-            component_type: 'RING_ITEM',
+            component_type: 'RING_BLANK',
             description: `${draft.template_variants.ring_templates.name} - ${draft.template_variants.materials.name}`,
             quantity: new Prisma.Decimal(1),
             unit_amount: unitPrice,
             line_amount: unitPrice,
-            price_source_type: 'CATALOG_ESTIMATE',
+            price_source_type: 'MANUAL',
           },
         });
 
@@ -1068,6 +1068,7 @@ export class OrderingRepository {
         .substring(2, 6)
         .toUpperCase();
       const generatedReceiptNo = `REC-${orderNo}-${tx.payment_stage}-${randomSuffix}`;
+      const receiptAssetKey = `receipts/${orderNo}/${generatedReceiptNo}.pdf`;
       const now = new Date();
 
       await this.prisma.payment_transactions.update({
@@ -1075,11 +1076,13 @@ export class OrderingRepository {
         data: {
           receipt_no: generatedReceiptNo,
           receipt_issued_at: now,
+          receipt_asset_key: receiptAssetKey,
         },
       });
 
       tx.receipt_no = generatedReceiptNo;
       tx.receipt_issued_at = now;
+      tx.receipt_asset_key = receiptAssetKey;
     }
 
     return tx;

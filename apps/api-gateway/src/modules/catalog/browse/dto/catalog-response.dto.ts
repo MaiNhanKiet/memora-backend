@@ -111,14 +111,14 @@ export class GemstoneOptionResponseDto {
   @ApiProperty({ example: 'DIA-RD-050-VS1' })
   stoneCode!: string;
 
+  @ApiProperty({ example: 'Natural Diamond Round 0.50ct' })
+  name!: string;
+
   @ApiProperty({ example: 'DIAMOND' })
   stoneType!: string;
 
   @ApiProperty({ example: 'ROUND' })
   shape!: string;
-
-  @ApiProperty({ example: 'EXCELLENT' })
-  cutGrade!: string;
 
   @ApiProperty({ example: 'F' })
   color!: string;
@@ -126,17 +126,11 @@ export class GemstoneOptionResponseDto {
   @ApiProperty({ example: 'VS1' })
   clarity!: string;
 
-  @ApiProperty({ example: 0.5 })
-  caratWeight!: number;
-
   @ApiProperty({ example: 5.1 })
   dimensionLengthMm!: number;
 
   @ApiProperty({ example: 5.1 })
   dimensionWidthMm!: number;
-
-  @ApiProperty({ example: 3.15 })
-  dimensionHeightMm!: number;
 
   @ApiProperty({ example: true })
   isCertified!: boolean;

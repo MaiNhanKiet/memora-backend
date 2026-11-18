@@ -129,17 +129,15 @@ message ListGemstoneOptionsRequest {
 message GemstoneOptionResponse {
   string id = 1;
   string stone_code = 2;
-  string stone_type = 3;
-  string shape = 4;
-  string cut_grade = 5;
+  string name = 3;
+  string stone_type = 4;
+  string shape = 5;
   string color = 6;
   string clarity = 7;
-  double carat_weight = 8;
-  double dimension_length_mm = 9;
-  double dimension_width_mm = 10;
-  double dimension_height_mm = 11;
-  bool is_certified = 12;
-  string status = 13;
+  double dimension_length_mm = 8;
+  double dimension_width_mm = 9;
+  bool is_certified = 10;
+  string status = 11;
 }
 
 message ListGemstoneOptionsResponse {

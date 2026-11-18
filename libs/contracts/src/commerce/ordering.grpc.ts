@@ -666,6 +666,7 @@ export interface PayosWebhookResponse {
   message: string;
   transactionId?: string;
   status?: string;
+  orderId?: string;
 }
 
 export interface ReconcilePaymentTransactionRequest {

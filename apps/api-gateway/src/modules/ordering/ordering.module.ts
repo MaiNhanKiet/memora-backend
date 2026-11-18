@@ -5,6 +5,7 @@ import { CheckoutOrdersController } from './checkout-orders/controllers/checkout
 import { AdminOrdersController } from './order-management/controllers/admin-orders.controller';
 import { OrderQuotesController } from './quotes/controllers/order-quotes.controller';
 import { OrderPaymentsController } from './payments/controllers/order-payments.controller';
+import { OrderPaymentsSseController } from './payments/controllers/order-payments-sse.controller';
 import { AdminPaymentsController } from './payments/controllers/admin-payments.controller';
 import { PaymentsWebhookController } from './payments/controllers/payments-webhook.controller';
 import { ReceiptsInvoicesController } from './receipts-invoices/controllers/receipts-invoices.controller';
@@ -13,6 +14,7 @@ import {
   COMMERCE_ORDERING_GRPC_CLIENT,
   OrderingGrpcClient,
 } from './clients/ordering-grpc.client';
+import { PaymentEventsService } from './payments/services/payment-events.service';
 
 @Module({
   imports: [
@@ -30,12 +32,13 @@ import {
     AdminOrdersController,
     OrderQuotesController,
     OrderPaymentsController,
+    OrderPaymentsSseController,
     AdminPaymentsController,
     PaymentsWebhookController,
     ReceiptsInvoicesController,
     ClaimQuotesController,
   ],
-  providers: [OrderingGrpcClient],
-  exports: [OrderingGrpcClient],
+  providers: [OrderingGrpcClient, PaymentEventsService],
+  exports: [OrderingGrpcClient, PaymentEventsService],
 })
 export class OrderingModule {}

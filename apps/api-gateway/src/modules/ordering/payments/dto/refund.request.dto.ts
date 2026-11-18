@@ -1,9 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateRefundRequestBodyDto {
   @ApiProperty({ example: 4500000 })
+  @IsNumber()
   @Type(() => Number)
   refundAmount!: number;
 

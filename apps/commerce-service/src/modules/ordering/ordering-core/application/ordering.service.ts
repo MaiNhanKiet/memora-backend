@@ -1754,6 +1754,7 @@ export class OrderingService {
         message: 'Transaction already processed',
         transactionId: tx.id,
         status: tx.status,
+        orderId: tx.order_id ?? undefined,
       };
     }
 
@@ -1788,6 +1789,7 @@ export class OrderingService {
       message: 'Payment processed successfully',
       transactionId: updated.id,
       status: updated.status,
+      orderId: tx.order_id ?? undefined,
     };
   }
 

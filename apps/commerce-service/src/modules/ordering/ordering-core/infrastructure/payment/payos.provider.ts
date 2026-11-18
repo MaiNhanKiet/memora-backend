@@ -65,7 +65,10 @@ export class PayosProvider {
 
     // Call live PayOS API using native fetch
     try {
-      const signatureData = `amount=${params.amount}&cancelUrl=${params.cancelUrl}&description=${params.description}&orderCode=${params.orderCode}&returnUrl=${params.returnUrl}`;
+      const description = (
+        params.description || `MEMORA ${params.orderCode}`
+      ).slice(0, 25);
+      const signatureData = `amount=${params.amount}&cancelUrl=${params.cancelUrl}&description=${description}&orderCode=${params.orderCode}&returnUrl=${params.returnUrl}`;
       const signature = crypto
         .createHmac('sha256', this.checksumKey!)
         .update(signatureData)
@@ -74,7 +77,7 @@ export class PayosProvider {
       const body = {
         orderCode: params.orderCode,
         amount: params.amount,
-        description: params.description,
+        description,
         returnUrl: params.returnUrl,
         cancelUrl: params.cancelUrl,
         items: params.items || [],
@@ -101,6 +104,9 @@ export class PayosProvider {
       };
 
       if (resData.code !== '00' || !resData.data) {
+        this.logger.error(
+          `PayOS API error response: ${JSON.stringify(resData)}`,
+        );
         throw new Error(`PayOS API error: [${resData.code}] ${resData.desc}`);
       }
 

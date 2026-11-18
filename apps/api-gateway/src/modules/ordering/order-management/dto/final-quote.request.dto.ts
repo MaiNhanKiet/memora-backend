@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -28,14 +29,17 @@ export class CreateQuoteLineItemDto {
 
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   quantity?: number;
 
   @ApiProperty({ example: 8500000 })
+  @IsNumber()
   @Type(() => Number)
   unitAmount!: number;
 
   @ApiProperty({ example: 8500000 })
+  @IsNumber()
   @Type(() => Number)
   lineAmount!: number;
 
@@ -48,20 +52,24 @@ export class CreateQuoteLineItemDto {
 export class CreateFinalQuoteBodyDto {
   @ApiPropertyOptional({ example: 15000000 })
   @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   subtotalAmount?: number;
 
   @ApiPropertyOptional({ example: 50000, default: 0 })
   @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   deliveryAmount?: number;
 
   @ApiPropertyOptional({ example: -500000, default: 0 })
   @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   adjustmentAmount?: number;
 
   @ApiProperty({ example: 14550000 })
+  @IsNumber()
   @Type(() => Number)
   totalAmount!: number;
 
@@ -106,14 +114,17 @@ export class UpdateQuoteLineItemDto {
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   quantity?: number;
 
   @ApiProperty({ example: 8500000 })
+  @IsNumber()
   @Type(() => Number)
   unitAmount!: number;
 
   @ApiProperty({ example: 8500000 })
+  @IsNumber()
   @Type(() => Number)
   lineAmount!: number;
 
@@ -126,20 +137,25 @@ export class UpdateQuoteLineItemDto {
 export class UpdateFinalQuoteBodyDto {
   @ApiPropertyOptional({ example: 15000000 })
   @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   subtotalAmount?: number;
 
   @ApiPropertyOptional({ example: 50000 })
   @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   deliveryAmount?: number;
 
   @ApiPropertyOptional({ example: -500000 })
   @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   adjustmentAmount?: number;
 
   @ApiPropertyOptional({ example: 14550000 })
+  @IsOptional()
+  @IsNumber()
   @Type(() => Number)
   totalAmount?: number;
 
