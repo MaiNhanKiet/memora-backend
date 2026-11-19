@@ -59,6 +59,8 @@ v1.1 adds `CUSTOMER` → `CONSENT_MANAGE_OWN` and `CUSTOMER` → `DESIGN_CHANGE_
 
 ## Permission catalog (48)
 
+The **Business source** column cites the legacy six-flow numbering (for example `MF05-15`, `MF06-02`) used when RBAC v1 was approved. Map it to the current MF01–MF04 with [memora-backend-4-service.md](memora-backend-4-service.md) section 4.0. The citations are kept as recorded.
+
 | Domain | Code | Name | Business source |
 |---|---|---|---|
 | IAM | `IAM_USER_READ` | Read user accounts | IAM admin extension; user-approved RBAC v1 |
