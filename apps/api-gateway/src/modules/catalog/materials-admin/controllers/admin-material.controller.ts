@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '@app/auth';
@@ -137,12 +138,13 @@ export class AdminMaterialController {
   @RequirePermissions(PERMISSIONS.CATALOG_VARIANT_MANAGE)
   @ApiUpdateResizePoliciesDocs()
   async updateResizePolicies(
-    @Param('templateVariantId') templateVariantId: string,
-    @Body() body: UpdateResizePoliciesBodyDto,
+    @Query('templateVariantId') queryVariantId: string | undefined,
+    @Body() body: UpdateResizePoliciesBodyDto & { templateVariantId?: string },
   ) {
+    const templateVariantId = queryVariantId || body.templateVariantId || '';
     const res = await this.catalogClient.updateResizePolicies(
       toUpdateResizePoliciesGrpcRequest(templateVariantId, body),
     );
-    return res.data;
+    return res;
   }
 }
