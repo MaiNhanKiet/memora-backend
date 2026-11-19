@@ -24,7 +24,8 @@
   - `proto/` on `dev` and on `origin/DuyPQ`
   - `apps/operations-service/src/**`
 - **Not found (NEEDS_REVIEW):**
-  - API Master spreadsheet, MF01–MF04 `.md` files, Database Tracker `FIELDS/RELATION_RULES/DECISIONS`: only linked in the source plan, not in the workspace. Not opened.
+  - `MF01.md`–`MF04.md` are now in `docs/requirements/` (snapshot 2026-11-15) and are the current flow baseline.
+  - API Master spreadsheet, Database Tracker `FIELDS/RELATION_RULES/DECISIONS`: only linked in the source plan, not in the workspace. Not opened.
   - Any Commerce Order / P1 / Ring Item Version contract (no `proto/ordering`, no `proto/commerce` on `dev`; `origin/DuyPQ` has only `CatalogService` with 4 read RPCs).
   - Object storage (no S3/MinIO dependency in `package.json`).
   - Python fingerprint worker (no `.py` in the repo).

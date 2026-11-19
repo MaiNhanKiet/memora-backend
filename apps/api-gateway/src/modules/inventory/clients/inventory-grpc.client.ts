@@ -3,8 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import type { ClientGrpc } from '@nestjs/microservices';
 import type {
   AdjustInventoryRequest,
+  AllocateInventoryRequest,
+  AllocationResponse,
   CertifiedGemstoneResponse,
+  ConsumeInventoryRequest,
   CreateCertifiedGemstoneRequest,
+  HoldInventoryRequest,
   InventoryServiceClient,
   ListCertifiedGemstoneAvailabilityRequest,
   ListCertifiedGemstoneAvailabilityResponse,
@@ -16,6 +20,8 @@ import type {
   ListRingBlankStocksResponse,
   ReceiveGemstoneBatchRequest,
   ReceiveRingBlankStockRequest,
+  ReleaseInventoryRequest,
+  ReserveInventoryRequest,
   StockLotResponse,
 } from '@app/contracts';
 import { DomainGrpcClient } from '../../../common/grpc/domain-grpc';
@@ -104,6 +110,44 @@ export class InventoryGrpcClient
   adjustInventory(request: AdjustInventoryRequest): Promise<StockLotResponse> {
     return this.unary((metadata) =>
       this.inventoryService.adjustInventory(request, metadata),
+    );
+  }
+
+  holdInventory(request: HoldInventoryRequest): Promise<AllocationResponse> {
+    return this.unary((metadata) =>
+      this.inventoryService.holdInventory(request, metadata),
+    );
+  }
+
+  reserveInventory(
+    request: ReserveInventoryRequest,
+  ): Promise<AllocationResponse> {
+    return this.unary((metadata) =>
+      this.inventoryService.reserveInventory(request, metadata),
+    );
+  }
+
+  allocateInventory(
+    request: AllocateInventoryRequest,
+  ): Promise<AllocationResponse> {
+    return this.unary((metadata) =>
+      this.inventoryService.allocateInventory(request, metadata),
+    );
+  }
+
+  consumeInventory(
+    request: ConsumeInventoryRequest,
+  ): Promise<AllocationResponse> {
+    return this.unary((metadata) =>
+      this.inventoryService.consumeInventory(request, metadata),
+    );
+  }
+
+  releaseInventory(
+    request: ReleaseInventoryRequest,
+  ): Promise<AllocationResponse> {
+    return this.unary((metadata) =>
+      this.inventoryService.releaseInventory(request, metadata),
     );
   }
 }

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package memora.commerce.v1;
 
+import "common/v1/actor.proto";
+
 service InventoryService {
   rpc ListRingBlankStocks (ListRingBlankStocksRequest) returns (ListRingBlankStocksResponse);
   rpc ReceiveRingBlankStock (ReceiveRingBlankStockRequest) returns (StockLotResponse);
@@ -11,6 +13,11 @@ service InventoryService {
   rpc CreateCertifiedGemstone (CreateCertifiedGemstoneRequest) returns (CertifiedGemstoneResponse);
   rpc ListInventoryMovements (ListInventoryMovementsRequest) returns (ListInventoryMovementsResponse);
   rpc AdjustInventory (AdjustInventoryRequest) returns (StockLotResponse);
+  rpc HoldInventory (HoldInventoryRequest) returns (AllocationResponse);
+  rpc ReserveInventory (ReserveInventoryRequest) returns (AllocationResponse);
+  rpc AllocateInventory (AllocateInventoryRequest) returns (AllocationResponse);
+  rpc ConsumeInventory (ConsumeInventoryRequest) returns (AllocationResponse);
+  rpc ReleaseInventory (ReleaseInventoryRequest) returns (AllocationResponse);
 }
 
 // Common Stock Lot Response
@@ -158,4 +165,53 @@ message AdjustInventoryRequest {
   string reason = 3;
   string metadata_json = 4;
   string performed_by_user_id = 5;
+}
+
+// -----------------------------------------------------------------------------
+// Inventory Allocations & Stock Lifecycle Messages (INVEN-007..011)
+// -----------------------------------------------------------------------------
+
+message AllocationResponse {
+  string id = 1;
+  string ring_item_id = 2;
+  string production_attempt_id = 3;
+  string stock_lot_id = 4;
+  string certified_gemstone_id = 5;
+  int32 quantity = 6;
+  string status = 7;
+  string expires_at = 8;
+  string allocated_by_user_id = 9;
+  string created_at = 10;
+  string updated_at = 11;
+}
+
+message HoldInventoryRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string ring_item_id = 2;
+  string stock_lot_id = 3;
+  string certified_gemstone_id = 4;
+  int32 quantity = 5;
+  int32 ttl_minutes = 6; // default e.g. 60 mins
+}
+
+message ReserveInventoryRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string allocation_id = 2;
+}
+
+message AllocateInventoryRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string allocation_id = 2;
+  string production_attempt_id = 3;
+}
+
+message ConsumeInventoryRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string allocation_id = 2;
+}
+
+message ReleaseInventoryRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string allocation_id = 2;
+  string reason = 3;
 }

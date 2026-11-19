@@ -1,12 +1,20 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { domainGrpcClientOptions } from '../../common/grpc/domain-grpc';
-import { AdminOrdersController } from './controllers/admin-orders.controller';
-import { OrdersController } from './controllers/orders.controller';
+import { CheckoutOrdersController } from './checkout-orders/controllers/checkout-orders.controller';
+import { AdminOrdersController } from './order-management/controllers/admin-orders.controller';
+import { OrderQuotesController } from './quotes/controllers/order-quotes.controller';
+import { OrderPaymentsController } from './payments/controllers/order-payments.controller';
+import { OrderPaymentsSseController } from './payments/controllers/order-payments-sse.controller';
+import { AdminPaymentsController } from './payments/controllers/admin-payments.controller';
+import { PaymentsWebhookController } from './payments/controllers/payments-webhook.controller';
+import { ReceiptsInvoicesController } from './receipts-invoices/controllers/receipts-invoices.controller';
+import { ClaimQuotesController } from './claims/controllers/claim-quotes.controller';
 import {
   COMMERCE_ORDERING_GRPC_CLIENT,
   OrderingGrpcClient,
 } from './clients/ordering-grpc.client';
+import { PaymentEventsService } from './payments/services/payment-events.service';
 
 @Module({
   imports: [
@@ -19,8 +27,18 @@ import {
       }),
     ]),
   ],
-  controllers: [OrdersController, AdminOrdersController],
-  providers: [OrderingGrpcClient],
-  exports: [OrderingGrpcClient],
+  controllers: [
+    CheckoutOrdersController,
+    AdminOrdersController,
+    OrderQuotesController,
+    OrderPaymentsController,
+    OrderPaymentsSseController,
+    AdminPaymentsController,
+    PaymentsWebhookController,
+    ReceiptsInvoicesController,
+    ClaimQuotesController,
+  ],
+  providers: [OrderingGrpcClient, PaymentEventsService],
+  exports: [OrderingGrpcClient, PaymentEventsService],
 })
 export class OrderingModule {}

@@ -1,13 +1,8 @@
 import { Module } from '@nestjs/common';
-import { CatalogGrpcController } from '../../presentation/grpc/catalog.grpc.controller';
-import { CatalogService } from '../../application/catalog/catalog.service';
-import { CatalogMapper } from '../../application/catalog/catalog.mapper';
-import { RepositoriesModule } from '../../repositories/repositories.module';
+import { CatalogCoreModule } from './catalog-core/catalog-core.module';
 
 @Module({
-  imports: [RepositoriesModule],
-  controllers: [CatalogGrpcController],
-  providers: [CatalogService, CatalogMapper],
-  exports: [CatalogService],
+  imports: [CatalogCoreModule],
+  exports: [CatalogCoreModule],
 })
 export class CatalogModule {}
