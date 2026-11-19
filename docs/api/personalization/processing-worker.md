@@ -152,3 +152,18 @@ Non-`200` responses use `{ "status": "FAILED", "failureCode": "…", "message": 
 - Operations writes `processed_asset_key` = manifest key, `vector_asset_key` + `vector_checksum` = the SVG, and keeps
   `artwork` / `wavecode` / `measuredDurationMs` / `processorVersion` in `personalization_sources.metadata_json`.
 - A result for a source that is no longer `PROCESSING` is ignored by Operations.
+
+## 5. Clarifications (v1, 2026-11-19, from the first worker implementation)
+
+1. `outputPrefix` must end with `/`; keys containing `..`, `\` or starting with `/` are rejected with `400 INVALID_REQUEST`.
+2. `segmentDurationMs` must be exactly `3000`.
+3. `manifest.json` lists every output except itself; its own sha256 is only in the response (`outputs.manifest`).
+4. `render-wavecode` rewrites `wavecode.svg`, `wavecode_alpha.png` and `manifest.json`. It keeps `audioSegment`,
+   `measuredDurationMs` and the original request from the previous manifest and adds `renderedFromLevels: true`.
+5. `quality.message` is English free text. A low score never fails the job; the staff already chose the image.
+6. Nudge candidates: each data bar may give a `+1` and a `-1` candidate (kept inside 0..7), ordered by the distance of
+   its pre-quantization value to the boundary in that direction (`level ± 0.5`), closest first; at most 8.
+7. Hull points use pixel centres, `(x + 0.5) / 1024`, rounded to 4 decimals.
+8. Unexpected errors: `500 INTERNAL_ERROR` (Operations treats any 5xx as transient). `/health` always answers `200`
+   with `potrace`, `ffmpeg` and `storage` flags. No OpenAPI/docs endpoints are exposed.
+9. `measuredDurationMs = round(samples / sampleRate * 1000)`; the 3000..30000 range is inclusive.
