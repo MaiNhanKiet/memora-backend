@@ -6,8 +6,8 @@
 - Domain: `personalization`
 - Service: `operations-service` (Gateway HTTP → Operations gRPC)
 - Feature: Consent, Fingerprint capture (IoT), Soundwave upload, sources, placement, approvals, change requests
-- Plan status: AWAITING_APPROVAL (decisions D-P-01..16 recorded in section 8; API IDs not yet approved)
-- Updated: 2026-11-13
+- Plan status: AWAITING_APPROVAL for PERSO-009..019 (PERSO-001..003, 005..008, 026..029 approved and implemented; decisions in section 8, D-P-15/18/19/20 open)
+- Updated: 2026-11-19 (source pipeline PERSO-009..019 planned on `feat/personalization-source-pipeline`)
 - Source plan: `docs/plans/MEMORA_OPERATIONS_SERVICE_API_IOT_PLAN_FOR_CLAUDE.md` (engineering proposal, not approval)
 
 ## 2. Scope and references
@@ -90,7 +90,7 @@ No approved code for: accepting/listing/revoking Consent, setting the source pla
 | PERSO-001 | POST | /api/v1/orders/{orderId}/consents | WF-01 F-02 | CONSENT_MANAGE_OWN | AcceptConsent | APPROVED |
 | PERSO-002 | GET | /api/v1/orders/{orderId}/consents | WF-01 F-02 | CONSENT_MANAGE_OWN | ListConsents | APPROVED |
 | PERSO-003 | POST | /api/v1/orders/{orderId}/consents/{consentId}/revoke | WF-01 F-13 | CONSENT_MANAGE_OWN | RevokeConsent | APPROVED |
-| PERSO-004 | PUT | /api/v1/orders/{orderId}/source-plan | WF-01 F-13 | NEEDS_REVIEW | SetSourcePlan | NEEDS_REVIEW |
+| PERSO-004 | PUT | /api/v1/orders/{orderId}/source-plan | WF-01 F-13 | — | — | MOVED to Commerce (D-P-05) |
 | PERSO-005 | POST | /api/v1/orders/{orderId}/fingerprint/capture-sessions | WF-01 F-02 | SOURCE_CAPTURE | CreateCaptureSession | APPROVED |
 | PERSO-006 | GET | /api/v1/fingerprint/capture-sessions/{sessionId} | WF-01 F-02 | SOURCE_CAPTURE | GetCaptureSession | APPROVED |
 | PERSO-007 | MQTT | MQTT `memora/capture/{deviceCode}/attempts` | WF-01 F-02 | device broker user + ACL (D-P-07) | none (MQTT) | APPROVED |
@@ -99,17 +99,17 @@ No approved code for: accepting/listing/revoking Consent, setting the source pla
 | PERSO-027 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/attempts/{attemptNo}/reject | WF-01 F-02 | SOURCE_CAPTURE | RejectCaptureAttempt | APPROVED |
 | PERSO-028 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/next-attempt | WF-01 F-02 | SOURCE_CAPTURE | NextCaptureAttempt | APPROVED |
 | PERSO-029 | POST | /api/v1/fingerprint/capture-sessions/{sessionId}/close | WF-01 F-02 | SOURCE_CAPTURE | CloseCaptureSession | APPROVED |
-| PERSO-009 | POST | /api/v1/orders/{orderId}/soundwave/uploads/initiate | WF-01 F-02 | SOURCE_AUDIO_UPLOAD_OWN | InitiateSoundwaveUpload | PROPOSED |
-| PERSO-010 | POST | /api/v1/orders/{orderId}/soundwave/uploads/complete | WF-01 F-02 | SOURCE_AUDIO_UPLOAD_OWN | CompleteSoundwaveUpload | PROPOSED |
-| PERSO-011 | GET | /api/v1/orders/{orderId}/personalization-sources | WF-01 F-02 | NEEDS_REVIEW | ListSources | NEEDS_REVIEW |
-| PERSO-012 | GET | /api/v1/personalization-sources/{sourceId}/processing | WF-01 F-02 | NEEDS_REVIEW | GetSourceProcessing | NEEDS_REVIEW |
-| PERSO-013 | INTERNAL | internal: process source | WF-01 F-02 | internal only | ProcessSource | NEEDS_REVIEW |
-| PERSO-014 | POST | /api/v1/orders/{orderId}/source-bindings | WF-01 F-13 | NEEDS_REVIEW | BindSource | NEEDS_REVIEW |
-| PERSO-015 | GET | /api/v1/orders/{orderId}/items/{ringItemId}/placement | WF-01 F-12 | NEEDS_REVIEW | GetPlacement | NEEDS_REVIEW |
-| PERSO-016 | PUT | /api/v1/orders/{orderId}/items/{ringItemId}/placement | WF-01 F-12 | NEEDS_REVIEW | SavePlacement | NEEDS_REVIEW |
-| PERSO-017 | POST | /api/v1/orders/{orderId}/items/{ringItemId}/placement/validate | WF-01 F-12 | NEEDS_REVIEW | ValidatePlacement | NEEDS_REVIEW |
-| PERSO-018 | POST | /api/v1/orders/{orderId}/items/{ringItemId}/customer-approvals | WF-01 F-02 | NEEDS_REVIEW | ApproveItemDesign | NEEDS_REVIEW |
-| PERSO-019 | POST | /api/v1/orders/{orderId}/items/{ringItemId}/submit-review | WF-01 / WF-02 | DESIGN_SUBMIT_OWN | SubmitForReview | PROPOSED |
+| PERSO-009 | POST | /api/v1/orders/{orderId}/soundwave/uploads/initiate | MF01-S07 | SOURCE_AUDIO_UPLOAD_OWN | InitiateSoundwaveUpload | APPROVED |
+| PERSO-010 | POST | /api/v1/orders/{orderId}/soundwave/uploads/complete | MF01-S07 | SOURCE_AUDIO_UPLOAD_OWN | CompleteSoundwaveUpload | APPROVED |
+| PERSO-011 | GET | /api/v1/orders/{orderId}/personalization-sources | MF01-S07 | DESIGN_SUBMIT_OWN | ListOrderSources | APPROVED |
+| PERSO-012 | GET | /api/v1/personalization-sources/{sourceId}/processing | MF01-S07 | DESIGN_SUBMIT_OWN | GetSourceProcessing | APPROVED |
+| PERSO-013 | INTERNAL | BullMQ job in Operations → Python worker (D-P-09) | MF01-S07 | internal only | none (queue) + worker HTTP | APPROVED |
+| PERSO-014 | POST | /api/v1/orders/{orderId}/source-bindings | MF01-S07 | DESIGN_SUBMIT_OWN | BindSource | DEFERRED (D-P-18 = automatic binding) |
+| PERSO-015 | GET | /api/v1/orders/{orderId}/items/{ringItemId}/placement | MF01-S07 | DESIGN_SUBMIT_OWN | GetPlacement | NEEDS_REVIEW (D-P-15) |
+| PERSO-016 | PUT | /api/v1/orders/{orderId}/items/{ringItemId}/placement | MF01-S07 | DESIGN_SUBMIT_OWN | SavePlacement | NEEDS_REVIEW (D-P-15) |
+| PERSO-017 | POST | /api/v1/orders/{orderId}/items/{ringItemId}/placement/validate | MF01-S07 | DESIGN_SUBMIT_OWN | ValidatePlacement | NEEDS_REVIEW (D-P-15) |
+| PERSO-018 | POST | /api/v1/orders/{orderId}/items/{ringItemId}/customer-approvals | MF01-S08 | DESIGN_SUBMIT_OWN | ApproveItemDesign | NEEDS_REVIEW (D-P-20) |
+| PERSO-019 | POST | /api/v1/orders/{orderId}/items/{ringItemId}/submit-review | MF01-S08 | DESIGN_SUBMIT_OWN | SubmitForReview | NEEDS_REVIEW (D-P-20) |
 | PERSO-020 | GET | /api/v1/admin/design/reviews | WF-02 F-04 | DESIGN_REVIEW | ListDesignReviews | PROPOSED |
 | PERSO-021 | GET | /api/v1/admin/design/reviews/{reviewId} | WF-02 F-04 | DESIGN_REVIEW | GetDesignReview | PROPOSED |
 | PERSO-022 | POST | /api/v1/admin/design/reviews/{reviewId}/decide | WF-02 F-04 | DESIGN_REVIEW | DecideDesignReview | PROPOSED |
@@ -117,7 +117,7 @@ No approved code for: accepting/listing/revoking Consent, setting the source pla
 | PERSO-024 | GET | /api/v1/admin/design/change-requests | WF-02 F-12 | DESIGN_CHANGE_APPROVE | ListChangeRequests | PROPOSED |
 | PERSO-025 | POST | /api/v1/admin/design/change-requests/{changeRequestId}/decide | WF-02 F-12 | DESIGN_CHANGE_APPROVE | DecideChangeRequest | PROPOSED |
 
-Count: 0 EXISTING, 9 APPROVED, 8 PROPOSED, 10 NEEDS_REVIEW. gRPC names are candidates, not an approved proto.
+Count (2026-11-19): 16 APPROVED (11 implemented: PERSO-001..003, 005..008, 026..029; 5 to build: PERSO-009..013), 5 PROPOSED, 6 NEEDS_REVIEW, PERSO-014 DEFERRED, PERSO-004 moved to Commerce. gRPC names are candidates, not an approved proto. Step IDs follow `docs/requirements/MF01.md` (post-Review 2 numbering).
 
 ## 5. Dependencies and order
 
@@ -136,6 +136,16 @@ Count: 0 EXISTING, 9 APPROVED, 8 PROPOSED, 10 NEEDS_REVIEW. gRPC names are candi
 12. PERSO-023..025 — Change requests. Depend on Commerce new-version contract.
 
 The first API that can be built without an unresolved permission is **PERSO-005** (and 006, 008), but it still needs PERSO-001 data and a Commerce P1 answer. A fake Commerce/Consent in tests is allowed; a fake in production is not.
+
+**Order from 2026-11-19 (after PERSO-001..008, 026..029 are done):**
+
+1. D-P-18 change to PERSO-008 (create `source_bindings` on complete) + PERSO-011 (list sources).
+2. PERSO-009 → 010 (Soundwave upload; PERSO-010 also binds). The new source waits for PERSO-013.
+3. Worker HTTP contract `docs/api/personalization/processing-worker.md`, then PERSO-013 → 012 against a fake worker (queue, worker call, WAVECODE uniqueness, status read). The real worker is built in its own repo (D-P-19).
+4. PERSO-014 deferred (automatic binding chosen).
+5. PERSO-015 → 017 → 016 (read, validate, save placement). Needs D-P-15 from Commerce Catalog.
+6. PERSO-018 → 019 (customer approval, submit). Needs D-P-20 from Commerce Ordering.
+7. MF02-S01: PERSO-020..025.
 
 ## 6. API checklists
 
@@ -383,21 +393,103 @@ true: a new session is refused only while one is open or after one is `COMPLETED
 - **Device contract:** new `commands` type `next`; `end` may carry `acceptedAttemptNo` and status
   `CANCELLED`. The reference firmware already handles both (`memora-firmware`, README section 14).
 
-### Remaining IDs (summary checklists; expand when the user approves them)
+### Source pipeline PERSO-009..019 (planned 2026-11-19, MF01-S07/S08)
+
+Source: `docs/requirements/MF01.md` S07/S08, BR14, AF06, AF08, AF14; decisions D-P-01, D-P-09, D-P-11, D-P-14 (section 8). All IDs below are PROPOSED or NEEDS_REVIEW. **None is approved**; the user approves IDs one by one.
+
+Shared rules:
+
+- Customer routes take `actor` (D-P-03) and use `requireCustomerActor`. The owner is checked against `GetOrderPersonalizationContext.owner_customer_identity_id` (Commerce) and, for a source, `personalization_sources.owner_customer_identity_id`. FP/SW requires login, so no guest actor.
+- Responses never contain object keys, checksums, raw images, audio or vectors (NFR-S-01). Only status, type, timestamps and ids.
+- Source status flow (DDL CHECK): `PENDING` (upload started) → `ACCEPTED` (FP chosen by staff, or SW upload verified) → `PROCESSING` → `READY` | `PROCESSING_FAILED`; `DELETED` only with `deleted_at` + `delete_reason`.
+- No DDL change (D-P-11). Processing details (job attempts, failure code, processed time, SW duration) go in `personalization_sources.metadata_json`.
+
+#### PERSO-009 — POST /api/v1/orders/{orderId}/soundwave/uploads/initiate
+
+- Status: PROPOSED
+- Actor / Permission: Customer, `SOURCE_AUDIO_UPLOAD_OWN`.
+- Status update 2026-11-19: **APPROVED** (user), with the duration rule below.
+- Request: Params `orderId`. Body `consentId` (uuid), `contentType` (`audio/wav` | `audio/mpeg` | `audio/mp4` | `audio/aac`), `sizeBytes` (1..10 485 760), `sha256` (hex 64), `origin` (`UPLOAD` | `IN_APP_RECORDING`), `durationMs` (3000..30000, measured by the FE; out of range → 400 `AUDIO_DURATION_INVALID`). The FE value is only an early check; PERSO-013 measures the real duration (user decision 2026-11-19).
+- Response: `201 { uploadId, uploadUrl, uploadHeaders, expiresAt }`. `uploadId` = new source id; `uploadUrl` is a short-lived presigned PUT bound to content type, length and checksum.
+- Rules: Commerce context: order owned by actor, `p1Paid`, every consent item is `SOUNDWAVE`. Consent belongs to the order, `ACCEPTED`, type `SOUNDWAVE_PROCESSING`, not yet linked to a source (`personalization_source_id IS NULL`, else 409 `SOURCE_ALREADY_UPLOADED`). One `PENDING` upload per consent: a new initiate replaces an older `PENDING` one (old row → `DELETED`, reason `SUPERSEDED`). Creates `personalization_sources` (`SOUNDWAVE`, `PENDING`, `raw_asset_key`, `raw_checksum` = declared sha256).
+- Errors: 400 validation; 401; 403; 404 `ORDER_NOT_FOUND` / `CONSENT_NOT_FOUND`; 409 `P1_NOT_PAID`, `CONSENT_NOT_ACCEPTED`, `CONSENT_TYPE_MISMATCH`, `PACKAGE_MISMATCH`, `SOURCE_ALREADY_UPLOADED`; 503 storage.
+- Tables: `consents`, `consent_ring_items` (read), `personalization_sources` (write). Garage presign.
+
+#### PERSO-010 — POST /api/v1/orders/{orderId}/soundwave/uploads/complete
+
+- Status: PROPOSED
+- Actor / Permission: Customer, `SOURCE_AUDIO_UPLOAD_OWN`.
+- Status update 2026-11-19: **APPROVED** (user).
+- Request: Params `orderId`. Body `uploadId`, `segmentStartMs` (integer ≥ 0, `segmentStartMs + 3000 ≤ durationMs`). The customer picks the 3 s segment on the FE before complete (user decision 2026-11-19); it is stored in `metadata_json` and copied into the placement later. Changing the segment after complete needs a re-process API (not planned).
+- Response: `200 { sourceId, sourceType: "SOUNDWAVE", status }`.
+- Rules: source is `PENDING`, owned by the actor, linked to a consent of this order. Operations reads the object: size ≤ 10 MB and equal to the declared size, sha256 equal to `raw_checksum`, magic bytes match the content type; otherwise the object is deleted and the row → `DELETED` (reason `UPLOAD_INVALID`), 422 `UPLOAD_INVALID`. On success: source → `ACCEPTED` (`accepted_at`, `captured_at`), `consents.personalization_source_id` set, bindings per D-P-18, PERSO-013 job enqueued after commit. Duration (≤ 30 s, ≥ 3 s) is measured by the worker in PERSO-013; a bad duration ends as `PROCESSING_FAILED` / `AUDIO_DURATION_INVALID`. Idempotent: repeating on an `ACCEPTED`/`PROCESSING`/`READY` source returns it.
+- Errors: 400; 401; 403; 404 `UPLOAD_NOT_FOUND`; 409 `UPLOAD_NOT_PENDING`; 422 `UPLOAD_INVALID`; 503 storage.
+- Tables: `personalization_sources`, `consents`, `source_bindings` (write). Garage read/delete. Queue.
+
+#### PERSO-011 — GET /api/v1/orders/{orderId}/personalization-sources
+
+- Status: PROPOSED
+- Status update 2026-11-19: **APPROVED** (user), customer route only.
+- Actor / Permission: Customer, `DESIGN_SUBMIT_OWN` (D-P-01). A staff/manager view is out of scope until asked for (it would be a separate admin route with `ORDER_READ_OPERATIONS`).
+- Response: `200 { data: [{ sourceId, sourceType, status, failureCode|null, acceptedAt, ringItemIds: [..], bindingMode }] }`.
+- Rules: order owned by the actor (Commerce context). Sources = those linked through this order's consents (`consents.order_id`) plus active `source_bindings` of the order. `DELETED` sources are left out.
+- Errors: 401; 403; 404 `ORDER_NOT_FOUND`.
+- Tables: `consents`, `personalization_sources`, `source_bindings` (read).
+
+#### PERSO-012 — GET /api/v1/personalization-sources/{sourceId}/processing
+
+- Status: **APPROVED** (user, 2026-11-19), built together with PERSO-013.
+- Actor / Permission: Customer, `DESIGN_SUBMIT_OWN`.
+- Response: `200 { sourceId, sourceType, status, failureCode|null, startedAt|null, finishedAt|null }`.
+- Rules: `owner_customer_identity_id` = actor; otherwise 404 (no existence leak). Read only; no retry trigger here.
+- Tables: `personalization_sources` (read).
+
+#### PERSO-013 — internal processing job
+
+- Status: **APPROVED** (user, 2026-11-19), worker per D-P-19.
+- Trigger: after commit of PERSO-008 (FP) and PERSO-010 (SW). BullMQ queue inside Operations (`@app/queue`), job id = source id (dedupe).
+- Rules: source `ACCEPTED` → `PROCESSING` → worker call over internal HTTP with its own secret, passing object keys only (D-P-09) → `READY` or `PROCESSING_FAILED` with a failure code. A late result for a source that is no longer `PROCESSING` is ignored. The worker never touches Order, Consent, Commerce or the database.
+- Retry (user, 2026-11-19): transient errors (network, timeout, worker 5xx) retry 3 times with growing backoff (30 s, 2 min, 8 min), then `PROCESSING_FAILED` / `WORKER_UNAVAILABLE`. Data errors (unreadable image, empty fingerprint region, audio duration or segment invalid) fail at once. No reprocess / preset API for now (standard preset only).
+- Outputs (user, 2026-11-19), all under `personalization/sources/{sourceId}/` in Garage:
+  - FP: `fingerprint.svg` (laser vector), `fingerprint_alpha.png` (transparent decal for the web preview on `ENGRAVE_UV`).
+  - SW: `wavecode.svg`, `wavecode_alpha.png`, `audio_segment.wav` (the chosen 3 s, kept for playback).
+  - `manifest.json`: every file with key, sha256, size, pixel/mm size, processor version and options.
+  - DB: `processed_asset_key` = manifest key, `vector_asset_key` + `vector_checksum` = the SVG. No heightmap / normal / roughness / AO maps.
+- SW encoding (user, 2026-11-19): **`MEMORA_WAVECODE_v1`** from the `memora-3d` templates (BAR_001_SW): 23 bars = 3 reference bars at max level (positions 0, 11, 22) + 18 data bars + 2 check bars (positions 10, 21); data = RMS envelope of the 3 s segment in 18 equal windows, normalized, quantized to 8 levels; check = `sum((i+1)*level_i) mod 64` → `c // 8`, `c % 8`. The worker measures the real duration (3–30 s, within 250 ms of the declared value) and that the segment fits; otherwise `AUDIO_DURATION_INVALID` / `SEGMENT_OUT_OF_RANGE`.
+- WAVECODE uniqueness (user, 2026-11-19): checked by Operations when the result arrives. The worker returns the 18 levels plus an ordered list of nudge candidates (±1 level on the bar closest to a level boundary). Operations takes an advisory lock (`wavecode`), compares with `metadata_json.wavecode` of other non-deleted SW sources, picks the first unique sequence and, if it is not the base one, asks the worker to render that exact sequence. The final sequence is stored in `metadata_json.wavecode`. No DDL.
+- Tables: `personalization_sources` (write). Garage (worker reads raw, writes outputs).
+
+#### PERSO-014 — POST /api/v1/orders/{orderId}/source-bindings
+
+- Status: **DEFERRED** (D-P-18 decided (a) on 2026-11-19: automatic binding; PERSO-014 only if a re-bind is needed later).
+- Purpose: link a source to the Ring Items of its consent (`source_bindings`, one active binding per Ring Item).
+- If D-P-18 picks automatic binding, PERSO-008 and PERSO-010 create the bindings in the same transaction: one row per `consent_ring_items` item, `binding_mode` = the session's `source_plan_mode` snapshot (FP) or the Commerce context value (SW). PERSO-014 is then deferred (only needed for a later re-bind).
+- If D-P-18 keeps a customer call: body `{ sourceId, ringItemIds }`; items must be inside the consent scope and of the source's package; SHARED only for two items of the same type (AF08).
+
+#### PERSO-015 / 017 / 016 — placement (read, validate, save)
+
+- Status: NEEDS_REVIEW (D-P-15)
+- Actor / Permission: Customer, `DESIGN_SUBMIT_OWN`.
+- Rules: Ring Item has an active binding to a `READY` source. FP: `center_angle_deg`, `axial_offset_mm`, `width_mm`, `height_mm`, `rotation_deg` inside the template limits from Commerce Catalog. SW: only `segmentStartMs` (`segment_end_ms` = start + 3000, inside the clip); geometry is fixed by the template, transforms are rejected. One placement per Ring Item Version (`ring_item_version_id` unique): save replaces it while the version is not approved. `placement_hash` = hash of the values + `vector_checksum` + `mapping_version`. Validate (017) is a dry run that returns violations and stores nothing.
+- Blocker: Catalog has `engrave_surface_type` and anchor `surface_type`, but no min/max limits or SW fixed geometry (request sent to Commerce).
+- Tables: `personalization_placements`, `source_bindings`, `personalization_sources` (read).
+
+#### PERSO-018 / 019 — customer approval and submit
+
+- Status: NEEDS_REVIEW (D-P-20)
+- Actor / Permission: Customer, `DESIGN_SUBMIT_OWN`.
+- PERSO-018: body `{ ringItemVersionId, placementHash }`. The version must be the current one and the hash must match the stored placement (the customer approves exactly what they saw). Writes `design_reviews` (`CUSTOMER_APPROVAL`, `APPROVE`, evidence = placement hash) and asks Commerce to move the version to `READY_FOR_REVIEW`.
+- PERSO-019: body `{ ringItemVersionId }`. Requires the latest `CUSTOMER_APPROVAL` for that current version with an unchanged placement; Commerce moves the version to `SUBMITTED`. Per Ring Item, independent (MF01-S08). Memory Design opt-in is Experience and out of scope here.
+- Blocker: Commerce has no internal RPC for version status transitions (`ordering.proto` only has `UpdateCurrentRingItemVersion`, `UpdateOrderStatus`).
+- Tables: `design_reviews` (write), `personalization_placements` (read). Commerce RPC.
+
+### Remaining IDs after MF01 (summary)
 
 | API ID | Status | Key rules | Tables | Blockers |
 |---|---|---|---|---|
-| PERSO-004 | NEEDS_REVIEW | SHARED only for two items of the same type; change after collection forces re-consent / relink | (ordering.orders.source_plan_mode is Commerce) | D-P-05 |
-| PERSO-009/010 | PROPOSED | Supported codec, upload or in-app ≤30 s, P1 + Consent first | personalization_sources | D-P-08, D-P-14 |
-| PERSO-011 | NEEDS_REVIEW | Owner only, no raw asset | personalization_sources, source_bindings | D-P-01 |
-| PERSO-012/013 | NEEDS_REVIEW | Idempotent job, bounded retry, worker never changes Order | personalization_sources | D-P-09, schema gap |
-| PERSO-014 | NEEDS_REVIEW | Bind within Consent scope; one active binding per item | source_bindings | D-P-01 |
-| PERSO-015..017 | NEEDS_REVIEW | FP bounded position/scale/rotation inside `ENGRAVE_SURFACE`; SW exactly 3000 ms, fixed geometry, transforms rejected | personalization_placements | D-P-01, D-P-15 |
-| PERSO-018 | NEEDS_REVIEW | Exact current version + preview; independent per item | design_reviews | D-P-01, D-P-04 |
-| PERSO-019 | PROPOSED | Only after approval; Commerce moves version to SUBMITTED | design_reviews | D-P-04 |
-| PERSO-020..022 | PROPOSED | Manager reviews current SUBMITTED FP/SW only; REQUEST_CHANGES needs notes | design_reviews | D-P-04 |
-| PERSO-023 | NEEDS_REVIEW | One SUBMITTED request per item; before Lock | change_requests | D-P-01, D-P-04 |
-| PERSO-024/025 | PROPOSED | APPLIED needs a new Commerce version id | change_requests | D-P-04 |
+| PERSO-020..022 | PROPOSED | Manager reviews current SUBMITTED FP/SW only; REQUEST_CHANGES needs notes | design_reviews | D-P-20 |
+| PERSO-023 | NEEDS_REVIEW | One SUBMITTED request per item; before Lock | change_requests | D-P-01, D-P-20 |
+| PERSO-024/025 | PROPOSED | APPLIED needs a new Commerce version id | change_requests | D-P-20 |
 
 ## 7. Acceptance criteria and test cases
 
@@ -467,12 +559,15 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
 - [x] D-P-12 DECIDED: change `capture_sessions.capture_attempts` to a list in `schema.prisma`. Keep the partial unique index in the DB. Prisma-only change, checked with `prisma validate`. Done on `feat/business-prisma-baseline`: `prisma validate` passes, `migrate diff` against the baseline is empty.
 - [ ] D-P-13 DECIDED (retention open): revoking Consent is allowed only while no linked Ring Item Version is SUBMITTED or locked. Otherwise return `FAILED_PRECONDITION`. Data retention after the order (D-OPS-08) stays NEEDS_REVIEW.
 - [x] D-P-14 DECIDED: Soundwave accepts WAV, MP3 and M4A/AAC, up to 10 MB. Both file upload and in-app recording are limited to 30 s. The selected segment is exactly 3000 ms.
-- [ ] D-P-15 DEFERRED: Catalog engraving constraints (`ENGRAVE_SURFACE`, min/max scale, SW fixed geometry) are decided when placement is planned. They do not block Consent, capture or processing.
+- [ ] D-P-15 OPEN (Commerce, 2026-11-19). Data source found: `memora-3d/*_template.json` (FP: `default`, `scale_limits_mm`, `rotation_limits_deg`, `boundary`, `forbidden_zones`, `ENGRAVE_UV` mapping; SW: `fixed` center/size/rotation, `audio_seconds`, `MEMORA_WAVECODE_v1`). These describe a planar mm / UV frame, while `personalization_placements` has cylindrical columns (`center_angle_deg`, `axial_offset_mm`, `width_mm`, `height_mm`): the mapping must be decided when placement is planned. Catalog engraving constraints for PERSO-015..017. Catalog has `ring_templates.engrave_surface_type` and anchor `surface_type` but no FP limits (angle, axial offset, width/height min-max, rotation) and no SW fixed geometry. Requested from Commerce (Phạm Quốc Duy). Blocks placement only.
 - [x] D-P-16 DECIDED: create Prisma baselines now for Commerce, Operations and Experience.
   - Generate `0_baseline` from `db/` for each service's schemas.
   - Keep each service's `_prisma_migrations` table separate from IAM's.
   - Mark the baseline applied on the server with `prisma migrate resolve --applied`. That server step needs explicit authorization and a backup check when it runs.
   - Repo part done on `feat/business-prisma-baseline`: `_prisma_migrations` lives in `catalog`, `after_sales` and `memory`. Local checks passed: fresh deploy, resolve on a `db/` copy, empty `migrate diff`, identical `pg_dump`. Server: `migrate resolve --applied 0_baseline` ran on 2026-11-13 for all three services (status up to date; app-role grants on the new tables came from existing default privileges).
+- [x] D-P-18 DECIDED 2026-11-19 (user): option (a). PERSO-008 and PERSO-010 create `source_bindings` in their transaction for every `consent_ring_items` item; `binding_mode` = `source_plan_mode` (FP session snapshot / Commerce context for SW). Approved change to PERSO-008. PERSO-014 deferred. Original question: how a source is bound to Ring Items. (a) PERSO-008 / PERSO-010 create `source_bindings` automatically for every `consent_ring_items` item (SHARED = one consent with two items, SEPARATE = one consent per item); PERSO-014 deferred. (b) The customer calls PERSO-014. Recommendation: (a), fewer customer steps and always inside the consent scope. Changes the approved PERSO-008 behavior, so it needs explicit approval.
+- [x] D-P-19 DECIDED 2026-11-19 (user, revised the same day): the worker is a **separate repository** `memora-personalization-worker` (Python 3, FastAPI), ported from the earlier `bioring-be/python-services/personalization_engine` (fingerprint OpenCV pipeline: blur, CLAHE, adaptive threshold, small-component removal, main region, crop, square canvas, Potrace SVG; soundwave loader via FFmpeg). Changes for MEMORA: private Garage via S3 API (object keys in/out, no public URLs, no REVIEW/APPROVED stages, no local state kept), internal HTTP with its own secret, stateless, standard preset only, outputs and WAVECODE as in PERSO-013, no RAG/ingestion code. Delivery: **private image on GHCR** published by the worker repo's own CI, pinned by version tag (never `latest`); its own Compose project on the Mini PC joins the external `memora-network`, no host port, no tunnel route; Operations calls it by container name. Secrets: a shared internal secret (Operations → worker) and a **dedicated Garage key** limited to the personalization bucket. The HTTP contract lives in this repo at `docs/api/personalization/processing-worker.md` (versioned `/v1`); Operations is tested against a fake that follows it. No Python, CI or image changes in `memora-backend`; deploying the worker needs its own authorization. The architecture docs list it as a processing worker, not a business microservice. Original question: Python processing worker for PERSO-013.
+- [ ] D-P-20 OPEN (Commerce, 2026-11-19): internal RPC for Ring Item Version status (`READY_FOR_REVIEW` after PERSO-018, `SUBMITTED` after PERSO-019, later `MANAGER_APPROVED` / change requests for MF02). Caller Operations only, checks the version is current and the transition is valid, idempotent. Also the final list of `ring_item_versions.status` values. Requested from Commerce (Phạm Quốc Duy).
 
 ## 9. Implementation progress log
 
@@ -484,3 +579,4 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
 | 2026-11-15 | PERSO-026/027 + BMP rule + D-P-07 broker users via Arcane env | IMPLEMENTED (not deployed) | Builds gateway/operations/commerce/iam/experience PASS; jest 134 PASS with task specs (then removed per rule); eslint, tsc, proto:check, prisma validate, boundaries, guardrails, ci:deploy-layout PASS. Server broker (Arcane, user-deployed): anonymous/wrong password refused, both users connect, ACL blocks other-device and own-commands publish, start command delivered (also seen in MQTT Explorer). NOT RUN: presigned URL via public endpoint, reject flow against real DB/Garage |
 | 2026-11-15 | Revision: capture staff decides (PERSO-007/008/026/027) + migration `20261115120000_capture_attempt_pending_review` | IMPLEMENTED (code not deployed; migration APPLIED on server 2026-11-15) | Builds 5 services PASS; jest 152 PASS with task specs (then removed per rule); eslint, tsc, proto:check, prisma validate, boundaries, guardrails, ci:deploy-layout PASS. Migration: user-authorized, applied with `prisma migrate deploy` as owner `memora` on the server DB after a pre-check (capture_attempts and capture_sessions empty, old CHECK definitions saved); `migrate status` up to date; new CHECKs verified; operations_app grants unchanged. NOT RUN: flow against real DB/Garage/broker |
 | 2026-11-17 | PERSO-007 (several pending), 008 (NOT_SELECTED + acceptedAttemptNo), 028, 029, expiry cleanup, 006 failureReason | IMPLEMENTED (not deployed, not committed) | typecheck, proto:check, lint:check, build (gateway) + build:operations PASS; boundaries 0 findings; guardrails 8/8; jest 112 PASS (14 task specs for next/close/complete/expiry/evaluate ran PASS, then removed per rule). NOT RUN: real DB transactions, live MQTT/Garage, HTTP E2E |
+| 2026-11-19 | PERSO-009..019 plan + capture merge | PLAN ONLY / MERGED | PERSO-028/029 branch merged into local `dev` (57a3ee6) after typecheck, proto:check, lint, 5 builds, jest 169 PASS / 4 skipped, boundaries, guardrails PASS; not pushed. Source pipeline PERSO-009..019 planned (PROPOSED / NEEDS_REVIEW), D-P-18..20 opened. NOT RUN: live MQTT/ESP32, DB, Garage, HTTP E2E |
