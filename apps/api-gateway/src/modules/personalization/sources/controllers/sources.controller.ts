@@ -6,12 +6,17 @@ import { PERMISSIONS } from '@app/contracts';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { toVerifiedActor } from '../../../../common/grpc/verified-actor';
 import { PersonalizationGrpcClient } from '../../clients/personalization-grpc.client';
-import { ApiListOrderSourcesDocs } from '../docs/sources.swagger';
+import {
+  ApiGetSourceProcessingDocs,
+  ApiListOrderSourcesDocs,
+} from '../docs/sources.swagger';
 import type { PersonalizationSourceResponseDto } from '../dto/personalization-source.response.dto';
+import type { SourceProcessingResponseDto } from '../dto/source-processing.response.dto';
 import { toPersonalizationSourceListResponse } from '../mappers/personalization-source-http.mapper';
+import { toSourceProcessingResponse } from '../mappers/source-processing-http.mapper';
 
 @ApiTags('personalization-sources')
-@Controller('orders/:orderId/personalization-sources')
+@Controller()
 @RequirePermissions(PERMISSIONS.DESIGN_SUBMIT_OWN)
 export class SourcesController {
   constructor(
@@ -19,7 +24,7 @@ export class SourcesController {
   ) {}
 
   // [PERSO-011] GET /api/v1/orders/:orderId/personalization-sources
-  @Get()
+  @Get('orders/:orderId/personalization-sources')
   @ApiListOrderSourcesDocs()
   async listOrderSources(
     @CurrentUser() principal: AuthenticatedPrincipal,
@@ -30,5 +35,19 @@ export class SourcesController {
       orderId,
     });
     return toPersonalizationSourceListResponse(response);
+  }
+
+  // [PERSO-012] GET /api/v1/personalization-sources/:sourceId/processing
+  @Get('personalization-sources/:sourceId/processing')
+  @ApiGetSourceProcessingDocs()
+  async getSourceProcessing(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('sourceId', ParseUUIDPipe) sourceId: string,
+  ): Promise<SourceProcessingResponseDto> {
+    const response = await this.personalizationClient.getSourceProcessing({
+      actor: toVerifiedActor(principal),
+      sourceId,
+    });
+    return toSourceProcessingResponse(response);
   }
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ObjectStorageModule } from '../shared/object-storage/object-storage.module';
+import { SourceProcessingModule } from '../shared/source-processing/source-processing.module';
 import { OrderContextModule } from '../shared/order-context/order-context.module';
 import {
   CAPTURE_DEVICE_GATEWAY,
@@ -29,7 +30,7 @@ import { CaptureGrpcController } from './presentation/grpc/capture.grpc.controll
 import { CaptureMqttListener } from './presentation/mqtt/capture-mqtt.listener';
 
 @Module({
-  imports: [OrderContextModule, ObjectStorageModule],
+  imports: [OrderContextModule, ObjectStorageModule, SourceProcessingModule],
   controllers: [CaptureGrpcController],
   providers: [
     CreateCaptureSessionUseCase,

@@ -1,7 +1,6 @@
 /**
- * Seam for PERSO-013 (internal processing job). A source that just became ACCEPTED
- * (PERSO-010 now, PERSO-008 later) is handed over here AFTER its transaction commits.
- * PERSO-013 replaces the logging binding with the BullMQ producer (job id = source id).
+ * PERSO-013 producer port. A source that just became ACCEPTED (PERSO-008, PERSO-010) is
+ * handed over here AFTER its transaction commits. Bound to BullMQ (job id = source id).
  */
 export interface SourceProcessingTrigger {
   /** Must not throw for a transient failure the caller cannot act on; callers still guard it. */

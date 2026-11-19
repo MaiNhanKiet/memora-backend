@@ -47,10 +47,31 @@ export interface ListOrderSourcesResponse {
   items: PersonalizationSource[];
 }
 
+export interface GetSourceProcessingRequest {
+  actor: VerifiedActor;
+  sourceId: string;
+}
+
+/** Never carries object keys, checksums, artwork or wavecode. */
+export interface SourceProcessing {
+  sourceId: string;
+  sourceType: string;
+  status: string;
+  /** Unset unless processing failed. */
+  failureCode?: string;
+  /** ISO-8601 UTC; unset until the job starts. */
+  startedAt?: string;
+  /** ISO-8601 UTC; unset until READY or PROCESSING_FAILED. */
+  finishedAt?: string;
+}
+
 export interface PersonalizationSourceServiceHandler {
   listOrderSources(
     request: ListOrderSourcesRequest,
   ): Promise<ListOrderSourcesResponse>;
+  getSourceProcessing(
+    request: GetSourceProcessingRequest,
+  ): Promise<SourceProcessing>;
 }
 
 export interface PersonalizationSourceServiceClient {
@@ -58,4 +79,8 @@ export interface PersonalizationSourceServiceClient {
     request: ListOrderSourcesRequest,
     metadata?: Metadata,
   ): Observable<ListOrderSourcesResponse>;
+  getSourceProcessing(
+    request: GetSourceProcessingRequest,
+    metadata?: Metadata,
+  ): Observable<SourceProcessing>;
 }

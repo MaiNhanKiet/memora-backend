@@ -35,6 +35,7 @@ import {
   type CreateCaptureSessionRequest,
   type GetCaptureAttemptImageRequest,
   type GetCaptureSessionRequest,
+  type GetSourceProcessingRequest,
   type ListConsentsRequest,
   type ListOrderSourcesRequest,
   type ListOrderSourcesResponse,
@@ -45,6 +46,7 @@ import {
   type PersonalizationSourceServiceClient,
   type RejectCaptureAttemptRequest,
   type RevokeConsentRequest,
+  type SourceProcessing,
 } from '@app/contracts';
 import { DomainGrpcClient } from '../../../common/grpc/domain-grpc';
 
@@ -179,6 +181,14 @@ export class PersonalizationGrpcClient
   ): Promise<ListOrderSourcesResponse> {
     return this.unary((metadata) =>
       this.sourceService.listOrderSources(request, metadata),
+    );
+  }
+
+  getSourceProcessing(
+    request: GetSourceProcessingRequest,
+  ): Promise<SourceProcessing> {
+    return this.unary((metadata) =>
+      this.sourceService.getSourceProcessing(request, metadata),
     );
   }
 

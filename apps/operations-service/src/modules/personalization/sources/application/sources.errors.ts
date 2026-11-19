@@ -12,6 +12,8 @@ export const SourceReason = {
   INVALID_ORDER_ID: 'INVALID_ORDER_ID',
   ORDER_NOT_FOUND: 'ORDER_NOT_FOUND',
   ORDER_NOT_OWNED: 'ORDER_NOT_OWNED',
+  INVALID_SOURCE_ID: 'INVALID_SOURCE_ID',
+  SOURCE_NOT_FOUND: 'SOURCE_NOT_FOUND',
 } as const;
 
 export const sourceErrors = {

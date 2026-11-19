@@ -31,6 +31,8 @@ service FingerprintCaptureService {
 // Operations checks that the caller owns the order. Never returns keys, checksums or metadata.
 service PersonalizationSourceService {
   rpc ListOrderSources (ListOrderSourcesRequest) returns (ListOrderSourcesResponse);
+  // PERSO-012 (approved 2026-11-19). Owner only; a foreign, missing or DELETED source is NOT_FOUND.
+  rpc GetSourceProcessing (GetSourceProcessingRequest) returns (SourceProcessing);
 }
 
 message Consent {
@@ -174,6 +176,25 @@ message ListOrderSourcesRequest {
 
 message ListOrderSourcesResponse {
   repeated PersonalizationSource items = 1;
+}
+
+message GetSourceProcessingRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+}
+
+// Never carries object keys, checksums, artwork or wavecode.
+message SourceProcessing {
+  string source_id = 1;
+  // FINGERPRINT | SOUNDWAVE
+  string source_type = 2;
+  // ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 3;
+  optional string failure_code = 4;
+  // ISO-8601 UTC; unset until the job starts.
+  optional string started_at = 5;
+  // ISO-8601 UTC; unset until READY or PROCESSING_FAILED.
+  optional string finished_at = 6;
 }
 
 // PERSO-009 / PERSO-010 (approved 2026-11-19). The Gateway checks SOURCE_AUDIO_UPLOAD_OWN and fills `actor`.

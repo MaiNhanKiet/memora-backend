@@ -225,6 +225,12 @@ jobs:
               -e OPERATIONS_OBJECT_STORAGE_BUCKET=ci-smoke \
               -e OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID=ci-smoke \
               -e OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY=ci-smoke \
+              -e QUEUE_REDIS_HOST=127.0.0.1 \
+              -e QUEUE_REDIS_PORT=1 \
+              -e QUEUE_REDIS_PASSWORD=ci-smoke-unused-redis-pass \
+              -e QUEUE_REDIS_DB=2 \
+              -e OPERATIONS_PROCESSING_WORKER_URL=http://127.0.0.1:1 \
+              -e OPERATIONS_PROCESSING_WORKER_SECRET=0123456789abcdef0123456789abcdef \
               -p "127.0.0.1:${port}:${port}" \
               "$image")"
             cids+=("$cid")

@@ -232,6 +232,22 @@ export class OperationsEnvironment extends NodeEnvironment {
   @IsString()
   @MinLength(1)
   OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY?: string;
+
+  // Python processing worker (PERSO-013, D-P-19). Optional in development: unset makes
+  // every processing job fail as transient (the source stays retryable until retries run out).
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf(presentOrRequired('OPERATIONS_PROCESSING_WORKER_URL'))
+  @IsString()
+  @Matches(HTTP_URL_PATTERN, { message: 'must be an absolute http(s) URL' })
+  OPERATIONS_PROCESSING_WORKER_URL?: string;
+
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf(presentOrRequired('OPERATIONS_PROCESSING_WORKER_SECRET'))
+  @IsString()
+  @MinLength(16)
+  OPERATIONS_PROCESSING_WORKER_SECRET?: string;
 }
 
 export interface OperationsEnv {
@@ -258,6 +274,8 @@ export interface OperationsEnv {
   OPERATIONS_OBJECT_STORAGE_BUCKET: string | undefined;
   OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID: string | undefined;
   OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY: string | undefined;
+  OPERATIONS_PROCESSING_WORKER_URL: string | undefined;
+  OPERATIONS_PROCESSING_WORKER_SECRET: string | undefined;
 }
 
 export function validateOperationsEnv(
@@ -290,6 +308,7 @@ export function validateOperationsEnv(
         : source.OPERATIONS_CAPTURE_QUALITY_THRESHOLD,
   });
   assertMqttCredentialsTogether(validated);
+  assertProcessingWorkerTogether(validated);
   assertOperationsDatabaseUrl(
     validated.OPERATIONS_DATABASE_URL,
     validated.NODE_ENV,
@@ -328,6 +347,10 @@ export function validateOperationsEnv(
       validated.OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID,
     OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY:
       validated.OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY,
+    OPERATIONS_PROCESSING_WORKER_URL:
+      validated.OPERATIONS_PROCESSING_WORKER_URL,
+    OPERATIONS_PROCESSING_WORKER_SECRET:
+      validated.OPERATIONS_PROCESSING_WORKER_SECRET,
   };
 }
 
@@ -341,6 +364,17 @@ function assertMqttCredentialsTogether(env: OperationsEnvironment): void {
   if (present !== 0 && present !== 3) {
     throw new Error(
       'Environment validation failed: OPERATIONS_MQTT_URL, OPERATIONS_MQTT_USERNAME and OPERATIONS_MQTT_PASSWORD must be set together',
+    );
+  }
+}
+
+/** In development the worker URL and secret are all-or-nothing. */
+function assertProcessingWorkerTogether(env: OperationsEnvironment): void {
+  const urlSet = env.OPERATIONS_PROCESSING_WORKER_URL !== undefined;
+  const secretSet = env.OPERATIONS_PROCESSING_WORKER_SECRET !== undefined;
+  if (urlSet !== secretSet) {
+    throw new Error(
+      'Environment validation failed: OPERATIONS_PROCESSING_WORKER_URL and OPERATIONS_PROCESSING_WORKER_SECRET must be set together',
     );
   }
 }
@@ -377,6 +411,8 @@ export const operationsConfig = registerAs('operations', () => {
     objectStorageAccessKeyId: env.OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID,
     objectStorageSecretAccessKey:
       env.OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY,
+    processingWorkerUrl: env.OPERATIONS_PROCESSING_WORKER_URL,
+    processingWorkerSecret: env.OPERATIONS_PROCESSING_WORKER_SECRET,
   };
 });
 
