@@ -175,3 +175,51 @@ message ListOrderSourcesRequest {
 message ListOrderSourcesResponse {
   repeated PersonalizationSource items = 1;
 }
+
+// PERSO-009 / PERSO-010 (approved 2026-11-19). The Gateway checks SOURCE_AUDIO_UPLOAD_OWN and fills `actor`.
+// The response never carries object keys, checksums or metadata; `upload_url` is a credential, never log it.
+service SoundwaveUploadService {
+  rpc InitiateSoundwaveUpload (InitiateSoundwaveUploadRequest) returns (InitiateSoundwaveUploadResponse);
+  rpc CompleteSoundwaveUpload (CompleteSoundwaveUploadRequest) returns (CompleteSoundwaveUploadResponse);
+}
+
+message InitiateSoundwaveUploadRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string consent_id = 3;
+  // audio/wav | audio/mpeg | audio/mp4 | audio/aac
+  string content_type = 4;
+  // 1..10485760
+  int32 size_bytes = 5;
+  // 64 hex characters.
+  string sha256 = 6;
+  // UPLOAD | IN_APP_RECORDING
+  string origin = 7;
+  // 3000..30000, measured by the client.
+  int32 duration_ms = 8;
+}
+
+message InitiateSoundwaveUploadResponse {
+  // The new personalization source id.
+  string upload_id = 1;
+  string upload_url = 2;
+  map<string, string> upload_headers = 3;
+  // ISO-8601 UTC.
+  string expires_at = 4;
+}
+
+message CompleteSoundwaveUploadRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string upload_id = 3;
+  // >= 0 and segment_start_ms + 3000 <= duration_ms.
+  int32 segment_start_ms = 4;
+}
+
+message CompleteSoundwaveUploadResponse {
+  string source_id = 1;
+  // SOUNDWAVE
+  string source_type = 2;
+  // ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 3;
+}

@@ -19,8 +19,14 @@ import {
 import {
   PERSONALIZATION_CONSENT_SERVICE_NAME,
   PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
+  PERSONALIZATION_SOUNDWAVE_UPLOAD_SERVICE_NAME,
   PERSONALIZATION_SOURCE_SERVICE_NAME,
   type AcceptConsentRequest,
+  type CompleteSoundwaveUploadRequest,
+  type CompleteSoundwaveUploadResponse,
+  type InitiateSoundwaveUploadRequest,
+  type InitiateSoundwaveUploadResponse,
+  type SoundwaveUploadServiceClient,
   type CaptureAttemptImage,
   type CaptureSession,
   type CloseCaptureSessionRequest,
@@ -46,6 +52,8 @@ export const OPERATIONS_PERSONALIZATION_GRPC_CLIENT =
   'OPERATIONS_PERSONALIZATION_GRPC_CLIENT';
 
 const FAILED_PRECONDITION_MESSAGE = 'Failed precondition';
+/** PERSO-010: the uploaded object failed verification. Sent as INVALID_ARGUMENT, answered 422. */
+const UPLOAD_INVALID_REASON = 'UPLOAD_INVALID';
 
 /**
  * Gateway client for `memora.personalization.v1.ConsentService` and
@@ -61,6 +69,7 @@ export class PersonalizationGrpcClient
   private consentService!: PersonalizationConsentServiceClient;
   private captureService!: PersonalizationFingerprintCaptureServiceClient;
   private sourceService!: PersonalizationSourceServiceClient;
+  private soundwaveUploadService!: SoundwaveUploadServiceClient;
 
   constructor(
     @Inject(OPERATIONS_PERSONALIZATION_GRPC_CLIENT)
@@ -84,6 +93,10 @@ export class PersonalizationGrpcClient
     this.sourceService =
       this.grpcClient.getService<PersonalizationSourceServiceClient>(
         PERSONALIZATION_SOURCE_SERVICE_NAME,
+      );
+    this.soundwaveUploadService =
+      this.grpcClient.getService<SoundwaveUploadServiceClient>(
+        PERSONALIZATION_SOUNDWAVE_UPLOAD_SERVICE_NAME,
       );
   }
 
@@ -169,6 +182,22 @@ export class PersonalizationGrpcClient
     );
   }
 
+  initiateSoundwaveUpload(
+    request: InitiateSoundwaveUploadRequest,
+  ): Promise<InitiateSoundwaveUploadResponse> {
+    return this.unary((metadata) =>
+      this.soundwaveUploadService.initiateSoundwaveUpload(request, metadata),
+    );
+  }
+
+  completeSoundwaveUpload(
+    request: CompleteSoundwaveUploadRequest,
+  ): Promise<CompleteSoundwaveUploadResponse> {
+    return this.unary((metadata) =>
+      this.soundwaveUploadService.completeSoundwaveUpload(request, metadata),
+    );
+  }
+
   /**
    * Consent and capture contract: FAILED_PRECONDITION and ALREADY_EXISTS are 409 (the shared
    * mapper turns FAILED_PRECONDITION into 412), deadline is 503. The Operations
@@ -190,6 +219,12 @@ export class PersonalizationGrpcClient
     if (grpcStatus === GrpcStatus.DEADLINE_EXCEEDED) {
       return unavailable();
     }
+    if (
+      grpcStatus === GrpcStatus.INVALID_ARGUMENT &&
+      readReason(error) === UPLOAD_INVALID_REASON
+    ) {
+      return unprocessable(UPLOAD_INVALID_REASON);
+    }
     if (grpcStatus === GrpcStatus.FAILED_PRECONDITION) {
       return conflict(readReason(error));
     }
@@ -206,6 +241,17 @@ function unavailable(): HttpException {
       message: mapped.message,
     },
     HttpStatus.SERVICE_UNAVAILABLE,
+  );
+}
+
+function unprocessable(message: string): HttpException {
+  return new HttpException(
+    {
+      statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      code: ERROR_CODES.BAD_REQUEST,
+      message,
+    },
+    HttpStatus.UNPROCESSABLE_ENTITY,
   );
 }
 

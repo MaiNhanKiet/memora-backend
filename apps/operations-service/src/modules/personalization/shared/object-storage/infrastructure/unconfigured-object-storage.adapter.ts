@@ -13,6 +13,14 @@ export class UnconfiguredObjectStorageAdapter implements ObjectStoragePort {
     return Promise.reject(new Error('Object storage is not configured'));
   }
 
+  presignPut(): Promise<PresignedUrl> {
+    return Promise.reject(new Error('Object storage is not configured'));
+  }
+
+  getObject(): Promise<Uint8Array | undefined> {
+    return Promise.reject(new Error('Object storage is not configured'));
+  }
+
   deleteObject(): Promise<void> {
     return Promise.reject(new Error('Object storage is not configured'));
   }

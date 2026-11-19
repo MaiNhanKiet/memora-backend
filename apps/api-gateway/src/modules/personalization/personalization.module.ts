@@ -8,6 +8,7 @@ import {
 } from './clients/personalization-grpc.client';
 import { ConsentController } from './consent/controllers/consent.controller';
 import { FingerprintCaptureController } from './fingerprint-capture/controllers/fingerprint-capture.controller';
+import { SoundwaveUploadController } from './sources/controllers/soundwave-upload.controller';
 import { SourcesController } from './sources/controllers/sources.controller';
 
 @Module({
@@ -26,6 +27,7 @@ import { SourcesController } from './sources/controllers/sources.controller';
     ConsentController,
     FingerprintCaptureController,
     SourcesController,
+    SoundwaveUploadController,
   ],
   providers: [PersonalizationGrpcClient],
   exports: [PersonalizationGrpcClient],

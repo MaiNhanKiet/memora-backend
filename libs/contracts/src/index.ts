@@ -10,3 +10,4 @@ export * from './commerce/inventory.grpc';
 export * from './personalization/consent.grpc';
 export * from './personalization/fingerprint-capture.grpc';
 export * from './personalization/source.grpc';
+export * from './personalization/soundwave-upload.grpc';
