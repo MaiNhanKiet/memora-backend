@@ -114,6 +114,7 @@ Host publish (Tailscale `100.78.222.34`): Postgres `5432`, Redis `6379`. Gateway
 - Operations đọc `OPERATIONS_OBJECT_STORAGE_*` (endpoint, region, bucket, key) khi có code S3; mẫu trong `.env.example` và `deploy/secrets/operations.env.example`.
 - Web UI: project Arcane riêng `memora-garage-webui` từ `deploy/infra/garage-webui.compose.yaml` (`khairul169/garage-webui:1.1.0`, `100.78.222.34:3909`, bắt buộc `AUTH_USER_PASS`). Nút Share chỉ tạo link cho bucket bật website access (public); không bật cho `memora-personalization`, dùng URL ký sẵn.
 - Domain công khai qua Cloudflare Tunnel: route trỏ Docker DNS (`http://garage:3900`, `http://api-gateway:3000`), không trỏ IP container. Web UI public phải đứng sau Cloudflare Access.
+- CORS của bucket `memora-personalization` (trình duyệt PUT/GET thẳng bằng URL ký, PERSO-009/010 và preview 3D): cấu hình lưu trong metadata bucket, bản gốc ở `deploy/infra/garage/cors.memora-personalization.json`. Áp dụng lại bằng S3 API với key có quyền owner, ví dụ `aws s3api put-bucket-cors --endpoint-url http://100.78.222.34:3900 --region garage --bucket memora-personalization --cors-configuration file://deploy/infra/garage/cors.memora-personalization.json`. Garage so `AllowedHeaders` phân biệt hoa thường, nên giữ cả `content-type` (trình duyệt gửi chữ thường). Hiện `AllowedOrigins` là `*` (2026-11-19); thu hẹp về domain FE khi có. CORS không cấp quyền: bucket vẫn private, không có chữ ký thì 403.
 
 #### Mosquitto (MQTT broker, D-P-07)
 
