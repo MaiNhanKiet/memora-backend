@@ -373,6 +373,21 @@ export class PrismaCaptureRepository implements CaptureRepository {
         throw captureErrors.precondition(CaptureReason.ATTEMPT_NOT_REVIEWABLE);
       }
 
+      // D-P-18: every Ring Item of the consent gets one active binding. An item that
+      // is already bound fails the whole complete (the transaction rolls back).
+      const consentItems = await tx.consent_ring_items.findMany({
+        where: { consent_id: session.consentId },
+        select: { ring_item_id: true },
+      });
+      const ringItemIds = consentItems.map((item) => item.ring_item_id);
+      const alreadyBound = await tx.source_bindings.findFirst({
+        where: { ring_item_id: { in: ringItemIds }, released_at: null },
+        select: { id: true },
+      });
+      if (alreadyBound !== null) {
+        throw captureErrors.precondition(CaptureReason.RING_ITEM_ALREADY_BOUND);
+      }
+
       const source = await tx.personalization_sources.create({
         data: {
           owner_customer_identity_id: consent.customer_identity_id,
@@ -402,6 +417,27 @@ export class PrismaCaptureRepository implements CaptureRepository {
         where: { id: session.consentId },
         data: { personalization_source_id: source.id },
       });
+      if (ringItemIds.length > 0) {
+        try {
+          await tx.source_bindings.createMany({
+            data: ringItemIds.map((ringItemId) => ({
+              order_id: session.orderId,
+              ring_item_id: ringItemId,
+              personalization_source_id: source.id,
+              binding_mode: session.sourcePlanMode,
+            })),
+          });
+        } catch (error: unknown) {
+          // A parallel complete on another session bound the same item first: the
+          // partial unique index (one active binding per item) rejects this one.
+          if (isUniqueViolation(error)) {
+            throw captureErrors.precondition(
+              CaptureReason.RING_ITEM_ALREADY_BOUND,
+            );
+          }
+          throw error;
+        }
+      }
 
       const rawOf = (id: string): unknown =>
         row.capture_attempts.find((attempt) => attempt.id === id)
@@ -604,6 +640,16 @@ async function lock(tx: Tx, key: string): Promise<void> {
 type SessionFilter = NonNullable<
   Parameters<Tx['capture_sessions']['findMany']>[0]
 >['where'];
+
+/** Prisma P2002: a unique index (here the one-active-binding-per-item index) refused the row. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2002'
+  );
+}
 
 /**
  * Lazy expiry: open sessions created before the window become EXPIRED, and their

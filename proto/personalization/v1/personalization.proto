@@ -27,6 +27,12 @@ service FingerprintCaptureService {
   rpc CloseCaptureSession (CloseCaptureSessionRequest) returns (CaptureSession);
 }
 
+// PERSO-011 (approved 2026-11-19). The Gateway checks DESIGN_SUBMIT_OWN and fills `actor`;
+// Operations checks that the caller owns the order. Never returns keys, checksums or metadata.
+service PersonalizationSourceService {
+  rpc ListOrderSources (ListOrderSourcesRequest) returns (ListOrderSourcesResponse);
+}
+
 message Consent {
   string consent_id = 1;
   string order_id = 2;
@@ -143,4 +149,29 @@ message NextCaptureAttemptRequest {
 message CloseCaptureSessionRequest {
   memora.common.v1.VerifiedActor actor = 1;
   string session_id = 2;
+}
+
+message PersonalizationSource {
+  string source_id = 1;
+  // FINGERPRINT | SOUNDWAVE
+  string source_type = 2;
+  // PENDING | ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 3;
+  // From metadata_json.failureCode; unset until a processing job records one.
+  optional string failure_code = 4;
+  // ISO-8601 UTC; unset while not accepted.
+  optional string accepted_at = 5;
+  // Ring Items of the order with an active binding to this source.
+  repeated string ring_item_ids = 6;
+  // N/A | SHARED | SEPARATE; unset while the source has no active binding.
+  optional string binding_mode = 7;
+}
+
+message ListOrderSourcesRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+}
+
+message ListOrderSourcesResponse {
+  repeated PersonalizationSource items = 1;
 }

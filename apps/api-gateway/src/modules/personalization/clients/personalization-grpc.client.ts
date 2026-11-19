@@ -19,6 +19,7 @@ import {
 import {
   PERSONALIZATION_CONSENT_SERVICE_NAME,
   PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
+  PERSONALIZATION_SOURCE_SERVICE_NAME,
   type AcceptConsentRequest,
   type CaptureAttemptImage,
   type CaptureSession,
@@ -29,10 +30,13 @@ import {
   type GetCaptureAttemptImageRequest,
   type GetCaptureSessionRequest,
   type ListConsentsRequest,
+  type ListOrderSourcesRequest,
+  type ListOrderSourcesResponse,
   type ListConsentsResponse,
   type NextCaptureAttemptRequest,
   type PersonalizationConsentServiceClient,
   type PersonalizationFingerprintCaptureServiceClient,
+  type PersonalizationSourceServiceClient,
   type RejectCaptureAttemptRequest,
   type RevokeConsentRequest,
 } from '@app/contracts';
@@ -56,6 +60,7 @@ export class PersonalizationGrpcClient
 {
   private consentService!: PersonalizationConsentServiceClient;
   private captureService!: PersonalizationFingerprintCaptureServiceClient;
+  private sourceService!: PersonalizationSourceServiceClient;
 
   constructor(
     @Inject(OPERATIONS_PERSONALIZATION_GRPC_CLIENT)
@@ -75,6 +80,10 @@ export class PersonalizationGrpcClient
     this.captureService =
       this.grpcClient.getService<PersonalizationFingerprintCaptureServiceClient>(
         PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
+      );
+    this.sourceService =
+      this.grpcClient.getService<PersonalizationSourceServiceClient>(
+        PERSONALIZATION_SOURCE_SERVICE_NAME,
       );
   }
 
@@ -149,6 +158,14 @@ export class PersonalizationGrpcClient
   ): Promise<CaptureSession> {
     return this.unary((metadata) =>
       this.captureService.closeCaptureSession(request, metadata),
+    );
+  }
+
+  listOrderSources(
+    request: ListOrderSourcesRequest,
+  ): Promise<ListOrderSourcesResponse> {
+    return this.unary((metadata) =>
+      this.sourceService.listOrderSources(request, metadata),
     );
   }
 
