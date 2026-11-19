@@ -11,6 +11,7 @@ import type {
   CaptureMessageSource,
   DeviceResult,
   EndCommand,
+  NextCommand,
   StartCommand,
 } from '../application/capture-device.gateway';
 
@@ -92,6 +93,10 @@ export class MqttCaptureDeviceGateway
   }
 
   publishEnd(deviceCode: string, command: EndCommand): Promise<void> {
+    return this.publish(commandsTopic(deviceCode), command);
+  }
+
+  publishNext(deviceCode: string, command: NextCommand): Promise<void> {
     return this.publish(commandsTopic(deviceCode), command);
   }
 

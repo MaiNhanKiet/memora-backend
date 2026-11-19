@@ -22,6 +22,7 @@ import {
   type AcceptConsentRequest,
   type CaptureAttemptImage,
   type CaptureSession,
+  type CloseCaptureSessionRequest,
   type CompleteCaptureSessionRequest,
   type Consent,
   type CreateCaptureSessionRequest,
@@ -29,6 +30,7 @@ import {
   type GetCaptureSessionRequest,
   type ListConsentsRequest,
   type ListConsentsResponse,
+  type NextCaptureAttemptRequest,
   type PersonalizationConsentServiceClient,
   type PersonalizationFingerprintCaptureServiceClient,
   type RejectCaptureAttemptRequest,
@@ -131,6 +133,22 @@ export class PersonalizationGrpcClient
   ): Promise<CaptureSession> {
     return this.unary((metadata) =>
       this.captureService.rejectCaptureAttempt(request, metadata),
+    );
+  }
+
+  nextCaptureAttempt(
+    request: NextCaptureAttemptRequest,
+  ): Promise<CaptureSession> {
+    return this.unary((metadata) =>
+      this.captureService.nextCaptureAttempt(request, metadata),
+    );
+  }
+
+  closeCaptureSession(
+    request: CloseCaptureSessionRequest,
+  ): Promise<CaptureSession> {
+    return this.unary((metadata) =>
+      this.captureService.closeCaptureSession(request, metadata),
     );
   }
 

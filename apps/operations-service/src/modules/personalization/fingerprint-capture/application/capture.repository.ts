@@ -16,6 +16,7 @@ export interface CaptureAttemptRecord {
   readonly id: string;
   readonly attemptNo: number;
   readonly result: string;
+  readonly failureReason: string | null;
   readonly qualityScore: number | null;
   readonly qualityThresholdSnapshot: number | null;
   readonly attemptedAt: Date;
@@ -112,6 +113,19 @@ export interface RejectCaptureAttemptOutcome {
   readonly previous: CaptureAttemptRecord;
 }
 
+export interface CloseCaptureSessionInput extends ExpiryWindow {
+  readonly sessionId: string;
+  readonly staffUserId: string;
+}
+
+export interface CloseCaptureSessionOutcome {
+  readonly session: CaptureSessionRecord;
+  /** True when this call cancelled the session; false for an idempotent repeat. */
+  readonly closed: boolean;
+  /** PENDING_REVIEW attempts that became REJECTED (NOT_SELECTED); objects are deleted after commit. */
+  readonly rejected: readonly CaptureAttemptRecord[];
+}
+
 export interface CaptureRepository {
   findConsent(consentId: string): Promise<ConsentCaptureRecord | undefined>;
 
@@ -126,7 +140,11 @@ export interface CaptureRepository {
     input: CreateCaptureSessionInput,
   ): Promise<CaptureSessionRecord>;
 
-  /** Applies lazy expiry (persisted) before returning. Undefined when it does not exist. */
+  /**
+   * Applies lazy expiry (persisted; PENDING_REVIEW attempts become REJECTED / EXPIRED and
+   * their images are deleted after commit) before returning.
+   * Undefined when it does not exist.
+   */
   findSession(
     sessionId: string,
     window: ExpiryWindow,
@@ -148,7 +166,7 @@ export interface CaptureRepository {
   /**
    * One transaction under an advisory lock on the session (PERSO-008). The chosen
    * PENDING_REVIEW attempt becomes ACCEPTED, the other PENDING_REVIEW attempts become
-   * REJECTED (STAFF_REJECTED). Idempotent for a COMPLETED session with the same
+   * REJECTED (NOT_SELECTED). Idempotent for a COMPLETED session with the same
    * attemptNo; another attemptNo is SESSION_NOT_OPEN. Throws the CaptureReason errors.
    */
   completeSession(
@@ -165,6 +183,16 @@ export interface CaptureRepository {
   rejectAttempt(
     input: RejectCaptureAttemptInput,
   ): Promise<RejectCaptureAttemptOutcome>;
+
+  /**
+   * One transaction under an advisory lock on the session (PERSO-029). An open session
+   * becomes CANCELLED (ended_at set, no source) and its PENDING_REVIEW attempts become
+   * REJECTED (NOT_SELECTED). CANCELLED is returned unchanged; other final states throw
+   * SESSION_NOT_OPEN.
+   */
+  closeSession(
+    input: CloseCaptureSessionInput,
+  ): Promise<CloseCaptureSessionOutcome>;
 }
 
 export const CAPTURE_REPOSITORY = Symbol('CAPTURE_REPOSITORY');

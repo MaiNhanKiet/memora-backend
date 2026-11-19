@@ -39,6 +39,8 @@ export interface CaptureAttemptSummary {
   attemptedAt: string;
   /** PASS | LOW_QUALITY. */
   suggestion?: string;
+  /** Only for REJECTED / ERROR: CAPTURE_FAILED | STAFF_REJECTED | NOT_SELECTED | EXPIRED. */
+  failureReason?: string;
 }
 
 export interface CaptureSession {
@@ -95,6 +97,18 @@ export interface RejectCaptureAttemptRequest {
   attemptNo: number;
 }
 
+/** PERSO-028: publishes a `next` command to the device; stores nothing. */
+export interface NextCaptureAttemptRequest {
+  actor: VerifiedActor;
+  sessionId: string;
+}
+
+/** PERSO-029: ends an open session without picking (CANCELLED). */
+export interface CloseCaptureSessionRequest {
+  actor: VerifiedActor;
+  sessionId: string;
+}
+
 export interface FingerprintCaptureServiceHandler {
   createCaptureSession(
     request: CreateCaptureSessionRequest,
@@ -108,6 +122,12 @@ export interface FingerprintCaptureServiceHandler {
   ): Promise<CaptureAttemptImage>;
   rejectCaptureAttempt(
     request: RejectCaptureAttemptRequest,
+  ): Promise<CaptureSession>;
+  nextCaptureAttempt(
+    request: NextCaptureAttemptRequest,
+  ): Promise<CaptureSession>;
+  closeCaptureSession(
+    request: CloseCaptureSessionRequest,
   ): Promise<CaptureSession>;
 }
 
@@ -130,6 +150,14 @@ export interface PersonalizationFingerprintCaptureServiceClient {
   ): Observable<CaptureAttemptImage>;
   rejectCaptureAttempt(
     request: RejectCaptureAttemptRequest,
+    metadata?: Metadata,
+  ): Observable<CaptureSession>;
+  nextCaptureAttempt(
+    request: NextCaptureAttemptRequest,
+    metadata?: Metadata,
+  ): Observable<CaptureSession>;
+  closeCaptureSession(
+    request: CloseCaptureSessionRequest,
     metadata?: Metadata,
   ): Observable<CaptureSession>;
 }

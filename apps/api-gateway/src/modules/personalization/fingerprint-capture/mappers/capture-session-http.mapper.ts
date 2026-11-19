@@ -29,6 +29,7 @@ export function toCaptureSessionResponse(
       qualityScore: orNull(attempt.qualityScore),
       attemptedAt: attempt.attemptedAt,
       suggestion: orNull(attempt.suggestion),
+      failureReason: orNull(attempt.failureReason),
     })),
   };
 }
