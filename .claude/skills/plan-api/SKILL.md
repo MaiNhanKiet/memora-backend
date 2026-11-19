@@ -11,9 +11,10 @@ Plan **one feature** so `implement-api` can build one approved API at a time. Th
 
 Read and compare the sources that exist. Record every missing or conflicting source as `NEEDS_REVIEW`. Do not claim a file or external sheet was reviewed if it was not opened.
 
-- `docs/architecture/`, including `memora-backend-4-service.md` (four business services, API Gateway, MF01–MF06) and `iam-permission-matrix.md`.
+- `docs/architecture/`, including `memora-backend-4-service.md` (four business services, API Gateway, MF01–MF04) and `iam-permission-matrix.md`.
 - A local `MEMORA — API MASTER SPECIFICATION`, if the workspace contains it. Search before concluding it is absent.
-- The Main Flow section for MF01–MF06 and the Prisma schema plus migrations of the owning service.
+- `docs/requirements/` (`MF01.md`–`MF04.md`, BM04 Review 2 Commitment): the current Main Flows. Cite steps as `MF0x-Snn`. Older sources use the legacy six-flow numbering; map them with `memora-backend-4-service.md` section 4.0.
+- The Prisma schema plus migrations of the owning service.
 - Approved RBAC codes in the permission matrix and the owning service's permission catalog. For IAM, include `apps/iam-service/prisma/approved-permissions.ts` when that file exists.
 - Current Gateway feature code, owning-service handlers, DTOs, `proto/<domain>/v1/`, handwritten `libs/contracts`, and Swagger.
 - `.claude/rules/` and `.claude/skills/implement-api/SKILL.md`.
