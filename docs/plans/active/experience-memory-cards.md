@@ -6,7 +6,7 @@
 - Domain: `memory`
 - Service: `experience-service` (Gateway HTTP → Experience gRPC)
 - Feature: Memory Cards, PIN Protection, Memory Contents (Media/Text), Access Grants & Shared Access Sessions
-- Plan status: `AWAITING_APPROVAL`
+- Plan status: `COMPLETED`
 - Updated: 2026-11-18
 - Source references:
   - `docs/duypq/MEMORA_API_MASTER_SPECIFICATION_v1.0_AGENT.md` (Rows 206–219, `MEMOR-001` .. `MEMOR-014`)
@@ -254,9 +254,9 @@ ALTER TABLE memory.access_grants ADD CONSTRAINT memory_access_grants_b06aab3c_ck
 
 ## 7. Kế hoạch triển khai tuần tự theo từng Slice (Implementation Checklist)
 
-- [ ] **Slice 1:** Proto & Contracts definition (`proto/experience/v1/memory.proto` & `libs/contracts/src/experience/memory.grpc.ts`).
-- [ ] **Slice 2:** Memory Cards Management (`MEMOR-001`, `MEMOR-002`, `MEMOR-003`).
-- [ ] **Slice 3:** PIN Protection & Security (`MEMOR-004`, `MEMOR-005`, `MEMOR-006`).
-- [ ] **Slice 4:** Memory Contents & Media Upload (`MEMOR-007`, `MEMOR-008`, `MEMOR-009`).
-- [ ] **Slice 5:** Sharing, Access Grants & Web Session Access (`MEMOR-010`, `MEMOR-011`, `MEMOR-012`, `MEMOR-013`, `MEMOR-014`).
-- [ ] **Slice 6:** Verification & End-to-End manual testing report.
+- [x] **Slice 1:** Proto & Contracts definition (`proto/experience/v1/memory.proto` & `libs/contracts/src/experience/memory.grpc.ts`).
+- [x] **Slice 2:** Memory Cards Management (`MEMOR-001`, `MEMOR-002`, `MEMOR-003`).
+- [x] **Slice 3:** PIN Protection & Security (`MEMOR-004`, `MEMOR-005`, `MEMOR-006`).
+- [x] **Slice 4:** Memory Contents & Media Upload (`MEMOR-007`, `MEMOR-008`, `MEMOR-009`).
+- [x] **Slice 5:** Sharing, Access Grants & Web Session Access (`MEMOR-010`, `MEMOR-011`, `MEMOR-012`, `MEMOR-013`, `MEMOR-014`).
+- [x] **Slice 6:** Verification & End-to-End manual testing report.

@@ -1,0 +1,269 @@
+syntax = "proto3";
+
+package memora.experience.v1;
+
+import "common/v1/actor.proto";
+
+service MemoryService {
+  // Memory Cards
+  rpc ListMyCards (ListMyCardsRequest) returns (ListMyCardsResponse);
+  rpc GetCardDetail (GetCardDetailRequest) returns (MemoryCardDetailResponse);
+  rpc ActivateCard (ActivateCardRequest) returns (MemoryCardDetailResponse);
+
+  // PIN Protection
+  rpc SetupPin (SetupPinRequest) returns (SetupPinResponse);
+  rpc ChangePin (ChangePinRequest) returns (ChangePinResponse);
+  rpc ResetPin (ResetPinRequest) returns (ResetPinResponse);
+
+  // Memory Contents & Media
+  rpc ListCardContents (ListCardContentsRequest) returns (ListCardContentsResponse);
+  rpc UpdateCardContents (UpdateCardContentsRequest) returns (UpdateCardContentsResponse);
+  rpc InitiateMediaUpload (InitiateMediaUploadRequest) returns (InitiateMediaUploadResponse);
+
+  // Access Grants & Web Session
+  rpc CreateAccessGrant (CreateAccessGrantRequest) returns (CreateAccessGrantResponse);
+  rpc ListAccessGrants (ListAccessGrantsRequest) returns (ListAccessGrantsResponse);
+  rpc RevokeAccessGrant (RevokeAccessGrantRequest) returns (RevokeAccessGrantResponse);
+  rpc RedeemInvitation (RedeemInvitationRequest) returns (RedeemInvitationResponse);
+  rpc GetMemoryBySession (GetMemoryBySessionRequest) returns (GetMemoryBySessionResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Memory Cards
+// ---------------------------------------------------------------------------
+
+message MemoryCardSummary {
+  string id = 1;
+  string ring_item_id = 2;
+  string owner_customer_identity_id = 3;
+  string owner_email = 4;
+  string status = 5;
+  bool has_pin = 6;
+  bool is_locked = 7;
+  string locked_until = 8;
+  string activated_at = 9;
+  string created_at = 10;
+  string updated_at = 11;
+}
+
+message ListMyCardsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  int32 page = 2;
+  int32 limit = 3;
+}
+
+message ListMyCardsResponse {
+  repeated MemoryCardSummary items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 limit = 4;
+}
+
+message GetCardDetailRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+}
+
+message MemoryCardDetailResponse {
+  string id = 1;
+  string ring_item_id = 2;
+  string owner_customer_identity_id = 3;
+  string owner_email = 4;
+  string status = 5;
+  bool has_pin = 6;
+  bool is_locked = 7;
+  int32 pin_failed_attempts = 8;
+  string pin_locked_until = 9;
+  string activated_at = 10;
+  string ar_target_asset_key = 11;
+  string created_at = 12;
+  string updated_at = 13;
+  bool is_owner = 14;
+}
+
+message ActivateCardRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+  optional string initial_pin = 3;
+}
+
+// ---------------------------------------------------------------------------
+// PIN Protection
+// ---------------------------------------------------------------------------
+
+message SetupPinRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+  string pin = 3;
+}
+
+message SetupPinResponse {
+  bool success = 1;
+  string message = 2;
+  string updated_at = 3;
+}
+
+message ChangePinRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+  string current_pin = 3;
+  string new_pin = 4;
+}
+
+message ChangePinResponse {
+  bool success = 1;
+  string message = 2;
+  string updated_at = 3;
+}
+
+message ResetPinRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+  string new_pin = 3;
+  string verification_code = 4;
+}
+
+message ResetPinResponse {
+  bool success = 1;
+  string message = 2;
+  string updated_at = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Memory Contents & Media Upload
+// ---------------------------------------------------------------------------
+
+message MemoryContentItem {
+  string id = 1;
+  string memory_card_id = 2;
+  string content_type = 3;
+  string title = 4;
+  string text_content = 5;
+  string asset_key = 6;
+  string asset_url = 7;
+  int32 sort_order = 8;
+  string status = 9;
+  string layout_json = 10;
+  string created_at = 11;
+  string updated_at = 12;
+}
+
+message ListCardContentsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+  optional string pin = 3;
+}
+
+message ListCardContentsResponse {
+  string card_id = 1;
+  repeated MemoryContentItem items = 2;
+}
+
+message ContentItemInput {
+  optional string id = 1;
+  string content_type = 2;
+  optional string title = 3;
+  optional string text_content = 4;
+  optional string asset_key = 5;
+  int32 sort_order = 6;
+  optional string layout_json = 7;
+}
+
+message UpdateCardContentsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+  repeated ContentItemInput items = 3;
+}
+
+message UpdateCardContentsResponse {
+  bool success = 1;
+  repeated MemoryContentItem items = 2;
+}
+
+message InitiateMediaUploadRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+  string file_name = 3;
+  string content_type = 4;
+  int64 file_size = 5;
+}
+
+message InitiateMediaUploadResponse {
+  string upload_url = 1;
+  string asset_key = 2;
+  string expires_at = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Access Grants & Web Session Access
+// ---------------------------------------------------------------------------
+
+message AccessGrantItem {
+  string id = 1;
+  string memory_card_id = 2;
+  string grantee_email = 3;
+  string status = 4;
+  string invite_expires_at = 5;
+  string accepted_at = 6;
+  string last_accessed_at = 7;
+  string created_at = 8;
+}
+
+message CreateAccessGrantRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+  string grantee_email = 3;
+  optional int32 ttl_days = 4;
+}
+
+message CreateAccessGrantResponse {
+  string grant_id = 1;
+  string memory_card_id = 2;
+  string grantee_email = 3;
+  string invitation_token = 4;
+  string invite_url = 5;
+  string expires_at = 6;
+}
+
+message ListAccessGrantsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+}
+
+message ListAccessGrantsResponse {
+  repeated AccessGrantItem items = 1;
+}
+
+message RevokeAccessGrantRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string card_id = 2;
+  string grant_id = 3;
+}
+
+message RevokeAccessGrantResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message RedeemInvitationRequest {
+  string invitation_token = 1;
+  optional memora.common.v1.VerifiedActor actor = 2;
+}
+
+message RedeemInvitationResponse {
+  string access_session_id = 1;
+  string memory_card_id = 2;
+  string expires_at = 3;
+  bool requires_pin = 4;
+}
+
+message GetMemoryBySessionRequest {
+  string access_session_id = 1;
+  optional string pin = 2;
+}
+
+message GetMemoryBySessionResponse {
+  string card_id = 1;
+  string status = 2;
+  repeated MemoryContentItem items = 3;
+}
