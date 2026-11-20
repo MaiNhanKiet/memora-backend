@@ -28,10 +28,10 @@ export class TestReporter {
     return { total, passed, failed };
   }
 
-  static printSummaryTable(): void {
+  static printSummaryTable(serviceTitle: string = 'COMMERCE SERVICE (80 APIS)'): void {
     const summary = this.getSummary();
     console.log('\n================================================================================');
-    console.log('📊 BÁO CÁO TỔNG HỢP KIỂM THỬ AUTOMATION COMMERCE SERVICE (80 APIS)');
+    console.log(`📊 BÁO CÁO TỔNG HỢP KIỂM THỬ AUTOMATION ${serviceTitle}`);
     console.log('================================================================================');
     console.log(`- Tổng số API đã kiểm thử : ${summary.total}`);
     console.log(`- Số lượng API ĐẠT (PASS) : \x1b[32m${summary.passed}\x1b[0m`);
