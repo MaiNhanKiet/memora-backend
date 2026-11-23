@@ -9,6 +9,10 @@ import {
   type ObjectStoragePort,
 } from '../../shared/object-storage/object-storage.port';
 import {
+  SOURCE_PROCESSING_TRIGGER,
+  type SourceProcessingTrigger,
+} from '../../shared/source-processing/source-processing.port';
+import {
   CAPTURE_DEVICE_GATEWAY,
   type CaptureDeviceGateway,
 } from './capture-device.gateway';
@@ -40,6 +44,8 @@ export class CompleteCaptureSessionUseCase {
     @Inject(CAPTURE_DEVICE_GATEWAY)
     private readonly device: CaptureDeviceGateway,
     @Inject(CAPTURE_CONFIG) private readonly config: CaptureConfig,
+    @Inject(SOURCE_PROCESSING_TRIGGER)
+    private readonly processing: SourceProcessingTrigger,
   ) {}
 
   async execute(
@@ -90,11 +96,23 @@ export class CompleteCaptureSessionUseCase {
           type: 'end',
           sessionId,
           status: 'COMPLETED',
+          acceptedAttemptNo: attemptNo,
         });
       } catch (error) {
         this.logger.error(
           `End for session ${sessionId} was not published: ${describe(error)}`,
         );
+      }
+      // After commit. The source stays ACCEPTED if the queue is down; failures are only logged.
+      const sourceId = outcome.session.acceptedSourceId;
+      if (sourceId !== null) {
+        try {
+          await this.processing.enqueue(sourceId, 0);
+        } catch (error) {
+          this.logger.warn(
+            `Processing was not queued for source ${sourceId}: ${describe(error)}`,
+          );
+        }
       }
     }
     return toCaptureSession(outcome.session, this.config);

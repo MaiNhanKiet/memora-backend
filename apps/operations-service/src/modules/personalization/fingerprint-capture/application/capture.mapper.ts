@@ -34,6 +34,9 @@ export function toCaptureSession(
         : { qualityScore: attempt.qualityScore }),
       attemptedAt: attempt.attemptedAt.toISOString(),
       ...suggestionField(attempt),
+      ...(attempt.failureReason === null
+        ? {}
+        : { failureReason: attempt.failureReason }),
     })),
   };
 }

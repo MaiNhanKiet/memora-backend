@@ -1,10 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../persistence/prisma/prisma.service';
+import {
+  OBJECT_STORAGE_PORT,
+  type ObjectStoragePort,
+} from '../../shared/object-storage/object-storage.port';
 import { captureErrors, CaptureReason } from '../application/capture.errors';
 import type {
   CaptureAttemptRecord,
   CaptureRepository,
   CaptureSessionRecord,
+  CloseCaptureSessionInput,
+  CloseCaptureSessionOutcome,
   CompleteCaptureSessionInput,
   CompleteCaptureSessionOutcome,
   ConsentCaptureRecord,
@@ -31,6 +37,7 @@ interface AttemptRow {
   quality_score: { toString(): string } | null;
   quality_threshold_snapshot: { toString(): string } | null;
   result: string;
+  failure_reason: string | null;
   attempted_at: Date;
   metadata_json: unknown;
 }
@@ -52,7 +59,43 @@ interface SessionRow {
 
 @Injectable()
 export class PrismaCaptureRepository implements CaptureRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(PrismaCaptureRepository.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(OBJECT_STORAGE_PORT) private readonly storage: ObjectStoragePort,
+  ) {}
+
+  /**
+   * Runs `work` in one transaction. `expiredKeys` collects the image keys of attempts
+   * that lazy expiry rejected; they are deleted only after the transaction committed
+   * (best effort, logged on failure).
+   */
+  private async transact<T>(
+    work: (tx: Tx, expiredKeys: string[]) => Promise<T>,
+  ): Promise<T> {
+    const keys: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
+      keys.length = 0;
+      return work(tx, keys);
+    });
+    await this.deleteObjects(keys);
+    return result;
+  }
+
+  private async deleteObjects(keys: readonly string[]): Promise<void> {
+    for (const key of keys) {
+      try {
+        await this.storage.deleteObject(key);
+      } catch (error) {
+        this.logger.warn(
+          `Object ${key} of an expired attempt could not be deleted: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      }
+    }
+  }
 
   async findConsent(
     consentId: string,
@@ -82,22 +125,23 @@ export class PrismaCaptureRepository implements CaptureRepository {
   createSession(
     input: CreateCaptureSessionInput,
   ): Promise<CaptureSessionRecord> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.transact(async (tx, expiredKeys) => {
       // Fixed order (consent, then device) so two creators cannot deadlock.
       await lock(tx, `capture-consent:${input.consentId}`);
       await lock(tx, `capture-device:${input.deviceCode}`);
 
-      await tx.capture_sessions.updateMany({
-        where: {
-          status: { in: OPEN },
-          created_at: { lt: input.expireCreatedBefore },
-          OR: [
-            { consent_id: input.consentId },
-            { device_code: input.deviceCode },
-          ],
-        },
-        data: expiredData(input.now),
-      });
+      expiredKeys.push(
+        ...(await expireStale(
+          tx,
+          {
+            OR: [
+              { consent_id: input.consentId },
+              { device_code: input.deviceCode },
+            ],
+          },
+          input,
+        )),
+      );
 
       const consent = await tx.consents.findUnique({
         where: { id: input.consentId },
@@ -149,54 +193,41 @@ export class PrismaCaptureRepository implements CaptureRepository {
     sessionId: string,
     window: ExpiryWindow,
   ): Promise<CaptureSessionRecord | undefined> {
-    await this.prisma.capture_sessions.updateMany({
-      where: {
-        id: sessionId,
-        status: { in: OPEN },
-        created_at: { lt: window.expireCreatedBefore },
-      },
-      data: expiredData(window.now),
+    return this.transact(async (tx, expiredKeys) => {
+      expiredKeys.push(...(await expireStale(tx, { id: sessionId }, window)));
+      const row = await tx.capture_sessions.findUnique({
+        where: { id: sessionId },
+        include: WITH_ATTEMPTS,
+      });
+      return row === null ? undefined : toSession(row);
     });
-    const row = await this.prisma.capture_sessions.findUnique({
-      where: { id: sessionId },
-      include: WITH_ATTEMPTS,
-    });
-    return row === null ? undefined : toSession(row);
   }
 
   async findOpenSessionForDevice(
     deviceCode: string,
     window: ExpiryWindow,
   ): Promise<CaptureSessionRecord | undefined> {
-    await this.prisma.capture_sessions.updateMany({
-      where: {
-        device_code: deviceCode,
-        status: { in: OPEN },
-        created_at: { lt: window.expireCreatedBefore },
-      },
-      data: expiredData(window.now),
+    return this.transact(async (tx, expiredKeys) => {
+      expiredKeys.push(
+        ...(await expireStale(tx, { device_code: deviceCode }, window)),
+      );
+      const row = await tx.capture_sessions.findFirst({
+        where: { device_code: deviceCode, status: { in: OPEN } },
+        orderBy: { created_at: 'desc' },
+        include: WITH_ATTEMPTS,
+      });
+      return row === null ? undefined : toSession(row);
     });
-    const row = await this.prisma.capture_sessions.findFirst({
-      where: { device_code: deviceCode, status: { in: OPEN } },
-      orderBy: { created_at: 'desc' },
-      include: WITH_ATTEMPTS,
-    });
-    return row === null ? undefined : toSession(row);
   }
 
   recordAttempt(input: RecordAttemptInput): Promise<RecordAttemptOutcome> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.transact(async (tx, expiredKeys) => {
       await lock(tx, `capture-session:${input.sessionId}`);
 
       // Persist expiry before deciding, so EXPIRED is committed with the refusal.
-      await tx.capture_sessions.updateMany({
-        where: {
-          id: input.sessionId,
-          status: { in: OPEN },
-          created_at: { lt: input.expireCreatedBefore },
-        },
-        data: expiredData(input.now),
-      });
+      expiredKeys.push(
+        ...(await expireStale(tx, { id: input.sessionId }, input)),
+      );
       const row = await tx.capture_sessions.findUnique({
         where: { id: input.sessionId },
         include: WITH_ATTEMPTS,
@@ -253,9 +284,15 @@ export class PrismaCaptureRepository implements CaptureRepository {
         },
       });
 
-      // No attempt is pending here (REVIEW_PENDING is refused above) and none is ACCEPTED.
+      // None is ACCEPTED here. Several attempts may be PENDING_REVIEW; the session fails
+      // only when every attempt is used and none is waiting for the staff.
+      const nonePending = !session.attempts.some(
+        (attempt) => attempt.result === 'PENDING_REVIEW',
+      );
       const exhausted =
-        input.result === 'REJECTED' && attemptNo >= input.maxAttempts;
+        input.result === 'REJECTED' &&
+        nonePending &&
+        attemptNo >= input.maxAttempts;
       await tx.capture_sessions.updateMany({
         where: { id: input.sessionId, status: { in: OPEN } },
         data: {
@@ -336,6 +373,21 @@ export class PrismaCaptureRepository implements CaptureRepository {
         throw captureErrors.precondition(CaptureReason.ATTEMPT_NOT_REVIEWABLE);
       }
 
+      // D-P-18: every Ring Item of the consent gets one active binding. An item that
+      // is already bound fails the whole complete (the transaction rolls back).
+      const consentItems = await tx.consent_ring_items.findMany({
+        where: { consent_id: session.consentId },
+        select: { ring_item_id: true },
+      });
+      const ringItemIds = consentItems.map((item) => item.ring_item_id);
+      const alreadyBound = await tx.source_bindings.findFirst({
+        where: { ring_item_id: { in: ringItemIds }, released_at: null },
+        select: { id: true },
+      });
+      if (alreadyBound !== null) {
+        throw captureErrors.precondition(CaptureReason.RING_ITEM_ALREADY_BOUND);
+      }
+
       const source = await tx.personalization_sources.create({
         data: {
           owner_customer_identity_id: consent.customer_identity_id,
@@ -365,6 +417,27 @@ export class PrismaCaptureRepository implements CaptureRepository {
         where: { id: session.consentId },
         data: { personalization_source_id: source.id },
       });
+      if (ringItemIds.length > 0) {
+        try {
+          await tx.source_bindings.createMany({
+            data: ringItemIds.map((ringItemId) => ({
+              order_id: session.orderId,
+              ring_item_id: ringItemId,
+              personalization_source_id: source.id,
+              binding_mode: session.sourcePlanMode,
+            })),
+          });
+        } catch (error: unknown) {
+          // A parallel complete on another session bound the same item first: the
+          // partial unique index (one active binding per item) rejects this one.
+          if (isUniqueViolation(error)) {
+            throw captureErrors.precondition(
+              CaptureReason.RING_ITEM_ALREADY_BOUND,
+            );
+          }
+          throw error;
+        }
+      }
 
       const rawOf = (id: string): unknown =>
         row.capture_attempts.find((attempt) => attempt.id === id)
@@ -390,7 +463,7 @@ export class PrismaCaptureRepository implements CaptureRepository {
           where: { id: attempt.id },
           data: {
             result: 'REJECTED',
-            failure_reason: 'STAFF_REJECTED',
+            failure_reason: 'NOT_SELECTED',
             metadata_json: rejectedMetadata(
               rawOf(attempt.id),
               input.staffUserId,
@@ -411,17 +484,11 @@ export class PrismaCaptureRepository implements CaptureRepository {
   rejectAttempt(
     input: RejectCaptureAttemptInput,
   ): Promise<RejectCaptureAttemptOutcome> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.transact(async (tx, expiredKeys) => {
       await lock(tx, `capture-session:${input.sessionId}`);
-      // Persist expiry first so EXPIRED is committed with the refusal.
-      await tx.capture_sessions.updateMany({
-        where: {
-          id: input.sessionId,
-          status: { in: OPEN },
-          created_at: { lt: input.expireCreatedBefore },
-        },
-        data: expiredData(input.now),
-      });
+      expiredKeys.push(
+        ...(await expireStale(tx, { id: input.sessionId }, input)),
+      );
       const row = await tx.capture_sessions.findUnique({
         where: { id: input.sessionId },
         include: WITH_ATTEMPTS,
@@ -484,6 +551,66 @@ export class PrismaCaptureRepository implements CaptureRepository {
       return { session: toSession(reloaded), previous };
     });
   }
+
+  closeSession(
+    input: CloseCaptureSessionInput,
+  ): Promise<CloseCaptureSessionOutcome> {
+    return this.transact(async (tx, expiredKeys) => {
+      await lock(tx, `capture-session:${input.sessionId}`);
+      expiredKeys.push(
+        ...(await expireStale(tx, { id: input.sessionId }, input)),
+      );
+      const row = await tx.capture_sessions.findUnique({
+        where: { id: input.sessionId },
+        include: WITH_ATTEMPTS,
+      });
+      if (row === null) {
+        throw captureErrors.notFound(CaptureReason.SESSION_NOT_FOUND);
+      }
+      const session = toSession(row);
+      if (session.status === 'CANCELLED') {
+        return { session, closed: false, rejected: [] };
+      }
+      if (!OPEN.includes(session.status)) {
+        throw captureErrors.precondition(CaptureReason.SESSION_NOT_OPEN);
+      }
+
+      const rejected = session.attempts.filter(
+        (attempt) => attempt.result === 'PENDING_REVIEW',
+      );
+      for (const attempt of rejected) {
+        const raw = row.capture_attempts.find(
+          (candidate) => candidate.id === attempt.id,
+        );
+        await tx.capture_attempts.update({
+          where: { id: attempt.id },
+          data: {
+            result: 'REJECTED',
+            failure_reason: 'NOT_SELECTED',
+            metadata_json: rejectedMetadata(
+              raw?.metadata_json,
+              input.staffUserId,
+              input.now,
+            ),
+          },
+        });
+      }
+      await tx.capture_sessions.update({
+        where: { id: session.id },
+        data: {
+          status: 'CANCELLED',
+          ended_at: input.now,
+          accepted_source_id: null,
+        },
+      });
+
+      const reloaded = await tx.capture_sessions.findUniqueOrThrow({
+        where: { id: session.id },
+        include: WITH_ATTEMPTS,
+      });
+      return { session: toSession(reloaded), closed: true, rejected };
+    });
+  }
 }
 
 /** Staff rejection: drops the image reference, records who and when. */
@@ -508,6 +635,92 @@ function rejectedMetadata(
 /** Serializes concurrent writers on one key until the transaction ends. */
 async function lock(tx: Tx, key: string): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+}
+
+type SessionFilter = NonNullable<
+  Parameters<Tx['capture_sessions']['findMany']>[0]
+>['where'];
+
+/** Prisma P2002: a unique index (here the one-active-binding-per-item index) refused the row. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2002'
+  );
+}
+
+/**
+ * Lazy expiry: open sessions created before the window become EXPIRED, and their
+ * PENDING_REVIEW attempts become REJECTED / EXPIRED in the same transaction. Returns
+ * the image keys the caller deletes after commit. Each session is handled under its
+ * `capture-session:{id}` lock (ids sorted, so two callers cannot deadlock).
+ */
+async function expireStale(
+  tx: Tx,
+  filter: SessionFilter,
+  window: ExpiryWindow,
+): Promise<string[]> {
+  const stale = await tx.capture_sessions.findMany({
+    where: {
+      AND: [
+        filter ?? {},
+        {
+          status: { in: OPEN },
+          created_at: { lt: window.expireCreatedBefore },
+        },
+      ],
+    },
+    select: { id: true },
+    orderBy: { id: 'asc' },
+  });
+  const keys: string[] = [];
+  for (const { id } of stale) {
+    await lock(tx, `capture-session:${id}`);
+    const row = await tx.capture_sessions.findFirst({
+      where: { id, status: { in: OPEN } },
+      include: WITH_ATTEMPTS,
+    });
+    if (row === null) {
+      continue;
+    }
+    for (const attempt of row.capture_attempts) {
+      if (attempt.result !== 'PENDING_REVIEW') {
+        continue;
+      }
+      const meta = metadataRecord(attempt.metadata_json);
+      if (typeof meta.imageKey === 'string') {
+        keys.push(meta.imageKey);
+      }
+      await tx.capture_attempts.update({
+        where: { id: attempt.id },
+        data: {
+          result: 'REJECTED',
+          failure_reason: 'EXPIRED',
+          metadata_json: {
+            ...withoutImage(meta),
+            rejectedAt: window.now.toISOString(),
+          },
+        },
+      });
+    }
+    await tx.capture_sessions.update({
+      where: { id },
+      data: expiredData(window.now),
+    });
+  }
+  return keys;
+}
+
+function withoutImage(meta: Record<string, unknown>): Record<string, unknown> {
+  const {
+    imageKey: _imageKey,
+    imageSha256: _imageSha256,
+    imageBytes: _imageBytes,
+    ...kept
+  } = meta;
+  return kept;
 }
 
 function expiredData(now: Date) {
@@ -541,6 +754,7 @@ function toAttempt(row: AttemptRow): CaptureAttemptRecord {
     id: row.id,
     attemptNo: row.attempt_no,
     result: row.result,
+    failureReason: row.failure_reason,
     qualityScore: row.quality_score === null ? null : Number(row.quality_score),
     qualityThresholdSnapshot:
       row.quality_threshold_snapshot === null

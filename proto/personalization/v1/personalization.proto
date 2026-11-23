@@ -22,6 +22,165 @@ service FingerprintCaptureService {
   // PERSO-026 / PERSO-027: the capture staff reviews each PENDING_REVIEW attempt.
   rpc GetCaptureAttemptImage (GetCaptureAttemptImageRequest) returns (CaptureAttemptImage);
   rpc RejectCaptureAttempt (RejectCaptureAttemptRequest) returns (CaptureSession);
+  // PERSO-028 / PERSO-029 (2026-11-17): ask the device for another scan, or end without picking.
+  rpc NextCaptureAttempt (NextCaptureAttemptRequest) returns (CaptureSession);
+  rpc CloseCaptureSession (CloseCaptureSessionRequest) returns (CaptureSession);
+}
+
+// PERSO-011 (approved 2026-11-19). The Gateway checks DESIGN_SUBMIT_OWN and fills `actor`;
+// Operations checks that the caller owns the order. Never returns keys, checksums or metadata.
+service PersonalizationSourceService {
+  rpc ListOrderSources (ListOrderSourcesRequest) returns (ListOrderSourcesResponse);
+  // PERSO-012 (approved 2026-11-19). Owner only; a foreign, missing or DELETED source is NOT_FOUND.
+  rpc GetSourceProcessing (GetSourceProcessingRequest) returns (SourceProcessing);
+  // PERSO-032..034 (approved 2026-11-23). Owner only; foreign, missing or DELETED is NOT_FOUND; not a READY SOUNDWAVE is ALREADY_EXISTS (SOURCE_NOT_READY).
+  rpc GetSoundwaveWavecode (GetSoundwaveWavecodeRequest) returns (SoundwaveWavecode);
+  // ALREADY_EXISTS WAVECODE_STYLE_LOCKED after accept; UNAVAILABLE PROCESSING_WORKER_UNAVAILABLE when the worker is needed and down.
+  rpc SelectWavecodeStyle (SelectWavecodeStyleRequest) returns (SoundwaveWavecode);
+  rpc AcceptWavecodeStyle (AcceptWavecodeStyleRequest) returns (SoundwaveWavecode);
+  // PERSO-035 (approved 2026-11-23). Pick another 3 s segment without re-uploading; the source goes back to ACCEPTED and is processed again.
+  rpc ResegmentSoundwaveSource (ResegmentSoundwaveSourceRequest) returns (SoundwaveWavecode);
+  // PERSO-036..039 (approved 2026-11-23): fingerprint artwork design. ListFingerprintFrames is a public read without actor.
+  // Reasons: NOT_FOUND SOURCE_NOT_FOUND / VERSION_NOT_FOUND; ALREADY_EXISTS SOURCE_NOT_READY / ARTWORK_LOCKED / ARTWORK_NOT_EDITABLE / ARTWORK_VERSION_LIMIT_REACHED;
+  // INVALID_ARGUMENT ERASE_AREA_TOO_LARGE / FRAME_COVERAGE_TOO_LOW (answered 422); UNAVAILABLE PROCESSING_WORKER_UNAVAILABLE.
+  rpc ListFingerprintFrames (ListFingerprintFramesRequest) returns (ListFingerprintFramesResponse);
+  rpc GetFingerprintArtwork (GetFingerprintArtworkRequest) returns (FingerprintArtwork);
+  rpc CreateFingerprintCrop (CreateFingerprintCropRequest) returns (FingerprintArtwork);
+  rpc AcceptFingerprintArtwork (AcceptFingerprintArtworkRequest) returns (FingerprintArtwork);
+}
+
+message ListFingerprintFramesRequest {}
+
+message FingerprintFrame {
+  // NATURAL | CIRCLE | HEART | SQUARE
+  string code = 1;
+  string name = 2;
+  string description = 3;
+  string sample_svg = 4;
+}
+
+message ListFingerprintFramesResponse {
+  string default_shape = 1;
+  repeated FingerprintFrame shapes = 2;
+}
+
+message GetFingerprintArtworkRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+}
+
+message ErasePoint {
+  // 0..1
+  double x = 1;
+  double y = 2;
+}
+
+message EraseStroke {
+  // 0.005..0.1
+  double radius = 1;
+  // 1..200 points
+  repeated ErasePoint points = 2;
+}
+
+message CreateFingerprintCropRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  string shape = 3;
+  // -1..1
+  double offset_x = 4;
+  double offset_y = 5;
+  // 1..3
+  double zoom = 6;
+  // at most 50 strokes
+  repeated EraseStroke erase_strokes = 7;
+}
+
+message AcceptFingerprintArtworkRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  string version_id = 3;
+}
+
+// Never carries object keys, checksums, hulls or erase strokes.
+message FingerprintArtworkVersion {
+  string version_id = 1;
+  string shape = 2;
+  double offset_x = 3;
+  double offset_y = 4;
+  double zoom = 5;
+  double erased_ratio = 6;
+  double min_engrave_size_mm = 7;
+  double coverage = 8;
+  // ISO-8601 UTC.
+  string created_at = 9;
+  // 300 s presigned GET URLs; credentials, never log them.
+  optional string preview_svg_url = 10;
+  optional string preview_png_url = 11;
+}
+
+message FingerprintArtwork {
+  // PENDING | ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 1;
+  optional string failure_code = 2;
+  // 300 s presigned GET URL; unset once a version is accepted (the base image is deleted).
+  optional string base_image_url = 3;
+  optional string current_version_id = 4;
+  optional string accepted_version_id = 5;
+  repeated FingerprintArtworkVersion versions = 6;
+}
+
+message ResegmentSoundwaveSourceRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  // >= 0; segment_start_ms + 3000 <= audio duration.
+  int32 segment_start_ms = 3;
+  // CLASSIC | HAIRLINE | OSCILLOSCOPE. Unset or empty keeps the current style.
+  optional string wavecode_style = 4;
+}
+
+message GetSoundwaveWavecodeRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+}
+
+message SelectWavecodeStyleRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  // CLASSIC | HAIRLINE | OSCILLOSCOPE
+  string style = 3;
+}
+
+message AcceptWavecodeStyleRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  // Unset or empty means the current style.
+  optional string style = 3;
+}
+
+message WavecodeStyleState {
+  string code = 1;
+  string name = 2;
+  bool generated = 3;
+  // 300 s presigned GET URLs; credentials, never log them. Unset unless generated.
+  optional string preview_svg_url = 4;
+  optional string preview_png_url = 5;
+}
+
+// Never carries object keys or checksums.
+message SoundwaveWavecode {
+  string current_style = 1;
+  optional string accepted_style = 2;
+  repeated WavecodeStyleState styles = 3;
+  // PENDING | ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 4;
+  optional string failure_code = 5;
+  // Worker-measured duration when known, else the declared one.
+  optional int32 duration_ms = 6;
+  optional int32 segment_start_ms = 7;
+  int32 segment_duration_ms = 8;
+  // 300 s presigned GET URLs; credentials, never log them.
+  optional string raw_audio_url = 9;
+  optional string segment_audio_url = 10;
 }
 
 message Consent {
@@ -71,6 +230,8 @@ message CaptureAttemptSummary {
   string attempted_at = 4;
   // PASS | LOW_QUALITY: threshold suggestion only; the staff decides.
   optional string suggestion = 5;
+  // Only for REJECTED / ERROR: CAPTURE_FAILED | STAFF_REJECTED | NOT_SELECTED | EXPIRED.
+  optional string failure_reason = 6;
 }
 
 message CaptureSession {
@@ -128,4 +289,128 @@ message RejectCaptureAttemptRequest {
   memora.common.v1.VerifiedActor actor = 1;
   string session_id = 2;
   int32 attempt_no = 3;
+}
+
+message NextCaptureAttemptRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string session_id = 2;
+}
+
+message CloseCaptureSessionRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string session_id = 2;
+}
+
+message PersonalizationSource {
+  string source_id = 1;
+  // FINGERPRINT | SOUNDWAVE
+  string source_type = 2;
+  // PENDING | ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 3;
+  // From metadata_json.failureCode; unset until a processing job records one.
+  optional string failure_code = 4;
+  // ISO-8601 UTC; unset while not accepted.
+  optional string accepted_at = 5;
+  // Ring Items of the order with an active binding to this source.
+  repeated string ring_item_ids = 6;
+  // N/A | SHARED | SEPARATE; unset while the source has no active binding.
+  optional string binding_mode = 7;
+}
+
+message ListOrderSourcesRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+}
+
+message ListOrderSourcesResponse {
+  repeated PersonalizationSource items = 1;
+}
+
+message GetSourceProcessingRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+}
+
+// Never carries object keys, checksums, artwork or wavecode.
+message SourceProcessing {
+  string source_id = 1;
+  // FINGERPRINT | SOUNDWAVE
+  string source_type = 2;
+  // ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 3;
+  optional string failure_code = 4;
+  // ISO-8601 UTC; unset until the job starts.
+  optional string started_at = 5;
+  // ISO-8601 UTC; unset until READY or PROCESSING_FAILED.
+  optional string finished_at = 6;
+}
+
+// PERSO-009 / PERSO-010 (approved 2026-11-19). The Gateway checks SOURCE_AUDIO_UPLOAD_OWN and fills `actor`.
+// The response never carries object keys, checksums or metadata; `upload_url` is a credential, never log it.
+service SoundwaveUploadService {
+  rpc InitiateSoundwaveUpload (InitiateSoundwaveUploadRequest) returns (InitiateSoundwaveUploadResponse);
+  rpc CompleteSoundwaveUpload (CompleteSoundwaveUploadRequest) returns (CompleteSoundwaveUploadResponse);
+  // PERSO-031 (approved 2026-11-23). Public read, no actor. Operations asks the processing worker and caches the answer.
+  rpc ListSoundwaveStyles (ListSoundwaveStylesRequest) returns (ListSoundwaveStylesResponse);
+}
+
+message InitiateSoundwaveUploadRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string consent_id = 3;
+  // audio/wav | audio/mpeg | audio/mp4 | audio/aac
+  string content_type = 4;
+  // 1..10485760
+  int32 size_bytes = 5;
+  // 64 hex characters.
+  string sha256 = 6;
+  // UPLOAD | IN_APP_RECORDING
+  string origin = 7;
+  // 3000..30000, measured by the client.
+  int32 duration_ms = 8;
+}
+
+message InitiateSoundwaveUploadResponse {
+  // The new personalization source id.
+  string upload_id = 1;
+  string upload_url = 2;
+  map<string, string> upload_headers = 3;
+  // ISO-8601 UTC.
+  string expires_at = 4;
+}
+
+message CompleteSoundwaveUploadRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string order_id = 2;
+  string upload_id = 3;
+  // >= 0 and segment_start_ms + 3000 <= duration_ms.
+  int32 segment_start_ms = 4;
+  // CLASSIC | HAIRLINE | OSCILLOSCOPE. Unset or empty means CLASSIC. Stored in metadata_json.
+  optional string wavecode_style = 5;
+}
+
+message ListSoundwaveStylesRequest {}
+
+message SoundwaveStyle {
+  // CLASSIC | HAIRLINE | OSCILLOSCOPE
+  string code = 1;
+  string name = 2;
+  string description = 3;
+  // BAR_HEIGHT | PEAK_HEIGHT
+  string decoder = 4;
+  // Small preview SVG supplied by the worker.
+  string sample_svg = 5;
+}
+
+message ListSoundwaveStylesResponse {
+  string default_style = 1;
+  repeated SoundwaveStyle styles = 2;
+}
+
+message CompleteSoundwaveUploadResponse {
+  string source_id = 1;
+  // SOUNDWAVE
+  string source_type = 2;
+  // ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 3;
 }

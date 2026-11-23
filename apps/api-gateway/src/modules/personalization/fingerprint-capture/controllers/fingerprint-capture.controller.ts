@@ -20,10 +20,12 @@ import { CurrentUser } from '../../../../common/decorators/current-user.decorato
 import { toVerifiedActor } from '../../../../common/grpc/verified-actor';
 import { PersonalizationGrpcClient } from '../../clients/personalization-grpc.client';
 import {
+  ApiCloseCaptureSessionDocs,
   ApiCompleteCaptureSessionDocs,
   ApiCreateCaptureSessionDocs,
   ApiGetCaptureAttemptImageDocs,
   ApiGetCaptureSessionDocs,
+  ApiNextCaptureAttemptDocs,
   ApiRejectCaptureAttemptDocs,
 } from '../docs/fingerprint-capture.swagger';
 import type { CaptureAttemptImageResponseDto } from '../dto/capture-attempt-image.response.dto';
@@ -144,6 +146,36 @@ export class FingerprintCaptureController {
       actor: toVerifiedActor(principal),
       sessionId,
       attemptNo,
+    });
+    return toCaptureSessionResponse(session);
+  }
+
+  // [PERSO-028] POST /api/v1/fingerprint/capture-sessions/:sessionId/next-attempt
+  @Post('fingerprint/capture-sessions/:sessionId/next-attempt')
+  @HttpCode(HttpStatus.OK)
+  @ApiNextCaptureAttemptDocs()
+  async nextCaptureAttempt(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+  ): Promise<CaptureSessionResponseDto> {
+    const session = await this.personalizationClient.nextCaptureAttempt({
+      actor: toVerifiedActor(principal),
+      sessionId,
+    });
+    return toCaptureSessionResponse(session);
+  }
+
+  // [PERSO-029] POST /api/v1/fingerprint/capture-sessions/:sessionId/close
+  @Post('fingerprint/capture-sessions/:sessionId/close')
+  @HttpCode(HttpStatus.OK)
+  @ApiCloseCaptureSessionDocs()
+  async closeCaptureSession(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+  ): Promise<CaptureSessionResponseDto> {
+    const session = await this.personalizationClient.closeCaptureSession({
+      actor: toVerifiedActor(principal),
+      sessionId,
     });
     return toCaptureSessionResponse(session);
   }

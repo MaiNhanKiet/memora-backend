@@ -1,14 +1,18 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  type GetObjectCommandOutput,
   PutObjectCommand,
   S3Client,
+  S3ServiceException,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import type {
-  ObjectStoragePort,
-  PresignedUrl,
-  PresignGetOptions,
+import {
+  ObjectTooLargeError,
+  type ObjectStoragePort,
+  type PresignedUrl,
+  type PresignGetOptions,
+  type PresignPutOptions,
 } from '../object-storage.port';
 
 export interface S3ObjectStorageConfig {
@@ -93,4 +97,61 @@ export class S3ObjectStorageAdapter implements ObjectStoragePort {
     );
     return { url, expiresAt };
   }
+
+  async presignPut(
+    key: string,
+    options: PresignPutOptions,
+  ): Promise<PresignedUrl> {
+    const expiresAt = new Date(Date.now() + options.expiresInSeconds * 1000);
+    const url = await getSignedUrl(
+      this.signer,
+      new PutObjectCommand({
+        Bucket: this.config.bucket,
+        Key: key,
+        ContentType: options.contentType,
+        ContentLength: options.contentLength,
+      }),
+      {
+        expiresIn: options.expiresInSeconds,
+        // The SDK presigner leaves Content-Type unsigned unless it is listed here.
+        signableHeaders: new Set(['content-type', 'content-length']),
+      },
+    );
+    return { url, expiresAt };
+  }
+
+  async getObject(
+    key: string,
+    maxBytes: number,
+  ): Promise<Uint8Array | undefined> {
+    let output: GetObjectCommandOutput;
+    try {
+      output = await this.client.send(
+        new GetObjectCommand({ Bucket: this.config.bucket, Key: key }),
+      );
+    } catch (error: unknown) {
+      if (isMissingObject(error)) {
+        return undefined;
+      }
+      throw error;
+    }
+    if (output.ContentLength !== undefined && output.ContentLength > maxBytes) {
+      throw new ObjectTooLargeError(maxBytes);
+    }
+    if (output.Body === undefined) {
+      return undefined;
+    }
+    const bytes = await output.Body.transformToByteArray();
+    if (bytes.byteLength > maxBytes) {
+      throw new ObjectTooLargeError(maxBytes);
+    }
+    return bytes;
+  }
+}
+
+function isMissingObject(error: unknown): boolean {
+  return (
+    error instanceof S3ServiceException &&
+    (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)
+  );
 }

@@ -90,6 +90,9 @@ export class RecordCaptureAttemptUseCase {
     if (evaluation.kind === 'REFUSED') {
       return { result: refused(message, evaluation.reason) };
     }
+    if (session === undefined) {
+      return { result: refused(message, 'SESSION_NOT_FOUND') };
+    }
     if (evaluation.kind === 'REPLAY') {
       // QoS 1 redelivery: answer with the recorded attempt, record nothing.
       return {
@@ -117,7 +120,12 @@ export class RecordCaptureAttemptUseCase {
       if (!isBmp(bytes)) {
         return { result: refused(message, 'INVALID_MESSAGE') };
       }
-      upload = await this.upload(message.sessionId, attemptId, bytes);
+      upload = await this.upload(
+        session.orderId,
+        message.sessionId,
+        attemptId,
+        bytes,
+      );
     }
 
     let outcome: RecordAttemptOutcome;
@@ -159,11 +167,12 @@ export class RecordCaptureAttemptUseCase {
   }
 
   private async upload(
+    orderId: string,
     sessionId: string,
     attemptId: string,
     bytes: Buffer,
   ): Promise<UploadedImage> {
-    const key = `personalization/fingerprint/raw/${sessionId}/${attemptId}`;
+    const key = fingerprintAttemptKey(orderId, sessionId, attemptId);
     const sha256 = createHash('sha256').update(bytes).digest('hex');
     await this.storage.putObject(
       key,
@@ -192,6 +201,19 @@ interface UploadedImage {
   readonly key: string;
   readonly sha256: string;
   readonly bytes: number;
+}
+
+/**
+ * Raw AS608 image key. The attempt number is assigned inside the `capture-session` lock
+ * after the upload, so it is neither known nor unique here; the attempt id is. The key
+ * is order/session scoped.
+ */
+export function fingerprintAttemptKey(
+  orderId: string,
+  sessionId: string,
+  attemptId: string,
+): string {
+  return `personalization/fingerprint/${orderId}/sessions/${sessionId}/attempt-${attemptId}.bmp`;
 }
 
 /** BMP magic `BM` and the little-endian file size at offset 2 equal to the byte length. */
