@@ -19,7 +19,25 @@ import {
 import {
   PERSONALIZATION_CONSENT_SERVICE_NAME,
   PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
+  PERSONALIZATION_SOUNDWAVE_UPLOAD_SERVICE_NAME,
+  PERSONALIZATION_SOURCE_SERVICE_NAME,
   type AcceptConsentRequest,
+  type CompleteSoundwaveUploadRequest,
+  type CompleteSoundwaveUploadResponse,
+  type InitiateSoundwaveUploadRequest,
+  type InitiateSoundwaveUploadResponse,
+  type ListSoundwaveStylesResponse,
+  type SoundwaveUploadServiceClient,
+  type AcceptWavecodeStyleRequest,
+  type AcceptFingerprintArtworkRequest,
+  type CreateFingerprintCropRequest,
+  type FingerprintArtwork,
+  type GetFingerprintArtworkRequest,
+  type ListFingerprintFramesResponse,
+  type GetSoundwaveWavecodeRequest,
+  type ResegmentSoundwaveSourceRequest,
+  type SelectWavecodeStyleRequest,
+  type SoundwaveWavecode,
   type CaptureAttemptImage,
   type CaptureSession,
   type CloseCaptureSessionRequest,
@@ -28,13 +46,18 @@ import {
   type CreateCaptureSessionRequest,
   type GetCaptureAttemptImageRequest,
   type GetCaptureSessionRequest,
+  type GetSourceProcessingRequest,
   type ListConsentsRequest,
+  type ListOrderSourcesRequest,
+  type ListOrderSourcesResponse,
   type ListConsentsResponse,
   type NextCaptureAttemptRequest,
   type PersonalizationConsentServiceClient,
   type PersonalizationFingerprintCaptureServiceClient,
+  type PersonalizationSourceServiceClient,
   type RejectCaptureAttemptRequest,
   type RevokeConsentRequest,
+  type SourceProcessing,
 } from '@app/contracts';
 import { DomainGrpcClient } from '../../../common/grpc/domain-grpc';
 
@@ -42,6 +65,16 @@ export const OPERATIONS_PERSONALIZATION_GRPC_CLIENT =
   'OPERATIONS_PERSONALIZATION_GRPC_CLIENT';
 
 const FAILED_PRECONDITION_MESSAGE = 'Failed precondition';
+/** PERSO-010: the uploaded object failed verification. Sent as INVALID_ARGUMENT, answered 422. */
+const UPLOAD_INVALID_REASON = 'UPLOAD_INVALID';
+/** PERSO-038: the worker refused the crop. Sent as INVALID_ARGUMENT, answered 422. */
+const UNPROCESSABLE_REASONS: readonly string[] = [
+  UPLOAD_INVALID_REASON,
+  'ERASE_AREA_TOO_LARGE',
+  'FRAME_COVERAGE_TOO_LOW',
+];
+/** PERSO-031: no style list from the worker and nothing cached. Answered 503 with this reason. */
+const WORKER_UNAVAILABLE_REASON = 'PROCESSING_WORKER_UNAVAILABLE';
 
 /**
  * Gateway client for `memora.personalization.v1.ConsentService` and
@@ -56,6 +89,8 @@ export class PersonalizationGrpcClient
 {
   private consentService!: PersonalizationConsentServiceClient;
   private captureService!: PersonalizationFingerprintCaptureServiceClient;
+  private sourceService!: PersonalizationSourceServiceClient;
+  private soundwaveUploadService!: SoundwaveUploadServiceClient;
 
   constructor(
     @Inject(OPERATIONS_PERSONALIZATION_GRPC_CLIENT)
@@ -75,6 +110,14 @@ export class PersonalizationGrpcClient
     this.captureService =
       this.grpcClient.getService<PersonalizationFingerprintCaptureServiceClient>(
         PERSONALIZATION_FINGERPRINT_CAPTURE_SERVICE_NAME,
+      );
+    this.sourceService =
+      this.grpcClient.getService<PersonalizationSourceServiceClient>(
+        PERSONALIZATION_SOURCE_SERVICE_NAME,
+      );
+    this.soundwaveUploadService =
+      this.grpcClient.getService<SoundwaveUploadServiceClient>(
+        PERSONALIZATION_SOUNDWAVE_UPLOAD_SERVICE_NAME,
       );
   }
 
@@ -152,6 +195,108 @@ export class PersonalizationGrpcClient
     );
   }
 
+  listOrderSources(
+    request: ListOrderSourcesRequest,
+  ): Promise<ListOrderSourcesResponse> {
+    return this.unary((metadata) =>
+      this.sourceService.listOrderSources(request, metadata),
+    );
+  }
+
+  getSourceProcessing(
+    request: GetSourceProcessingRequest,
+  ): Promise<SourceProcessing> {
+    return this.unary((metadata) =>
+      this.sourceService.getSourceProcessing(request, metadata),
+    );
+  }
+
+  getSoundwaveWavecode(
+    request: GetSoundwaveWavecodeRequest,
+  ): Promise<SoundwaveWavecode> {
+    return this.unary((metadata) =>
+      this.sourceService.getSoundwaveWavecode(request, metadata),
+    );
+  }
+
+  selectWavecodeStyle(
+    request: SelectWavecodeStyleRequest,
+  ): Promise<SoundwaveWavecode> {
+    return this.unary((metadata) =>
+      this.sourceService.selectWavecodeStyle(request, metadata),
+    );
+  }
+
+  acceptWavecodeStyle(
+    request: AcceptWavecodeStyleRequest,
+  ): Promise<SoundwaveWavecode> {
+    return this.unary((metadata) =>
+      this.sourceService.acceptWavecodeStyle(request, metadata),
+    );
+  }
+
+  listFingerprintFrames(): Promise<ListFingerprintFramesResponse> {
+    return this.unary((metadata) =>
+      this.sourceService.listFingerprintFrames({}, metadata),
+    );
+  }
+
+  getFingerprintArtwork(
+    request: GetFingerprintArtworkRequest,
+  ): Promise<FingerprintArtwork> {
+    return this.unary((metadata) =>
+      this.sourceService.getFingerprintArtwork(request, metadata),
+    );
+  }
+
+  createFingerprintCrop(
+    request: CreateFingerprintCropRequest,
+  ): Promise<FingerprintArtwork> {
+    return this.unary((metadata) =>
+      this.sourceService.createFingerprintCrop(request, metadata),
+    );
+  }
+
+  acceptFingerprintArtwork(
+    request: AcceptFingerprintArtworkRequest,
+  ): Promise<FingerprintArtwork> {
+    return this.unary((metadata) =>
+      this.sourceService.acceptFingerprintArtwork(request, metadata),
+    );
+  }
+
+  resegmentSoundwaveSource(
+    request: ResegmentSoundwaveSourceRequest,
+  ): Promise<SoundwaveWavecode> {
+    return this.unary((metadata) =>
+      this.sourceService.resegmentSoundwaveSource(request, metadata),
+    );
+  }
+
+  initiateSoundwaveUpload(
+    request: InitiateSoundwaveUploadRequest,
+  ): Promise<InitiateSoundwaveUploadResponse> {
+    return this.unary((metadata) =>
+      this.soundwaveUploadService.initiateSoundwaveUpload(request, metadata),
+    );
+  }
+
+  completeSoundwaveUpload(
+    request: CompleteSoundwaveUploadRequest,
+  ): Promise<CompleteSoundwaveUploadResponse> {
+    return this.unary((metadata) =>
+      this.soundwaveUploadService.completeSoundwaveUpload(request, metadata),
+    );
+  }
+
+  listSoundwaveStyles(
+    request: Record<string, never>,
+  ): Promise<ListSoundwaveStylesResponse> {
+    return this.unary((metadata) =>
+      this.soundwaveUploadService.listSoundwaveStyles(request, metadata),
+    );
+  }
+
   /**
    * Consent and capture contract: FAILED_PRECONDITION and ALREADY_EXISTS are 409 (the shared
    * mapper turns FAILED_PRECONDITION into 412), deadline is 503. The Operations
@@ -173,6 +318,18 @@ export class PersonalizationGrpcClient
     if (grpcStatus === GrpcStatus.DEADLINE_EXCEEDED) {
       return unavailable();
     }
+    if (
+      grpcStatus === GrpcStatus.INVALID_ARGUMENT &&
+      UNPROCESSABLE_REASONS.includes(readReason(error))
+    ) {
+      return unprocessable(readReason(error));
+    }
+    if (
+      grpcStatus === GrpcStatus.UNAVAILABLE &&
+      readReason(error) === WORKER_UNAVAILABLE_REASON
+    ) {
+      return unavailable(WORKER_UNAVAILABLE_REASON);
+    }
     if (grpcStatus === GrpcStatus.FAILED_PRECONDITION) {
       return conflict(readReason(error));
     }
@@ -180,15 +337,26 @@ export class PersonalizationGrpcClient
   }
 }
 
-function unavailable(): HttpException {
+function unavailable(message?: string): HttpException {
   const mapped = mapGrpcError({ code: GrpcStatus.UNAVAILABLE });
   return new HttpException(
     {
       statusCode: HttpStatus.SERVICE_UNAVAILABLE,
       code: mapped.code,
-      message: mapped.message,
+      message: message ?? mapped.message,
     },
     HttpStatus.SERVICE_UNAVAILABLE,
+  );
+}
+
+function unprocessable(message: string): HttpException {
+  return new HttpException(
+    {
+      statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      code: ERROR_CODES.BAD_REQUEST,
+      message,
+    },
+    HttpStatus.UNPROCESSABLE_ENTITY,
   );
 }
 

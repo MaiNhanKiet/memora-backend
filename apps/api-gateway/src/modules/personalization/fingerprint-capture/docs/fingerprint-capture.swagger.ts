@@ -77,7 +77,7 @@ export function ApiCompleteCaptureSessionDocs() {
     ...commonErrors(
       'Validation failed (attemptNo must be an integer 1..3)',
       'Message carries the reason: SESSION_NOT_FOUND, ATTEMPT_NOT_FOUND',
-      'Message carries the reason: ATTEMPT_NOT_REVIEWABLE, SESSION_NOT_OPEN, SESSION_EXPIRED, CONSENT_NOT_ACCEPTED',
+      'Message carries the reason: ATTEMPT_NOT_REVIEWABLE, SESSION_NOT_OPEN, SESSION_EXPIRED, CONSENT_NOT_ACCEPTED, RING_ITEM_ALREADY_BOUND',
     ),
     ApiSuccessResponse({
       type: CaptureSessionResponseDto,

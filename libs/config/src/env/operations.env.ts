@@ -144,6 +144,14 @@ export class OperationsEnvironment extends NodeEnvironment {
   @Max(3600)
   OPERATIONS_CAPTURE_SESSION_TTL_SECONDS!: number;
 
+  // Soundwave upload (PERSO-009): lifetime of the presigned PUT URL.
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => parseEnvNumber(value))
+  @IsInt()
+  @Min(60)
+  @Max(3600)
+  OPERATIONS_SOUNDWAVE_UPLOAD_TTL_SECONDS!: number;
+
   // No production default: startup fails when unset outside development.
   @Expose()
   @Transform(({ value }: { value: unknown }) => parseEnvNumber(value))
@@ -224,6 +232,22 @@ export class OperationsEnvironment extends NodeEnvironment {
   @IsString()
   @MinLength(1)
   OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY?: string;
+
+  // Python processing worker (PERSO-013, D-P-19). Optional in development: unset makes
+  // every processing job fail as transient (the source stays retryable until retries run out).
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf(presentOrRequired('OPERATIONS_PROCESSING_WORKER_URL'))
+  @IsString()
+  @Matches(HTTP_URL_PATTERN, { message: 'must be an absolute http(s) URL' })
+  OPERATIONS_PROCESSING_WORKER_URL?: string;
+
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf(presentOrRequired('OPERATIONS_PROCESSING_WORKER_SECRET'))
+  @IsString()
+  @MinLength(16)
+  OPERATIONS_PROCESSING_WORKER_SECRET?: string;
 }
 
 export interface OperationsEnv {
@@ -240,6 +264,7 @@ export interface OperationsEnv {
   OPERATIONS_CAPTURE_SESSION_TTL_SECONDS: number;
   OPERATIONS_CAPTURE_QUALITY_THRESHOLD: number;
   OPERATIONS_CAPTURE_DEVICE_CODES: string[];
+  OPERATIONS_SOUNDWAVE_UPLOAD_TTL_SECONDS: number;
   OPERATIONS_MQTT_URL: string | undefined;
   OPERATIONS_MQTT_USERNAME: string | undefined;
   OPERATIONS_MQTT_PASSWORD: string | undefined;
@@ -249,6 +274,8 @@ export interface OperationsEnv {
   OPERATIONS_OBJECT_STORAGE_BUCKET: string | undefined;
   OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID: string | undefined;
   OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY: string | undefined;
+  OPERATIONS_PROCESSING_WORKER_URL: string | undefined;
+  OPERATIONS_PROCESSING_WORKER_SECRET: string | undefined;
 }
 
 export function validateOperationsEnv(
@@ -271,12 +298,17 @@ export function validateOperationsEnv(
       source.OPERATIONS_CAPTURE_SESSION_TTL_SECONDS,
       '900',
     ),
+    OPERATIONS_SOUNDWAVE_UPLOAD_TTL_SECONDS: defaultText(
+      source.OPERATIONS_SOUNDWAVE_UPLOAD_TTL_SECONDS,
+      '600',
+    ),
     OPERATIONS_CAPTURE_QUALITY_THRESHOLD:
       source.NODE_ENV === 'development'
         ? defaultText(source.OPERATIONS_CAPTURE_QUALITY_THRESHOLD, '50')
         : source.OPERATIONS_CAPTURE_QUALITY_THRESHOLD,
   });
   assertMqttCredentialsTogether(validated);
+  assertProcessingWorkerTogether(validated);
   assertOperationsDatabaseUrl(
     validated.OPERATIONS_DATABASE_URL,
     validated.NODE_ENV,
@@ -298,6 +330,8 @@ export function validateOperationsEnv(
     OPERATIONS_CAPTURE_QUALITY_THRESHOLD:
       validated.OPERATIONS_CAPTURE_QUALITY_THRESHOLD,
     OPERATIONS_CAPTURE_DEVICE_CODES: validated.OPERATIONS_CAPTURE_DEVICE_CODES,
+    OPERATIONS_SOUNDWAVE_UPLOAD_TTL_SECONDS:
+      validated.OPERATIONS_SOUNDWAVE_UPLOAD_TTL_SECONDS,
     OPERATIONS_MQTT_URL: validated.OPERATIONS_MQTT_URL,
     OPERATIONS_MQTT_USERNAME: validated.OPERATIONS_MQTT_USERNAME,
     OPERATIONS_MQTT_PASSWORD: validated.OPERATIONS_MQTT_PASSWORD,
@@ -313,6 +347,10 @@ export function validateOperationsEnv(
       validated.OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID,
     OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY:
       validated.OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY,
+    OPERATIONS_PROCESSING_WORKER_URL:
+      validated.OPERATIONS_PROCESSING_WORKER_URL,
+    OPERATIONS_PROCESSING_WORKER_SECRET:
+      validated.OPERATIONS_PROCESSING_WORKER_SECRET,
   };
 }
 
@@ -326,6 +364,17 @@ function assertMqttCredentialsTogether(env: OperationsEnvironment): void {
   if (present !== 0 && present !== 3) {
     throw new Error(
       'Environment validation failed: OPERATIONS_MQTT_URL, OPERATIONS_MQTT_USERNAME and OPERATIONS_MQTT_PASSWORD must be set together',
+    );
+  }
+}
+
+/** In development the worker URL and secret are all-or-nothing. */
+function assertProcessingWorkerTogether(env: OperationsEnvironment): void {
+  const urlSet = env.OPERATIONS_PROCESSING_WORKER_URL !== undefined;
+  const secretSet = env.OPERATIONS_PROCESSING_WORKER_SECRET !== undefined;
+  if (urlSet !== secretSet) {
+    throw new Error(
+      'Environment validation failed: OPERATIONS_PROCESSING_WORKER_URL and OPERATIONS_PROCESSING_WORKER_SECRET must be set together',
     );
   }
 }
@@ -351,6 +400,7 @@ export const operationsConfig = registerAs('operations', () => {
     captureSessionTtlSeconds: env.OPERATIONS_CAPTURE_SESSION_TTL_SECONDS,
     captureQualityThreshold: env.OPERATIONS_CAPTURE_QUALITY_THRESHOLD,
     captureDeviceCodes: env.OPERATIONS_CAPTURE_DEVICE_CODES,
+    soundwaveUploadTtlSeconds: env.OPERATIONS_SOUNDWAVE_UPLOAD_TTL_SECONDS,
     mqttUrl: env.OPERATIONS_MQTT_URL,
     mqttUsername: env.OPERATIONS_MQTT_USERNAME,
     mqttPassword: env.OPERATIONS_MQTT_PASSWORD,
@@ -361,6 +411,8 @@ export const operationsConfig = registerAs('operations', () => {
     objectStorageAccessKeyId: env.OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID,
     objectStorageSecretAccessKey:
       env.OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY,
+    processingWorkerUrl: env.OPERATIONS_PROCESSING_WORKER_URL,
+    processingWorkerSecret: env.OPERATIONS_PROCESSING_WORKER_SECRET,
   };
 });
 
