@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../persistence/prisma/prisma.service';
-import type { memory_contents } from '../../../../../generated/prisma/client';
+import type {
+  Prisma,
+  memory_contents,
+} from '../../../../../generated/prisma/client';
 
 @Injectable()
 export class MemoryContentRepository {
@@ -56,7 +59,9 @@ export class MemoryContentRepository {
             sort_order: item.sortOrder,
             status: 'ACTIVE',
             created_by_customer_identity_id: customerIdentityId,
-            layout_json: item.layoutJson ? JSON.parse(item.layoutJson) : undefined,
+            layout_json: item.layoutJson
+              ? (JSON.parse(item.layoutJson) as Prisma.InputJsonValue)
+              : undefined,
           },
         });
         createdItems.push(created);

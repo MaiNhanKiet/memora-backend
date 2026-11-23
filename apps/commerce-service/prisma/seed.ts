@@ -214,9 +214,14 @@ async function main(): Promise<void> {
     // =========================================================================
     // 3. CATALOG: Ring Templates & 3D Gemstone Slots
     // =========================================================================
-    console.log('[commerce-seed] 3. Seeding Ring Templates & 3D Gemstone Slots...');
+    console.log(
+      '[commerce-seed] 3. Seeding Ring Templates & 3D Gemstone Slots...',
+    );
 
-    const base3DModelDir = resolve(__dirname, '../../../docs/duypq/3D RING MODEL');
+    const base3DModelDir = resolve(
+      __dirname,
+      '../../../docs/duypq/3D RING MODEL',
+    );
 
     interface ProductionRingTemplateDef {
       code: string;
@@ -303,21 +308,43 @@ async function main(): Promise<void> {
     console.log(`  - Ring Template T_TEST_BAND -> id=${testBand.id}`);
 
     // 3.2. Seed 5 Production 3D Ring Models từ JSON template
+    interface RawGemSlot {
+      slot: string;
+    }
+    interface RawTemplateJson {
+      engrave_surface?: {
+        boundary?: Prisma.InputJsonValue;
+        boundary_uv?: Prisma.InputJsonValue;
+        forbidden_zones?: Prisma.InputJsonValue;
+      };
+      packages?: Record<string, unknown>;
+      gems?: RawGemSlot[];
+    }
+
     for (const item of productionTemplates) {
-      const jsonPath = resolve(base3DModelDir, item.folderName, `${item.folderName}_template.json`);
-      let boundaryJson: any = null;
-      let forbiddenZonesJson: any = [];
+      const jsonPath = resolve(
+        base3DModelDir,
+        item.folderName,
+        `${item.folderName}_template.json`,
+      );
+      let boundaryJson: Prisma.InputJsonValue | null = null;
+      let forbiddenZonesJson: Prisma.InputJsonValue = [];
       let packages: string[] = ['NONE'];
-      let gemsList: any[] = [];
+      let gemsList: RawGemSlot[] = [];
       let stoneLayout = 'NONE';
 
       if (existsSync(jsonPath)) {
         try {
-          const raw = JSON.parse(readFileSync(jsonPath, 'utf8'));
-          boundaryJson = raw.engrave_surface?.boundary || raw.engrave_surface?.boundary_uv || null;
-          forbiddenZonesJson = raw.engrave_surface?.forbidden_zones || [];
+          const raw = JSON.parse(
+            readFileSync(jsonPath, 'utf8'),
+          ) as RawTemplateJson;
+          boundaryJson =
+            raw.engrave_surface?.boundary ??
+            raw.engrave_surface?.boundary_uv ??
+            null;
+          forbiddenZonesJson = raw.engrave_surface?.forbidden_zones ?? [];
           packages = raw.packages ? Object.keys(raw.packages) : ['NONE'];
-          gemsList = raw.gems || [];
+          gemsList = raw.gems ?? [];
           if (gemsList.length === 1) {
             stoneLayout = 'SOLITAIRE';
           } else if (gemsList.length > 1) {
@@ -359,7 +386,9 @@ async function main(): Promise<void> {
       });
 
       templateMap.set(item.code, row.id);
-      console.log(`  - Production Ring Template ${item.code} (Layout: ${stoneLayout}) -> id=${row.id}`);
+      console.log(
+        `  - Production Ring Template ${item.code} (Layout: ${stoneLayout}) -> id=${row.id}`,
+      );
 
       // Seed Gemstone Groups & Slots nếu mẫu có đính đá
       if (gemsList.length > 0) {
@@ -408,7 +437,9 @@ async function main(): Promise<void> {
             },
           });
         }
-        console.log(`    * Seeded ${gemsList.length} 3D gemstone slots for ${item.code}`);
+        console.log(
+          `    * Seeded ${gemsList.length} 3D gemstone slots for ${item.code}`,
+        );
       }
     }
 

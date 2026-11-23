@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { MemoryGrantService } from './memory-grant.service';
 import { MemoryGrantRepository } from '../infrastructure/memory-grant.repository';
 import { MemoryCardRepository } from '../../cards/infrastructure/memory-card.repository';
@@ -30,7 +30,9 @@ describe('MemoryGrantService', () => {
   };
 
   const mockStorageAdapter = {
-    presignGetUrl: jest.fn().mockResolvedValue('https://storage.memora.vn/sample.jpg'),
+    presignGetUrl: jest
+      .fn()
+      .mockResolvedValue('https://storage.memora.vn/sample.jpg'),
   };
 
   const mockPinHasher = {
@@ -166,7 +168,9 @@ describe('MemoryGrantService', () => {
 
       expect(res.cardId).toBe(sampleCard.id);
       expect(res.items.length).toBe(1);
-      expect(res.items[0].assetUrl).toBe('https://storage.memora.vn/sample.jpg');
+      expect(res.items[0].assetUrl).toBe(
+        'https://storage.memora.vn/sample.jpg',
+      );
       expect(mockGrantRepository.updateLastAccessed).toHaveBeenCalledWith(
         sampleGrant.id,
       );

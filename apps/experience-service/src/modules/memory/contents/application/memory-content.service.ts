@@ -12,6 +12,7 @@ import type {
   ListCardContentsRequest,
   ListCardContentsResponse,
   MemoryContentItem,
+  MemoryContentType,
   UpdateCardContentsRequest,
   UpdateCardContentsResponse,
 } from '@app/contracts';
@@ -80,7 +81,9 @@ export class MemoryContentService {
       }
 
       if (!request.pin) {
-        throw new BadRequestException('Mã PIN là bắt buộc để mở khóa nội dung thẻ');
+        throw new BadRequestException(
+          'Mã PIN là bắt buộc để mở khóa nội dung thẻ',
+        );
       }
 
       const isMatch = await this.pinHasher.verify(card.pin_hash, request.pin);
@@ -124,7 +127,7 @@ export class MemoryContentService {
         return {
           id: content.id,
           memoryCardId: content.memory_card_id,
-          contentType: content.content_type,
+          contentType: content.content_type as MemoryContentType,
           title: content.title ?? undefined,
           textContent: content.text_content ?? undefined,
           assetKey: content.asset_key ?? undefined,
@@ -204,7 +207,7 @@ export class MemoryContentService {
     const mappedItems: MemoryContentItem[] = saved.map((content) => ({
       id: content.id,
       memoryCardId: content.memory_card_id,
-      contentType: content.content_type,
+      contentType: content.content_type as MemoryContentType,
       title: content.title ?? undefined,
       textContent: content.text_content ?? undefined,
       assetKey: content.asset_key ?? undefined,
@@ -240,15 +243,20 @@ export class MemoryContentService {
     }
 
     if (request.fileSize <= 0 || request.fileSize > MAX_UPLOAD_FILE_SIZE) {
-      throw new BadRequestException('File size must be between 1 byte and 100MB');
+      throw new BadRequestException(
+        'File size must be between 1 byte and 100MB',
+      );
     }
 
     const cleanFileName = request.fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const randomHex = randomBytes(4).toString('hex');
     const key = `memories/${card.id}/${Date.now()}-${randomHex}/${cleanFileName}`;
 
-    const { uploadUrl, expiresAt } =
-      await this.storageAdapter.presignUploadUrl(key, request.contentType, 900);
+    const { uploadUrl, expiresAt } = await this.storageAdapter.presignUploadUrl(
+      key,
+      request.contentType,
+      900,
+    );
 
     return {
       uploadUrl,

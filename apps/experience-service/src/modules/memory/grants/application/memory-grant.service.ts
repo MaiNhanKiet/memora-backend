@@ -8,6 +8,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { parseVerifiedActor, requireCustomerIdentity } from '@app/common';
 import type {
   AccessGrantItem,
+  AccessGrantStatus,
   CreateAccessGrantRequest,
   CreateAccessGrantResponse,
   GetMemoryBySessionRequest,
@@ -15,6 +16,7 @@ import type {
   ListAccessGrantsRequest,
   ListAccessGrantsResponse,
   MemoryContentItem,
+  MemoryContentType,
   RedeemInvitationRequest,
   RedeemInvitationResponse,
   RevokeAccessGrantRequest,
@@ -95,7 +97,9 @@ export class MemoryGrantService {
       throw new NotFoundException('Memory card not found');
     }
     if (card.owner_customer_identity_id !== customerIdentityId) {
-      throw new ForbiddenException('Only the card owner can view access grants');
+      throw new ForbiddenException(
+        'Only the card owner can view access grants',
+      );
     }
 
     const grants = await this.grantRepository.listGrantsByCardId(card.id);
@@ -103,7 +107,7 @@ export class MemoryGrantService {
       id: g.id,
       memoryCardId: g.memory_card_id,
       granteeEmail: g.grantee_email,
-      status: g.status,
+      status: g.status as AccessGrantStatus,
       inviteExpiresAt: g.invite_expires_at?.toISOString(),
       acceptedAt: g.accepted_at?.toISOString(),
       lastAccessedAt: g.last_accessed_at?.toISOString(),
@@ -146,7 +150,10 @@ export class MemoryGrantService {
   async redeemInvitation(
     request: RedeemInvitationRequest,
   ): Promise<RedeemInvitationResponse> {
-    if (!request.invitationToken || request.invitationToken.trim().length === 0) {
+    if (
+      !request.invitationToken ||
+      request.invitationToken.trim().length === 0
+    ) {
       throw new BadRequestException('Mã mời không được để trống');
     }
 
@@ -236,7 +243,9 @@ export class MemoryGrantService {
       }
 
       if (!request.pin) {
-        throw new BadRequestException('Mã PIN là bắt buộc để xem nội dung kỷ niệm');
+        throw new BadRequestException(
+          'Mã PIN là bắt buộc để xem nội dung kỷ niệm',
+        );
       }
 
       const isMatch = await this.pinHasher.verify(card.pin_hash, request.pin);
@@ -280,7 +289,7 @@ export class MemoryGrantService {
         return {
           id: content.id,
           memoryCardId: content.memory_card_id,
-          contentType: content.content_type,
+          contentType: content.content_type as MemoryContentType,
           title: content.title ?? undefined,
           textContent: content.text_content ?? undefined,
           assetKey: content.asset_key ?? undefined,

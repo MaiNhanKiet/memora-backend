@@ -40,7 +40,7 @@ export interface MemoryCardSummary {
   ringItemId: string;
   ownerCustomerIdentityId: string;
   ownerEmail: string;
-  status: MemoryCardStatus | string;
+  status: MemoryCardStatus;
   hasPin: boolean;
   isLocked: boolean;
   lockedUntil?: string;
@@ -72,7 +72,7 @@ export interface MemoryCardDetailResponse {
   ringItemId: string;
   ownerCustomerIdentityId: string;
   ownerEmail: string;
-  status: MemoryCardStatus | string;
+  status: MemoryCardStatus;
   hasPin: boolean;
   isLocked: boolean;
   pinFailedAttempts: number;
@@ -151,7 +151,7 @@ export interface ResetPinResponse {
 export interface MemoryContentItem {
   id: string;
   memoryCardId: string;
-  contentType: MemoryContentType | string;
+  contentType: MemoryContentType;
   title?: string;
   textContent?: string;
   assetKey?: string;
@@ -176,7 +176,7 @@ export interface ListCardContentsResponse {
 
 export interface ContentItemInput {
   id?: string;
-  contentType: MemoryContentType | string;
+  contentType: MemoryContentType;
   title?: string;
   textContent?: string;
   assetKey?: string;
@@ -217,7 +217,7 @@ export interface AccessGrantItem {
   id: string;
   memoryCardId: string;
   granteeEmail: string;
-  status: AccessGrantStatus | string;
+  status: AccessGrantStatus;
   inviteExpiresAt?: string;
   acceptedAt?: string;
   lastAccessedAt?: string;
@@ -289,21 +289,43 @@ export interface GetMemoryBySessionResponse {
 
 export interface MemoryServiceHandler {
   listMyCards(request: ListMyCardsRequest): Promise<ListMyCardsResponse>;
-  getCardDetail(request: GetCardDetailRequest): Promise<MemoryCardDetailResponse>;
+  getCardDetail(
+    request: GetCardDetailRequest,
+  ): Promise<MemoryCardDetailResponse>;
   activateCard(request: ActivateCardRequest): Promise<MemoryCardDetailResponse>;
-  provisionMemoryCard(request: ProvisionMemoryCardRequest): Promise<MemoryCardDetailResponse>;
-  getCardByRingItemId(request: GetCardByRingItemIdRequest): Promise<MemoryCardDetailResponse>;
+  provisionMemoryCard(
+    request: ProvisionMemoryCardRequest,
+  ): Promise<MemoryCardDetailResponse>;
+  getCardByRingItemId(
+    request: GetCardByRingItemIdRequest,
+  ): Promise<MemoryCardDetailResponse>;
   setupPin(request: SetupPinRequest): Promise<SetupPinResponse>;
   changePin(request: ChangePinRequest): Promise<ChangePinResponse>;
   resetPin(request: ResetPinRequest): Promise<ResetPinResponse>;
-  listCardContents(request: ListCardContentsRequest): Promise<ListCardContentsResponse>;
-  updateCardContents(request: UpdateCardContentsRequest): Promise<UpdateCardContentsResponse>;
-  initiateMediaUpload(request: InitiateMediaUploadRequest): Promise<InitiateMediaUploadResponse>;
-  createAccessGrant(request: CreateAccessGrantRequest): Promise<CreateAccessGrantResponse>;
-  listAccessGrants(request: ListAccessGrantsRequest): Promise<ListAccessGrantsResponse>;
-  revokeAccessGrant(request: RevokeAccessGrantRequest): Promise<RevokeAccessGrantResponse>;
-  redeemInvitation(request: RedeemInvitationRequest): Promise<RedeemInvitationResponse>;
-  getMemoryBySession(request: GetMemoryBySessionRequest): Promise<GetMemoryBySessionResponse>;
+  listCardContents(
+    request: ListCardContentsRequest,
+  ): Promise<ListCardContentsResponse>;
+  updateCardContents(
+    request: UpdateCardContentsRequest,
+  ): Promise<UpdateCardContentsResponse>;
+  initiateMediaUpload(
+    request: InitiateMediaUploadRequest,
+  ): Promise<InitiateMediaUploadResponse>;
+  createAccessGrant(
+    request: CreateAccessGrantRequest,
+  ): Promise<CreateAccessGrantResponse>;
+  listAccessGrants(
+    request: ListAccessGrantsRequest,
+  ): Promise<ListAccessGrantsResponse>;
+  revokeAccessGrant(
+    request: RevokeAccessGrantRequest,
+  ): Promise<RevokeAccessGrantResponse>;
+  redeemInvitation(
+    request: RedeemInvitationRequest,
+  ): Promise<RedeemInvitationResponse>;
+  getMemoryBySession(
+    request: GetMemoryBySessionRequest,
+  ): Promise<GetMemoryBySessionResponse>;
 }
 
 export interface MemoryServiceClient {

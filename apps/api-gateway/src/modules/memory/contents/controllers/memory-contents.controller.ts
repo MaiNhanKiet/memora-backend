@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedPrincipal } from '@app/auth';
+import type { MemoryContentType } from '@app/contracts';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { toVerifiedActor } from '../../../../common/grpc/verified-actor';
 import { MemoryGrpcClient } from '../../clients/memory-grpc.client';
@@ -66,7 +67,7 @@ export class MemoryContentsController {
       cardId,
       items: body.items.map((i) => ({
         id: i.id,
-        contentType: i.contentType,
+        contentType: i.contentType as MemoryContentType,
         title: i.title,
         textContent: i.textContent,
         assetKey: i.assetKey,

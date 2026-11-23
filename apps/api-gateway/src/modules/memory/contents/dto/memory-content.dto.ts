@@ -56,7 +56,8 @@ export class ContentItemInputDto {
   textContent?: string;
 
   @ApiPropertyOptional({
-    description: 'Key của file trên Object Storage (bắt buộc với IMAGE/AUDIO/VIDEO)',
+    description:
+      'Key của file trên Object Storage (bắt buộc với IMAGE/AUDIO/VIDEO)',
     example: 'memories/card-123/sample.jpg',
   })
   @IsOptional()

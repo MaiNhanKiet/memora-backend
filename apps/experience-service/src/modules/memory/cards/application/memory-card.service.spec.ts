@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MemoryCardService } from './memory-card.service';
 import { MemoryCardRepository } from '../infrastructure/memory-card.repository';
 import { PinHasher } from './pin-hasher';
@@ -19,8 +19,14 @@ describe('MemoryCardService', () => {
   };
 
   const mockPinHasher = {
-    hash: jest.fn().mockImplementation((pin: string) => Promise.resolve(`hash_${pin}`)),
-    verify: jest.fn().mockImplementation((hash: string, pin: string) => Promise.resolve(hash === `hash_${pin}`)),
+    hash: jest
+      .fn()
+      .mockImplementation((pin: string) => Promise.resolve(`hash_${pin}`)),
+    verify: jest
+      .fn()
+      .mockImplementation((hash: string, pin: string) =>
+        Promise.resolve(hash === `hash_${pin}`),
+      ),
   };
 
   const sampleActor = {

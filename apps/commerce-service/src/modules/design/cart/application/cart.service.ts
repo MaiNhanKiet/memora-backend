@@ -43,9 +43,9 @@ function extractGemstones(json: unknown): GemstoneSelectionItem[] {
     json &&
     typeof json === 'object' &&
     'selections' in json &&
-    Array.isArray((json as { selections: unknown }).selections)
+    Array.isArray(json.selections)
   ) {
-    return (json as { selections: GemstoneSelectionItem[] }).selections;
+    return json.selections as GemstoneSelectionItem[];
   }
   return [];
 }
@@ -383,7 +383,9 @@ export class CartService {
     }
 
     const currentGemstones = extractGemstones(sourceDraft.gemstone_config_json);
-    const currentPlan = extractMaintenancePlan(sourceDraft.gemstone_config_json);
+    const currentPlan = extractMaintenancePlan(
+      sourceDraft.gemstone_config_json,
+    );
     const gemstoneOptionIds = currentGemstones.map((g) => g.gemstoneOptionId);
     const pricing = await this.pricingService.estimatePrice({
       templateVariantId: sourceDraft.template_variant_id,

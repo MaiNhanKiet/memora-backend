@@ -13,7 +13,8 @@ import { MemoryContentItemDto } from '../../contents/dto/memory-content.dto';
 
 export class CreateAccessGrantDto {
   @ApiProperty({
-    description: 'Địa chỉ email của người thân/bạn bè được chia sẻ quyền truy cập',
+    description:
+      'Địa chỉ email của người thân/bạn bè được chia sẻ quyền truy cập',
     example: 'friend@example.com',
   })
   @IsNotEmpty({ message: 'Email không được để trống' })
@@ -21,7 +22,8 @@ export class CreateAccessGrantDto {
   granteeEmail!: string;
 
   @ApiPropertyOptional({
-    description: 'Thời hạn hiệu lực của lời mời (tính bằng ngày, tối đa 30 ngày)',
+    description:
+      'Thời hạn hiệu lực của lời mời (tính bằng ngày, tối đa 30 ngày)',
     default: 7,
     minimum: 1,
     maximum: 30,
@@ -118,7 +120,8 @@ export class RevokeAccessGrantResponseDto {
 
 export class RedeemInvitationResponseDto {
   @ApiProperty({
-    description: 'Mã phiên truy cập Web Session (dùng để xem kỷ vật không cần đăng nhập)',
+    description:
+      'Mã phiên truy cập Web Session (dùng để xem kỷ vật không cần đăng nhập)',
   })
   accessSessionId!: string;
 

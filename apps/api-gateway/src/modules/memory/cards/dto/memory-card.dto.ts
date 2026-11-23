@@ -103,7 +103,10 @@ export class PinActionResponseDto {
   @ApiProperty({ description: 'Trạng thái thành công', example: true })
   success!: boolean;
 
-  @ApiProperty({ description: 'Thông điệp kết quả', example: 'Thao tác thành công' })
+  @ApiProperty({
+    description: 'Thông điệp kết quả',
+    example: 'Thao tác thành công',
+  })
   message!: string;
 
   @ApiProperty({ description: 'Thời điểm cập nhật' })

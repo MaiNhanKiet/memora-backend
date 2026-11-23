@@ -14,6 +14,10 @@ import { MemoryContentGrpcController } from './presentation/memory-content.grpc.
     MemoryContentRepository,
     MemoryContentService,
   ],
-  exports: [MemoryContentService, MemoryContentRepository, MemoryStorageAdapter],
+  exports: [
+    MemoryContentService,
+    MemoryContentRepository,
+    MemoryStorageAdapter,
+  ],
 })
 export class MemoryContentsModule {}

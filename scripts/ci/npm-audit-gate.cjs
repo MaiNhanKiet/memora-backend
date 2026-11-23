@@ -7,6 +7,7 @@ const allowedHigh = new Set([
   'GHSA-ggr8-5vv4-36mx',
   'GHSA-3f6p-5ww8-9rcr',
   'GHSA-rgwj-5xj2-c3m3',
+  'GHSA-7589-6fvf-x4pw', // @prisma/config, effect, prisma
 ]);
 
 const result = spawnSync('npm', ['audit', '--omit=dev', '--json'], {
@@ -66,7 +67,8 @@ for (const [name, entry] of Object.entries(vulns)) {
     continue;
   }
   const ghsa = collectGhsa(name, new Set());
-  const allowlisted = ghsa.length > 0 && ghsa.every((id) => allowedHigh.has(id));
+  const allowlisted =
+    ghsa.length > 0 && ghsa.every((id) => allowedHigh.has(id));
   if (allowlisted) {
     allowed.push(`${name}: ${ghsa.join(', ')}`);
   } else {
@@ -75,7 +77,9 @@ for (const [name, entry] of Object.entries(vulns)) {
 }
 
 for (const line of allowed) {
-  process.stdout.write(`::warning::Allowlisted production high advisory: ${line}\n`);
+  process.stdout.write(
+    `::warning::Allowlisted production high advisory: ${line}\n`,
+  );
 }
 
 if (blocking.length > 0) {

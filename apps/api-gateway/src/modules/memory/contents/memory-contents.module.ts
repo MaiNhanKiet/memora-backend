@@ -7,9 +7,7 @@ import {
 import { MemoryContentsController } from './controllers/memory-contents.controller';
 
 @Module({
-  imports: [
-    ClientsModule.registerAsync([experienceMemoryGrpcClientOptions()]),
-  ],
+  imports: [ClientsModule.registerAsync([experienceMemoryGrpcClientOptions()])],
   controllers: [MemoryContentsController],
   providers: [MemoryGrpcClient],
   exports: [MemoryGrpcClient],

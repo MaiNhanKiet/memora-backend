@@ -14,6 +14,7 @@ import type {
   ListMyCardsRequest,
   ListMyCardsResponse,
   MemoryCardDetailResponse,
+  MemoryCardStatus,
   MemoryCardSummary,
   ProvisionMemoryCardRequest,
   ResetPinRequest,
@@ -58,7 +59,7 @@ export class MemoryCardService {
         ringItemId: card.ring_item_id,
         ownerCustomerIdentityId: card.owner_customer_identity_id,
         ownerEmail: card.owner_email,
-        status: card.status,
+        status: card.status as MemoryCardStatus,
         hasPin: Boolean(card.pin_hash),
         isLocked,
         lockedUntil: card.pin_locked_until?.toISOString(),
@@ -89,9 +90,20 @@ export class MemoryCardService {
 
     const isOwner = card.owner_customer_identity_id === customerIdentityId;
     if (!isOwner) {
-      const grants = (card as unknown as { access_grants?: Array<{ status: string; grantee_user_id?: string | null }> }).access_grants ?? [];
+      const grants =
+        (
+          card as unknown as {
+            access_grants?: Array<{
+              status: string;
+              grantee_user_id?: string | null;
+            }>;
+          }
+        ).access_grants ?? [];
       const hasGrant = grants.some(
-        (g) => g.status === 'ACTIVE' && (actor.kind === 'USER' && g.grantee_user_id === actor.userId),
+        (g) =>
+          g.status === 'ACTIVE' &&
+          actor.kind === 'USER' &&
+          g.grantee_user_id === actor.userId,
       );
       if (!hasGrant) {
         throw new ForbiddenException('Access denied to this memory card');
@@ -107,7 +119,7 @@ export class MemoryCardService {
       ringItemId: card.ring_item_id,
       ownerCustomerIdentityId: card.owner_customer_identity_id,
       ownerEmail: card.owner_email,
-      status: card.status,
+      status: card.status as MemoryCardStatus,
       hasPin: Boolean(card.pin_hash),
       isLocked,
       pinFailedAttempts: card.pin_failed_attempts,
@@ -161,7 +173,7 @@ export class MemoryCardService {
       ringItemId: updated.ring_item_id,
       ownerCustomerIdentityId: updated.owner_customer_identity_id,
       ownerEmail: updated.owner_email,
-      status: updated.status,
+      status: updated.status as MemoryCardStatus,
       hasPin: Boolean(updated.pin_hash),
       isLocked: false,
       pinFailedAttempts: 0,
@@ -202,7 +214,7 @@ export class MemoryCardService {
       ringItemId: card.ring_item_id,
       ownerCustomerIdentityId: card.owner_customer_identity_id,
       ownerEmail: card.owner_email,
-      status: card.status,
+      status: card.status as MemoryCardStatus,
       hasPin: Boolean(card.pin_hash),
       isLocked,
       pinFailedAttempts: card.pin_failed_attempts,
@@ -230,7 +242,7 @@ export class MemoryCardService {
       actor.kind === 'USER' ? actor.customerIdentityId : undefined;
     const isOwner = Boolean(
       customerIdentityId &&
-        card.owner_customer_identity_id === customerIdentityId,
+      card.owner_customer_identity_id === customerIdentityId,
     );
 
     const now = new Date();
@@ -242,7 +254,7 @@ export class MemoryCardService {
       ringItemId: card.ring_item_id,
       ownerCustomerIdentityId: card.owner_customer_identity_id,
       ownerEmail: card.owner_email,
-      status: card.status,
+      status: card.status as MemoryCardStatus,
       hasPin: Boolean(card.pin_hash),
       isLocked,
       pinFailedAttempts: card.pin_failed_attempts,

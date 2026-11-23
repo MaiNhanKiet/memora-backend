@@ -53,10 +53,7 @@ export function experienceMemoryGrpcClientOptions() {
 }
 
 @Injectable()
-export class MemoryGrpcClient
-  extends DomainGrpcClient
-  implements OnModuleInit
-{
+export class MemoryGrpcClient extends DomainGrpcClient implements OnModuleInit {
   private memoryService!: MemoryServiceClient;
 
   constructor(

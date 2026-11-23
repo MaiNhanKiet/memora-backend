@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 @Injectable()
@@ -11,8 +15,7 @@ export class MemoryStorageAdapter {
     const endpoint =
       process.env.OPERATIONS_OBJECT_STORAGE_ENDPOINT ||
       'http://100.78.222.34:3900';
-    const region =
-      process.env.OPERATIONS_OBJECT_STORAGE_REGION || 'garage';
+    const region = process.env.OPERATIONS_OBJECT_STORAGE_REGION || 'garage';
     const accessKeyId =
       process.env.OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID ||
       process.env.GARAGE_ACCESS_KEY_ID ||

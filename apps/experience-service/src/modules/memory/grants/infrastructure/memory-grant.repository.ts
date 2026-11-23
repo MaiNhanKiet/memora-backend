@@ -75,10 +75,7 @@ export class MemoryGrantRepository {
     });
   }
 
-  async markAccepted(
-    grantId: string,
-    userId?: string,
-  ): Promise<access_grants> {
+  async markAccepted(grantId: string, userId?: string): Promise<access_grants> {
     return this.prisma.access_grants.update({
       where: { id: grantId },
       data: {
