@@ -128,6 +128,7 @@ describe('CartService', () => {
         targetSize: 13.0,
         gemstoneOptionIds: ['gem-1'],
         personalizationPackage: 'SOUNDWAVE',
+        maintenancePlan: 'NONE',
       });
       expect(res.item.draftId).toBe('draft-1');
       expect(res.item.estimatedPrice).toBe(15500000);
@@ -340,6 +341,7 @@ describe('CartService', () => {
         targetSize: 14.0,
         gemstoneOptionIds: ['gem-1'],
         personalizationPackage: 'SOUNDWAVE',
+        maintenancePlan: 'NONE',
       });
       expect(mockRepository.createDraft).toHaveBeenCalledWith(
         expect.objectContaining({

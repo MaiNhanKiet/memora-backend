@@ -9,11 +9,13 @@ import type {
   ActivateCardRequest,
   ChangePinRequest,
   ChangePinResponse,
+  GetCardByRingItemIdRequest,
   GetCardDetailRequest,
   ListMyCardsRequest,
   ListMyCardsResponse,
   MemoryCardDetailResponse,
   MemoryCardSummary,
+  ProvisionMemoryCardRequest,
   ResetPinRequest,
   ResetPinResponse,
   SetupPinRequest,
@@ -168,6 +170,88 @@ export class MemoryCardService {
       createdAt: updated.created_at.toISOString(),
       updatedAt: updated.updated_at.toISOString(),
       isOwner: true,
+    };
+  }
+
+  async provisionMemoryCard(
+    request: ProvisionMemoryCardRequest,
+  ): Promise<MemoryCardDetailResponse> {
+    parseVerifiedActor(request.actor);
+    if (!request.ringItemId) {
+      throw new BadRequestException('ringItemId is required');
+    }
+    if (!request.ownerCustomerIdentityId) {
+      throw new BadRequestException('ownerCustomerIdentityId is required');
+    }
+    if (!request.ownerEmail) {
+      throw new BadRequestException('ownerEmail is required');
+    }
+
+    const card = await this.cardRepository.provisionCard({
+      ringItemId: request.ringItemId,
+      ownerCustomerIdentityId: request.ownerCustomerIdentityId,
+      ownerEmail: request.ownerEmail,
+    });
+
+    const now = new Date();
+    const isLocked =
+      Boolean(card.pin_locked_until) && card.pin_locked_until! > now;
+
+    return {
+      id: card.id,
+      ringItemId: card.ring_item_id,
+      ownerCustomerIdentityId: card.owner_customer_identity_id,
+      ownerEmail: card.owner_email,
+      status: card.status,
+      hasPin: Boolean(card.pin_hash),
+      isLocked,
+      pinFailedAttempts: card.pin_failed_attempts,
+      pinLockedUntil: card.pin_locked_until?.toISOString(),
+      activatedAt: card.activated_at?.toISOString(),
+      arTargetAssetKey: card.ar_target_asset_key ?? undefined,
+      createdAt: card.created_at.toISOString(),
+      updatedAt: card.updated_at.toISOString(),
+      isOwner: true,
+    };
+  }
+
+  async getCardByRingItemId(
+    request: GetCardByRingItemIdRequest,
+  ): Promise<MemoryCardDetailResponse> {
+    const actor = parseVerifiedActor(request.actor);
+    const card = await this.cardRepository.findByRingItemId(request.ringItemId);
+    if (!card) {
+      throw new NotFoundException(
+        `Memory card for ring item ${request.ringItemId} not found`,
+      );
+    }
+
+    const customerIdentityId =
+      actor.kind === 'USER' ? actor.customerIdentityId : undefined;
+    const isOwner = Boolean(
+      customerIdentityId &&
+        card.owner_customer_identity_id === customerIdentityId,
+    );
+
+    const now = new Date();
+    const isLocked =
+      Boolean(card.pin_locked_until) && card.pin_locked_until! > now;
+
+    return {
+      id: card.id,
+      ringItemId: card.ring_item_id,
+      ownerCustomerIdentityId: card.owner_customer_identity_id,
+      ownerEmail: card.owner_email,
+      status: card.status,
+      hasPin: Boolean(card.pin_hash),
+      isLocked,
+      pinFailedAttempts: card.pin_failed_attempts,
+      pinLockedUntil: card.pin_locked_until?.toISOString(),
+      activatedAt: card.activated_at?.toISOString(),
+      arTargetAssetKey: card.ar_target_asset_key ?? undefined,
+      createdAt: card.created_at.toISOString(),
+      updatedAt: card.updated_at.toISOString(),
+      isOwner,
     };
   }
 

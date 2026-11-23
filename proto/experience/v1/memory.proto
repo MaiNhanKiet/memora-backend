@@ -9,6 +9,8 @@ service MemoryService {
   rpc ListMyCards (ListMyCardsRequest) returns (ListMyCardsResponse);
   rpc GetCardDetail (GetCardDetailRequest) returns (MemoryCardDetailResponse);
   rpc ActivateCard (ActivateCardRequest) returns (MemoryCardDetailResponse);
+  rpc ProvisionMemoryCard (ProvisionMemoryCardRequest) returns (MemoryCardDetailResponse);
+  rpc GetCardByRingItemId (GetCardByRingItemIdRequest) returns (MemoryCardDetailResponse);
 
   // PIN Protection
   rpc SetupPin (SetupPinRequest) returns (SetupPinResponse);
@@ -85,6 +87,18 @@ message ActivateCardRequest {
   memora.common.v1.VerifiedActor actor = 1;
   string card_id = 2;
   optional string initial_pin = 3;
+}
+
+message ProvisionMemoryCardRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string ring_item_id = 2;
+  string owner_customer_identity_id = 3;
+  string owner_email = 4;
+}
+
+message GetCardByRingItemIdRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string ring_item_id = 2;
 }
 
 // ---------------------------------------------------------------------------

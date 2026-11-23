@@ -9,6 +9,7 @@ import {
   type ChangePinResponse,
   type CreateAccessGrantRequest,
   type CreateAccessGrantResponse,
+  type GetCardByRingItemIdRequest,
   type GetCardDetailRequest,
   type GetMemoryBySessionRequest,
   type GetMemoryBySessionResponse,
@@ -22,6 +23,7 @@ import {
   type ListMyCardsResponse,
   type MemoryCardDetailResponse,
   type MemoryServiceClient,
+  type ProvisionMemoryCardRequest,
   type RedeemInvitationRequest,
   type RedeemInvitationResponse,
   type ResetPinRequest,
@@ -90,6 +92,22 @@ export class MemoryGrpcClient
   ): Promise<MemoryCardDetailResponse> {
     return this.unary((metadata) =>
       this.memoryService.activateCard(request, metadata),
+    );
+  }
+
+  provisionMemoryCard(
+    request: ProvisionMemoryCardRequest,
+  ): Promise<MemoryCardDetailResponse> {
+    return this.unary((metadata) =>
+      this.memoryService.provisionMemoryCard(request, metadata),
+    );
+  }
+
+  getCardByRingItemId(
+    request: GetCardByRingItemIdRequest,
+  ): Promise<MemoryCardDetailResponse> {
+    return this.unary((metadata) =>
+      this.memoryService.getCardByRingItemId(request, metadata),
     );
   }
 

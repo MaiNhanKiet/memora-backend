@@ -8,6 +8,7 @@ export interface EstimatePriceRequest {
   targetSize: number;
   gemstoneOptionIds: string[];
   personalizationPackage: string;
+  maintenancePlan?: string;
 }
 
 export interface PriceBreakdown {
@@ -15,6 +16,7 @@ export interface PriceBreakdown {
   gemstonesPrice: number;
   personalizationFee: number;
   resizeFee: number;
+  maintenancePlanFee?: number;
 }
 
 export interface GemstonePriceLineItem {

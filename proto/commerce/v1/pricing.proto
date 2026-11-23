@@ -20,6 +20,7 @@ message EstimatePriceRequest {
   double target_size = 2;
   repeated string gemstone_option_ids = 3;
   string personalization_package = 4;
+  optional string maintenance_plan = 5;
 }
 
 message PriceBreakdown {
@@ -27,6 +28,7 @@ message PriceBreakdown {
   double gemstones_price = 2;
   double personalization_fee = 3;
   double resize_fee = 4;
+  double maintenance_plan_fee = 5;
 }
 
 message GemstonePriceLineItem {

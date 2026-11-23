@@ -220,6 +220,7 @@ export class OrderingService {
       depositAmount: depositNum,
       currency: 'VND',
       createdAt: result.order.created_at.toISOString(),
+      items: result.items,
     };
   }
 
@@ -472,6 +473,13 @@ export class OrderingService {
     const ver =
       item.ring_item_versions_ring_items_current_version_idToring_item_versions;
 
+    const maintenancePlan =
+      typeof ver?.preview_snapshot_json === 'object' &&
+      ver?.preview_snapshot_json !== null
+        ? ((ver.preview_snapshot_json as Record<string, unknown>)
+            .maintenancePlan as string | undefined)
+        : undefined;
+
     return {
       id: item.id,
       orderId: item.order_id,
@@ -486,6 +494,7 @@ export class OrderingService {
       targetSize: Number(ver?.target_size ?? 0),
       personalizationPackage: ver?.personalization_package || 'NONE',
       memoryEnabled: ver?.memory_enabled ?? false,
+      maintenancePlan,
       gemstones: (ver?.ring_item_version_gemstones || []).map((gem) => ({
         slotNumber: gem.gemstone_slots.slot_index,
         gemstoneSlotId: gem.gemstone_slot_id,

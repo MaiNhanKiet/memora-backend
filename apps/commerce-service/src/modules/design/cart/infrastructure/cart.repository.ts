@@ -134,6 +134,7 @@ export class CartRepository {
       memoryEnabled?: boolean;
       estimatedPrice?: number;
       estimatedPriceAt?: Date;
+      gemstoneConfigJson?: object;
     },
   ) {
     return this.prisma.ring_design_drafts.update({
@@ -147,6 +148,9 @@ export class CartRepository {
           : {}),
         ...(data.memoryEnabled !== undefined
           ? { memory_enabled: data.memoryEnabled }
+          : {}),
+        ...(data.gemstoneConfigJson !== undefined
+          ? { gemstone_config_json: data.gemstoneConfigJson }
           : {}),
         ...(data.estimatedPrice !== undefined
           ? {

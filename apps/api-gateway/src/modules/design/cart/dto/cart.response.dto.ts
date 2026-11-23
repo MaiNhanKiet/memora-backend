@@ -29,6 +29,9 @@ export class CartItemDraftDto {
   @ApiProperty({ example: true })
   memoryEnabled!: boolean;
 
+  @ApiPropertyOptional({ example: 'LIFETIME_POLISHING' })
+  maintenancePlan?: string;
+
   @ApiProperty({ type: [GemstoneSelectionDto] })
   gemstoneSelections!: GemstoneSelectionDto[];
 

@@ -50,6 +50,28 @@ export class MemoryCardRepository {
     });
   }
 
+  async provisionCard(data: {
+    ringItemId: string;
+    ownerCustomerIdentityId: string;
+    ownerEmail: string;
+  }): Promise<memory_cards> {
+    const existing = await this.findByRingItemId(data.ringItemId);
+    if (existing) {
+      return existing;
+    }
+    const now = new Date();
+    return this.prisma.memory_cards.create({
+      data: {
+        ring_item_id: data.ringItemId,
+        owner_customer_identity_id: data.ownerCustomerIdentityId,
+        owner_email: data.ownerEmail,
+        status: 'PENDING',
+        created_at: now,
+        updated_at: now,
+      },
+    });
+  }
+
   async activateCard(
     cardId: string,
     initialPinHash?: string,

@@ -90,6 +90,18 @@ export interface ActivateCardRequest {
   initialPin?: string;
 }
 
+export interface ProvisionMemoryCardRequest {
+  actor: VerifiedActor;
+  ringItemId: string;
+  ownerCustomerIdentityId: string;
+  ownerEmail: string;
+}
+
+export interface GetCardByRingItemIdRequest {
+  actor: VerifiedActor;
+  ringItemId: string;
+}
+
 // ---------------------------------------------------------------------------
 // PIN Protection
 // ---------------------------------------------------------------------------
@@ -279,6 +291,8 @@ export interface MemoryServiceHandler {
   listMyCards(request: ListMyCardsRequest): Promise<ListMyCardsResponse>;
   getCardDetail(request: GetCardDetailRequest): Promise<MemoryCardDetailResponse>;
   activateCard(request: ActivateCardRequest): Promise<MemoryCardDetailResponse>;
+  provisionMemoryCard(request: ProvisionMemoryCardRequest): Promise<MemoryCardDetailResponse>;
+  getCardByRingItemId(request: GetCardByRingItemIdRequest): Promise<MemoryCardDetailResponse>;
   setupPin(request: SetupPinRequest): Promise<SetupPinResponse>;
   changePin(request: ChangePinRequest): Promise<ChangePinResponse>;
   resetPin(request: ResetPinRequest): Promise<ResetPinResponse>;
@@ -303,6 +317,14 @@ export interface MemoryServiceClient {
   ): Observable<MemoryCardDetailResponse>;
   activateCard(
     request: ActivateCardRequest,
+    metadata?: Metadata,
+  ): Observable<MemoryCardDetailResponse>;
+  provisionMemoryCard(
+    request: ProvisionMemoryCardRequest,
+    metadata?: Metadata,
+  ): Observable<MemoryCardDetailResponse>;
+  getCardByRingItemId(
+    request: GetCardByRingItemIdRequest,
     metadata?: Metadata,
   ): Observable<MemoryCardDetailResponse>;
   setupPin(

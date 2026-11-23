@@ -85,6 +85,111 @@ async function loginCustomer(client: TestHttpClient): Promise<string> {
   return token;
 }
 
+async function provisionCardViaCommerce(
+  client: TestHttpClient,
+): Promise<{ cardId: string; ringItemId: string }> {
+  // 1. Fetch template variants
+  const templatesRes = await client.get<{ data?: Array<{ id: string }> }>(
+    '/api/v1/catalog/templates',
+  );
+  const templateId = templatesRes.data?.data?.[0]?.id;
+  if (!templateId) {
+    throw new Error('No catalog template found');
+  }
+
+  const configOptionsRes = await client.get<{
+    data?: {
+      availableVariants?: Array<{ id: string }>;
+      templateVariants?: Array<{ id: string }>;
+      variants?: Array<{ id: string }>;
+      allowedPersonalizationPackages?: string[];
+    };
+  }>(`/api/v1/catalog/templates/${templateId}/configuration-options`);
+  const variants =
+    configOptionsRes.data?.data?.availableVariants ||
+    configOptionsRes.data?.data?.templateVariants ||
+    configOptionsRes.data?.data?.variants ||
+    [];
+  const variantId = variants[0]?.id;
+  if (!variantId) {
+    throw new Error('No template variant found');
+  }
+
+  const allowedPackages =
+    configOptionsRes.data?.data?.allowedPersonalizationPackages || [];
+  // DB check constraint design_ring_design_drafts_15279975_ck enforces:
+  // (personalization_package <> 'NONE' OR memory_enabled IS FALSE)
+  const personalizationPackage =
+    allowedPackages.find((p) => p !== 'NONE') || 'SOUNDWAVE';
+
+  // 2. Add ring item to cart with memoryEnabled=true and maintenancePlan=LIFETIME_POLISHING
+  const addCartRes = await client.post<{
+    data?: { item?: { draftId?: string } };
+  }>('/api/v1/cart/items', {
+    templateVariantId: variantId,
+    targetSize: 12.0,
+    gemstoneSelections: [],
+    personalizationPackage,
+    memoryEnabled: true,
+    maintenancePlan: 'LIFETIME_POLISHING',
+  });
+  const draftId = addCartRes.data?.data?.item?.draftId;
+  if (!draftId) {
+    throw new Error(
+      `Failed to add ring to cart: ${JSON.stringify(addCartRes.data)}`,
+    );
+  }
+
+  // 3. Create order (triggers automatic provisionMemoryCard at API Gateway)
+  const createOrderRes = await client.post<{
+    data?: {
+      orderId?: string;
+      items?: Array<{ id: string; memoryEnabled: boolean }>;
+    };
+  }>('/api/v1/orders', {
+    selectedDraftIds: [draftId],
+    fulfillmentMode: 'PICKUP',
+    recipientName: 'Memory E2E Customer',
+    recipientPhone: '0901234567',
+    recipientEmail: 'customer@memora.vn',
+    preP1Acknowledgement: {
+      noticeVersion: 'v1.0',
+      privacyNoticeAcknowledged: true,
+      p1NonrefundAcknowledged: true,
+    },
+  });
+
+  const orderData = createOrderRes.data?.data;
+  const orderId = orderData?.orderId;
+  const ringItem =
+    orderData?.items?.find((i) => i.memoryEnabled) || orderData?.items?.[0];
+  if (!orderId || !ringItem) {
+    throw new Error(
+      `Failed to create order: ${JSON.stringify(createOrderRes.data)}`,
+    );
+  }
+
+  // 4. Query ORDER-007 (getRingItemDetails) to verify Gateway merged memoryCard
+  const itemDetailRes = await client.get<{
+    data?: {
+      id: string;
+      memoryEnabled: boolean;
+      maintenancePlan?: string;
+      memoryCard?: { id: string; status: string };
+    };
+  }>(`/api/v1/orders/${orderId}/items/${ringItem.id}`);
+
+  const itemDetail = itemDetailRes.data?.data;
+  const cardId = itemDetail?.memoryCard?.id;
+  if (!cardId) {
+    throw new Error(
+      `Ring item details did not include provisioned memoryCard: ${JSON.stringify(itemDetailRes.data)}`,
+    );
+  }
+
+  return { cardId, ringItemId: ringItem.id };
+}
+
 async function main(): Promise<void> {
   console.log('================================================================================');
   console.log('🚀 MEMORA EXPERIENCE SERVICE — MEMORY DOMAIN AUTOMATION TEST SUITE (14 APIS)');
@@ -94,19 +199,31 @@ async function main(): Promise<void> {
   console.log(`- Storage Backend  : Garage S3 (http://100.78.222.34:3900)`);
   console.log('================================================================================\n');
 
-  console.log('🌱 Đang chuẩn bị dữ liệu kiểm thử (Database Seed Check)...');
-  const dbContext = await prepareDatabaseSeed();
-  console.log(`\x1b[32m✔ Khởi tạo dữ liệu thành công:\x1b[0m`);
-  console.log(`  • Customer Identity ID: ${dbContext.customerIdentityId}`);
-  console.log(`  • Test Memory Card ID : ${dbContext.cardId}`);
-  console.log(`  • Test Ring Item ID   : ${dbContext.ringItemId}\n`);
-
   const client = new TestHttpClient();
 
   console.log('🔑 Đang đăng nhập tài khoản Khách hàng (customer@memora.vn)...');
   const customerToken = await loginCustomer(client);
   client.setToken(customerToken);
   console.log('\x1b[32m✔ Đăng nhập thành công, đã cấp Bearer Token.\x1b[0m\n');
+
+  console.log('🛒 Tự động sinh Thẻ Ký Ức qua Luồng Đơn Hàng Commerce (Bridge Integration)...');
+  let cardId: string;
+  let ringItemId: string;
+  try {
+    const prov = await provisionCardViaCommerce(client);
+    cardId = prov.cardId;
+    ringItemId = prov.ringItemId;
+    console.log(`\x1b[32m✔ Tự động cấp Thẻ Ký Ức thành công qua Đơn hàng Commerce:\x1b[0m`);
+    console.log(`  • Memory Card ID: ${cardId}`);
+    console.log(`  • Ring Item ID  : ${ringItemId}\n`);
+  } catch (err: any) {
+    console.log(`⚠️ Luồng Commerce chưa cấp thẻ (${err.message}), dùng thẻ từ DB seed...`);
+    const dbContext = await prepareDatabaseSeed();
+    cardId = dbContext.cardId;
+    ringItemId = dbContext.ringItemId;
+  }
+
+  const dbContext = { cardId, ringItemId };
 
   // ===========================================================================
   // PHASE 1: Quản lý Thẻ Ký Ức (Memory Cards) — MEMOR-001..003

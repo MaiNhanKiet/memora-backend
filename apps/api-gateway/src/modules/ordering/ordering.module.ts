@@ -15,9 +15,11 @@ import {
   OrderingGrpcClient,
 } from './clients/ordering-grpc.client';
 import { PaymentEventsService } from './payments/services/payment-events.service';
+import { MemoryCardsModule } from '../memory/cards/memory-cards.module';
 
 @Module({
   imports: [
+    MemoryCardsModule,
     ClientsModule.registerAsync([
       domainGrpcClientOptions({
         name: COMMERCE_ORDERING_GRPC_CLIENT,

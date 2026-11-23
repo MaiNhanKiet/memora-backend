@@ -542,6 +542,27 @@ async function main(): Promise<void> {
 
       await upsertPriceVersion(prisma, item.id, amount);
     }
+
+    // D. Maintenance Plan Price (LIFETIME_POLISHING: 500k)
+    const maintenancePrices: Record<string, number> = {
+      LIFETIME_POLISHING: 500000,
+    };
+
+    for (const [planCode, amount] of Object.entries(maintenancePrices)) {
+      const pCode = `PLAN_${planCode}`;
+      const item = await prisma.price_items.upsert({
+        where: { code: pCode },
+        update: { status: 'ACTIVE' },
+        create: {
+          id: randomUUID(),
+          code: pCode,
+          price_type: 'MAINTENANCE_PLAN',
+          status: 'ACTIVE',
+        },
+      });
+
+      await upsertPriceVersion(prisma, item.id, amount);
+    }
     console.log(
       '  - Seeded Price Items and Active Price Versions successfully',
     );

@@ -11,6 +11,7 @@ describe('MemoryCardService', () => {
     listCardsByOwner: jest.fn(),
     findById: jest.fn(),
     findByRingItemId: jest.fn(),
+    provisionCard: jest.fn(),
     activateCard: jest.fn(),
     updatePin: jest.fn(),
     recordFailedPinAttempt: jest.fn(),
@@ -228,6 +229,55 @@ describe('MemoryCardService', () => {
         1,
         null,
       );
+    });
+  });
+
+  describe('provisionMemoryCard', () => {
+    it('should provision memory card idempotently', async () => {
+      mockCardRepository.provisionCard.mockResolvedValue(sampleCard);
+
+      const res = await service.provisionMemoryCard({
+        actor: sampleActor,
+        ringItemId: sampleCard.ring_item_id,
+        ownerCustomerIdentityId: sampleCard.owner_customer_identity_id,
+        ownerEmail: sampleCard.owner_email,
+      });
+
+      expect(res.id).toBe(sampleCard.id);
+      expect(res.ringItemId).toBe(sampleCard.ring_item_id);
+      expect(mockCardRepository.provisionCard).toHaveBeenCalledWith({
+        ringItemId: sampleCard.ring_item_id,
+        ownerCustomerIdentityId: sampleCard.owner_customer_identity_id,
+        ownerEmail: sampleCard.owner_email,
+      });
+    });
+  });
+
+  describe('getCardByRingItemId', () => {
+    it('should find card by ring item id', async () => {
+      mockCardRepository.findByRingItemId.mockResolvedValue(sampleCard);
+
+      const res = await service.getCardByRingItemId({
+        actor: sampleActor,
+        ringItemId: sampleCard.ring_item_id,
+      });
+
+      expect(res.id).toBe(sampleCard.id);
+      expect(res.isOwner).toBe(true);
+      expect(mockCardRepository.findByRingItemId).toHaveBeenCalledWith(
+        sampleCard.ring_item_id,
+      );
+    });
+
+    it('should throw NotFoundException when card does not exist', async () => {
+      mockCardRepository.findByRingItemId.mockResolvedValue(null);
+
+      await expect(
+        service.getCardByRingItemId({
+          actor: sampleActor,
+          ringItemId: 'non-existent-ring-item',
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

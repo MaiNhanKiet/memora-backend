@@ -5,10 +5,12 @@ import {
   type ActivateCardRequest,
   type ChangePinRequest,
   type ChangePinResponse,
+  type GetCardByRingItemIdRequest,
   type GetCardDetailRequest,
   type ListMyCardsRequest,
   type ListMyCardsResponse,
   type MemoryCardDetailResponse,
+  type ProvisionMemoryCardRequest,
   type ResetPinRequest,
   type ResetPinResponse,
   type SetupPinRequest,
@@ -39,6 +41,20 @@ export class MemoryCardGrpcController {
     request: ActivateCardRequest,
   ): Promise<MemoryCardDetailResponse> {
     return this.memoryCardService.activateCard(request);
+  }
+
+  @GrpcMethod(MEMORY_SERVICE_NAME, 'ProvisionMemoryCard')
+  provisionMemoryCard(
+    request: ProvisionMemoryCardRequest,
+  ): Promise<MemoryCardDetailResponse> {
+    return this.memoryCardService.provisionMemoryCard(request);
+  }
+
+  @GrpcMethod(MEMORY_SERVICE_NAME, 'GetCardByRingItemId')
+  getCardByRingItemId(
+    request: GetCardByRingItemIdRequest,
+  ): Promise<MemoryCardDetailResponse> {
+    return this.memoryCardService.getCardByRingItemId(request);
   }
 
   @GrpcMethod(MEMORY_SERVICE_NAME, 'SetupPin')
