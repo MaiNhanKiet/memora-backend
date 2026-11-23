@@ -66,6 +66,7 @@ message CreateOrderResponse {
   double deposit_amount = 7;
   string currency = 8;
   string created_at = 9;
+  repeated RingItemSummary items = 10;
 }
 
 message ListOrdersRequest {
@@ -206,6 +207,7 @@ message GetRingItemDetailsResponse {
   bool memory_enabled = 13;
   repeated RingItemGemstoneDetail gemstones = 14;
   string created_at = 15;
+  optional string maintenance_plan = 16;
 }
 
 // -----------------------------------------------------------------------------

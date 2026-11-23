@@ -70,7 +70,7 @@ export class InventoryRepository {
           quantity_reserved: 0,
           unit_cost: params.unitCost !== undefined ? params.unitCost : null,
           location_code: params.locationCode,
-          status: 'AVAILABLE',
+          status: 'ACTIVE',
           received_at: params.receivedAt ?? now,
           updated_at: now,
         },
@@ -84,7 +84,9 @@ export class InventoryRepository {
           unit_cost_snapshot:
             params.unitCost !== undefined ? params.unitCost : null,
           reason: 'Initial ring blank receipt',
-          performed_by_user_id: params.performedByUserId,
+          performed_by_user_id: params.performedByUserId
+            ? params.performedByUserId
+            : null,
           occurred_at: now,
         },
       });
@@ -150,7 +152,7 @@ export class InventoryRepository {
           quantity_reserved: 0,
           unit_cost: params.unitCost !== undefined ? params.unitCost : null,
           location_code: params.locationCode,
-          status: 'AVAILABLE',
+          status: 'ACTIVE',
           received_at: params.receivedAt ?? now,
           updated_at: now,
         },
@@ -164,7 +166,9 @@ export class InventoryRepository {
           unit_cost_snapshot:
             params.unitCost !== undefined ? params.unitCost : null,
           reason: 'Initial gemstone batch receipt',
-          performed_by_user_id: params.performedByUserId,
+          performed_by_user_id: params.performedByUserId
+            ? params.performedByUserId
+            : null,
           occurred_at: now,
         },
       });
@@ -248,7 +252,9 @@ export class InventoryRepository {
           unit_cost_snapshot:
             params.purchaseCost !== undefined ? params.purchaseCost : null,
           reason: 'Initial certified gemstone intake',
-          performed_by_user_id: params.performedByUserId,
+          performed_by_user_id: params.performedByUserId
+            ? params.performedByUserId
+            : null,
           occurred_at: now,
         },
       });
@@ -322,13 +328,15 @@ export class InventoryRepository {
 
       await tx.inventory_movements.create({
         data: {
-          movement_type: 'ADJUSTMENT',
+          movement_type: 'ADJUST',
           stock_lot_id: params.stockLotId,
           quantity: params.adjustedQuantity,
           unit_cost_snapshot: lot.unit_cost,
           reason: params.reason,
           metadata_json: params.metadataJson ?? {},
-          performed_by_user_id: params.performedByUserId,
+          performed_by_user_id: params.performedByUserId
+            ? params.performedByUserId
+            : null,
           occurred_at: now,
         },
       });
@@ -499,7 +507,9 @@ export class InventoryRepository {
             quantity: allocation.quantity,
             unit_cost_snapshot: lot.unit_cost,
             reason: 'Consumed for production',
-            performed_by_user_id: params.allocatedByUserId,
+            performed_by_user_id: params.allocatedByUserId
+              ? params.allocatedByUserId
+              : null,
             occurred_at: now,
           },
         });
@@ -525,7 +535,9 @@ export class InventoryRepository {
             quantity: 1,
             unit_cost_snapshot: gem.purchase_cost ?? 0,
             reason: 'Mounted gemstone for production',
-            performed_by_user_id: params.allocatedByUserId,
+            performed_by_user_id: params.allocatedByUserId
+              ? params.allocatedByUserId
+              : null,
             occurred_at: now,
           },
         });

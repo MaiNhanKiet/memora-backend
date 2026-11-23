@@ -16,6 +16,7 @@ import { CurrentUser } from '../../../../common/decorators/current-user.decorato
 import { toVerifiedActor } from '../../../../common/grpc/verified-actor';
 import { toPaginatedSuccessResponse } from '../../../../common/mappers/paginated-success.mapper';
 import { OrderingGrpcClient } from '../../clients/ordering-grpc.client';
+import { MemoryGrpcClient } from '../../../memory/clients/memory-grpc.client';
 import {
   CancelOrderBodyDto,
   CreateOrderBodyDto,
@@ -46,7 +47,10 @@ import {
 @ApiTags('commerce-orders')
 @Controller('orders')
 export class CheckoutOrdersController {
-  constructor(private readonly orderingClient: OrderingGrpcClient) {}
+  constructor(
+    private readonly orderingClient: OrderingGrpcClient,
+    private readonly memoryClient: MemoryGrpcClient,
+  ) {}
 
   // ---------------------------------------------------------------------------
   // [ORDER-001] POST /api/v1/orders
@@ -59,9 +63,41 @@ export class CheckoutOrdersController {
     @Body() body: CreateOrderBodyDto,
   ) {
     const actor = toVerifiedActor(principal);
-    return this.orderingClient.createOrder(
+    const order = await this.orderingClient.createOrder(
       toCreateOrderGrpcRequest(actor, body),
     );
+
+    // Fault-tolerant memory card provisioning for memory-enabled ring items
+    if (order.items && order.items.length > 0) {
+      const ownerCustomerIdentityId =
+        actor.customerIdentityId ?? actor.userId ?? '';
+      const ownerEmail =
+        (principal as unknown as { email?: string }).email ??
+        body.recipientEmail ??
+        'customer@memora.vn';
+
+      for (const item of order.items) {
+        if (item.memoryEnabled) {
+          try {
+            await Promise.race([
+              this.memoryClient.provisionMemoryCard({
+                actor,
+                ringItemId: item.id,
+                ownerCustomerIdentityId,
+                ownerEmail,
+              }),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Provision timeout')), 3000),
+              ),
+            ]);
+          } catch {
+            // Fault-tolerant: non-blocking, fallback will run on getRingItemDetails
+          }
+        }
+      }
+    }
+
+    return order;
   }
 
   // ---------------------------------------------------------------------------
@@ -134,9 +170,43 @@ export class CheckoutOrdersController {
     @Param('ringItemId', ParseUUIDPipe) ringItemId: string,
   ) {
     const actor = toVerifiedActor(principal);
-    return this.orderingClient.getRingItemDetails(
+    const details = await this.orderingClient.getRingItemDetails(
       toGetRingItemDetailsGrpcRequest(actor, orderId, ringItemId),
     );
+
+    let memoryCard: { id: string; status: string } | undefined;
+    if (details.memoryEnabled) {
+      try {
+        const card = await this.memoryClient.getCardByRingItemId({
+          actor,
+          ringItemId,
+        });
+        memoryCard = { id: card.id, status: card.status };
+      } catch {
+        // Fallback: if not found, lazy-provision card
+        try {
+          const ownerCustomerIdentityId =
+            actor.customerIdentityId ?? actor.userId ?? '';
+          const ownerEmail =
+            (principal as unknown as { email?: string }).email ??
+            'customer@memora.vn';
+          const card = await this.memoryClient.provisionMemoryCard({
+            actor,
+            ringItemId,
+            ownerCustomerIdentityId,
+            ownerEmail,
+          });
+          memoryCard = { id: card.id, status: card.status };
+        } catch {
+          // If experience service is unreachable, keep memoryCard undefined
+        }
+      }
+    }
+
+    return {
+      ...details,
+      memoryCard,
+    };
   }
 
   // ---------------------------------------------------------------------------

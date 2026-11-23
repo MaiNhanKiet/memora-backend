@@ -24,6 +24,7 @@ export function toAddCartItemGrpcRequest(
     })),
     personalizationPackage: body.personalizationPackage ?? 'NONE',
     memoryEnabled: body.memoryEnabled ?? false,
+    maintenancePlan: body.maintenancePlan,
   };
 }
 
@@ -38,6 +39,7 @@ export function toUpdateCartItemGrpcRequest(
     targetSize: body.targetSize,
     personalizationPackage: body.personalizationPackage,
     memoryEnabled: body.memoryEnabled,
+    maintenancePlan: body.maintenancePlan,
   };
 }
 

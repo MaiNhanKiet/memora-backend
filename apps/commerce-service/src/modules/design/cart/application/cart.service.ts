@@ -37,6 +37,26 @@ import {
 } from '../infrastructure/cart.repository';
 import { PricingService } from '../../../pricing/pricing-core/application/pricing.service';
 
+function extractGemstones(json: unknown): GemstoneSelectionItem[] {
+  if (Array.isArray(json)) return json as GemstoneSelectionItem[];
+  if (
+    json &&
+    typeof json === 'object' &&
+    'selections' in json &&
+    Array.isArray(json.selections)
+  ) {
+    return json.selections as GemstoneSelectionItem[];
+  }
+  return [];
+}
+
+function extractMaintenancePlan(json: unknown): string | undefined {
+  if (json && typeof json === 'object' && !Array.isArray(json)) {
+    return (json as { maintenancePlan?: string }).maintenancePlan;
+  }
+  return undefined;
+}
+
 @Injectable()
 export class CartService {
   constructor(
@@ -91,6 +111,7 @@ export class CartService {
     }
 
     // Call PricingService to calculate real-time estimated price
+    const maintenancePlan = request.maintenancePlan || 'NONE';
     const gemstoneOptionIds = (request.gemstoneSelections || []).map(
       (g) => g.gemstoneOptionId,
     );
@@ -99,7 +120,16 @@ export class CartService {
       targetSize: request.targetSize,
       gemstoneOptionIds,
       personalizationPackage: request.personalizationPackage || 'NONE',
+      maintenancePlan,
     });
+
+    const gemstoneConfigJson =
+      maintenancePlan !== 'NONE'
+        ? {
+            selections: request.gemstoneSelections || [],
+            maintenancePlan,
+          }
+        : request.gemstoneSelections || [];
 
     const draft = await this.repository.createDraft({
       cartId: cart!.id,
@@ -107,7 +137,7 @@ export class CartService {
       guestSessionId: actor.guestSessionId,
       templateVariantId: request.templateVariantId,
       targetSize: request.targetSize,
-      gemstoneConfigJson: request.gemstoneSelections || [],
+      gemstoneConfigJson,
       personalizationPackage: request.personalizationPackage || 'NONE',
       memoryEnabled: request.memoryEnabled ?? false,
       estimatedPrice: pricing.estimatedTotal,
@@ -144,22 +174,34 @@ export class CartService {
     const pkg = request.personalizationPackage ?? draft.personalization_package;
     const memoryEnabled = request.memoryEnabled ?? draft.memory_enabled;
 
-    // Recalculate price if size or personalization changed
-    const gemstoneSelections =
-      (draft.gemstone_config_json as unknown as GemstoneSelectionItem[]) || [];
-    const gemstoneOptionIds = gemstoneSelections.map((g) => g.gemstoneOptionId);
+    // Recalculate price if size, personalization, or maintenance plan changed
+    const currentGemstones = extractGemstones(draft.gemstone_config_json);
+    const currentPlan = extractMaintenancePlan(draft.gemstone_config_json);
+    const maintenancePlan = request.maintenancePlan ?? currentPlan ?? 'NONE';
+
+    const gemstoneOptionIds = currentGemstones.map((g) => g.gemstoneOptionId);
 
     const pricing = await this.pricingService.estimatePrice({
       templateVariantId: draft.template_variant_id,
       targetSize,
       gemstoneOptionIds,
       personalizationPackage: pkg,
+      maintenancePlan,
     });
+
+    const gemstoneConfigJson =
+      maintenancePlan !== 'NONE'
+        ? {
+            selections: currentGemstones,
+            maintenancePlan,
+          }
+        : currentGemstones;
 
     const updated = await this.repository.updateDraft(draft.id, {
       targetSize,
       personalizationPackage: pkg,
       memoryEnabled,
+      gemstoneConfigJson,
       estimatedPrice: pricing.estimatedTotal,
       estimatedPriceAt: new Date(),
     });
@@ -340,16 +382,23 @@ export class CartService {
       cart = await this.repository.findActiveCartByActor(actor);
     }
 
-    const gemstoneSelections =
-      (sourceDraft.gemstone_config_json as unknown as GemstoneSelectionItem[]) ||
-      [];
-    const gemstoneOptionIds = gemstoneSelections.map((g) => g.gemstoneOptionId);
+    const currentGemstones = extractGemstones(sourceDraft.gemstone_config_json);
+    const currentPlan = extractMaintenancePlan(
+      sourceDraft.gemstone_config_json,
+    );
+    const gemstoneOptionIds = currentGemstones.map((g) => g.gemstoneOptionId);
     const pricing = await this.pricingService.estimatePrice({
       templateVariantId: sourceDraft.template_variant_id,
       targetSize: Number(sourceDraft.target_size),
       gemstoneOptionIds,
       personalizationPackage: sourceDraft.personalization_package || 'NONE',
+      maintenancePlan: currentPlan ?? 'NONE',
     });
+
+    const gemstoneConfigJson =
+      currentPlan && currentPlan !== 'NONE'
+        ? { selections: currentGemstones, maintenancePlan: currentPlan }
+        : currentGemstones;
 
     const newDraft = await this.repository.createDraft({
       cartId: cart!.id,
@@ -357,7 +406,7 @@ export class CartService {
       guestSessionId: actor.guestSessionId,
       templateVariantId: sourceDraft.template_variant_id,
       targetSize: Number(sourceDraft.target_size),
-      gemstoneConfigJson: gemstoneSelections,
+      gemstoneConfigJson,
       personalizationPackage: sourceDraft.personalization_package,
       memoryEnabled: sourceDraft.memory_enabled,
       estimatedPrice: pricing.estimatedTotal,
@@ -458,8 +507,8 @@ export class CartService {
       ring_templates: { code: string; name: string };
     };
   }): CartItemDraft {
-    const selections =
-      (draft.gemstone_config_json as GemstoneSelectionItem[]) || [];
+    const selections = extractGemstones(draft.gemstone_config_json);
+    const maintenancePlan = extractMaintenancePlan(draft.gemstone_config_json);
 
     return {
       draftId: draft.id,
@@ -473,6 +522,7 @@ export class CartService {
       targetSize: Number(draft.target_size),
       personalizationPackage: draft.personalization_package,
       memoryEnabled: draft.memory_enabled,
+      maintenancePlan,
       gemstoneSelections: selections,
       estimatedPrice: draft.estimated_price ? Number(draft.estimated_price) : 0,
       currency: draft.currency,

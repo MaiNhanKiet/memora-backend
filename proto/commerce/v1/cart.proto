@@ -38,6 +38,7 @@ message CartItemDraft {
   string estimated_price_at = 13;
   string status = 14;
   string created_at = 15;
+  optional string maintenance_plan = 16;
 }
 
 message GetCartRequest {
@@ -61,6 +62,7 @@ message AddCartItemRequest {
   repeated GemstoneSelectionItem gemstone_selections = 4;
   string personalization_package = 5;
   bool memory_enabled = 6;
+  optional string maintenance_plan = 7;
 }
 
 message AddCartItemResponse {
@@ -76,6 +78,7 @@ message UpdateCartItemRequest {
   optional double target_size = 3;
   optional string personalization_package = 4;
   optional bool memory_enabled = 5;
+  optional string maintenance_plan = 6;
 }
 
 message UpdateCartItemResponse {

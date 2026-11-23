@@ -5,4 +5,5 @@
  */
 export const EXPERIENCE_GRPC_PROTOS = [
   { package: 'grpc.health.v1', file: 'grpc/health/v1/health.proto' },
+  { package: 'memora.experience.v1', file: 'experience/v1/memory.proto' },
 ] as const;

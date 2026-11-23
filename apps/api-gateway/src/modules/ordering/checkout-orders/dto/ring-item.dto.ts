@@ -109,3 +109,58 @@ export class UpdateCurrentRingItemVersionResponseDto {
   @ApiProperty({ description: 'Updated target size' })
   targetSize!: number;
 }
+
+export class MemoryCardSummaryDto {
+  @ApiProperty({ example: 'm1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  id!: string;
+
+  @ApiProperty({ example: 'PENDING' })
+  status!: string;
+}
+
+export class RingItemDetailResponseDto {
+  @ApiProperty({ example: 'r1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  id!: string;
+
+  @ApiProperty({ example: 'o1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  orderId!: string;
+
+  @ApiProperty({ example: 1 })
+  itemNo!: number;
+
+  @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  sourceRingDesignDraftId!: string;
+
+  @ApiProperty({ example: 'v1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
+  currentVersionId!: string;
+
+  @ApiProperty({ example: 1 })
+  versionNo!: number;
+
+  @ApiProperty({ example: 'RT-CLASSIC-01' })
+  templateCode!: string;
+
+  @ApiProperty({ example: 'Classic Solitaire' })
+  templateName!: string;
+
+  @ApiProperty({ example: 'Yellow Gold 18K' })
+  materialName!: string;
+
+  @ApiProperty({ example: 13.0 })
+  targetSize!: number;
+
+  @ApiProperty({ example: 'SOUNDWAVE' })
+  personalizationPackage!: string;
+
+  @ApiProperty({ example: true })
+  memoryEnabled!: boolean;
+
+  @ApiPropertyOptional({ example: 'LIFETIME_POLISHING' })
+  maintenancePlan?: string;
+
+  @ApiPropertyOptional({ type: MemoryCardSummaryDto })
+  memoryCard?: MemoryCardSummaryDto;
+
+  @ApiProperty({ example: '2026-11-14T10:00:00.000Z' })
+  createdAt!: string;
+}

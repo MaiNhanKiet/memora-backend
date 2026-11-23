@@ -25,4 +25,14 @@ export class UpdateCartItemBodyDto {
   @IsOptional()
   @IsBoolean()
   memoryEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Maintenance plan (NONE, LIFETIME_POLISHING)',
+    enum: ['NONE', 'LIFETIME_POLISHING'],
+    example: 'LIFETIME_POLISHING',
+    default: 'NONE',
+  })
+  @IsOptional()
+  @IsString()
+  maintenancePlan?: string;
 }

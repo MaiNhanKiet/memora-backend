@@ -34,6 +34,7 @@ export interface CreateOrderResponse {
   depositAmount: number;
   currency: string;
   createdAt: string;
+  items?: RingItemSummary[];
 }
 
 export interface ListOrdersRequest {
@@ -250,6 +251,7 @@ export interface GetRingItemDetailsResponse {
   targetSize: number;
   personalizationPackage: string;
   memoryEnabled: boolean;
+  maintenancePlan?: string;
   gemstones: RingItemGemstoneDetail[];
   createdAt: string;
 }

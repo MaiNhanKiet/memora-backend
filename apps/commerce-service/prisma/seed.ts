@@ -1,6 +1,7 @@
 import { config as loadDotenv } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { PrismaClient, Prisma } from '../generated/prisma/client';
@@ -211,11 +212,79 @@ async function main(): Promise<void> {
     }
 
     // =========================================================================
-    // 3. CATALOG: Ring Templates
+    // 3. CATALOG: Ring Templates & 3D Gemstone Slots
     // =========================================================================
-    console.log('[commerce-seed] 3. Seeding Ring Templates...');
-    const templatesData = [
+    console.log(
+      '[commerce-seed] 3. Seeding Ring Templates & 3D Gemstone Slots...',
+    );
+
+    const base3DModelDir = resolve(
+      __dirname,
+      '../../../docs/duypq/3D RING MODEL',
+    );
+
+    interface ProductionRingTemplateDef {
+      code: string;
+      name: string;
+      description: string;
+      folderName: string;
+    }
+
+    const productionTemplates: ProductionRingTemplateDef[] = [
       {
+        code: 'BAR_001_SW',
+        name: 'Memora Bar Ring - Soundwave Edition',
+        description:
+          'Mẫu nhẫn Bar dáng thẳng tinh tế với bề mặt phẳng rộng, tối ưu cho việc khắc sóng âm thanh độc bản (Soundwave) cùng 2 chấu đá quý.',
+        folderName: 'BAR_001_SW',
+      },
+      {
+        code: 'BYPASS_001_SW',
+        name: 'Memora Bypass Ring - Soundwave Edition',
+        description:
+          'Mẫu nhẫn dáng Bypass uốn lượn mềm mại, thiết kế lá cong hiện đại ôm trọn dải sóng âm kỷ niệm và 1 viên đá quý góc phải.',
+        folderName: 'BYPASS_001_SW',
+      },
+      {
+        code: 'SIGNET_001_FP',
+        name: 'Memora Signet Ring - Fingerprint & Gemstone',
+        description:
+          'Mẫu nhẫn Signet mặt vuông vát kinh điển, kết hợp đính 1 viên đá quý góc trái và bề mặt phẳng sang trọng khắc dấu vân tay.',
+        folderName: 'SIGNET_001_FP',
+      },
+      {
+        code: 'SIGNET_002_FP',
+        name: 'Memora Signet Ring - Fingerprint Classic',
+        description:
+          'Mẫu nhẫn Signet lòng chảo tròn vát, tôn vinh chi tiết dấu vân tay cá nhân hóa của cặp đôi cùng 1 viên đá chủ trung tâm.',
+        folderName: 'SIGNET_002_FP',
+      },
+      {
+        code: 'SIGNET_003_FP',
+        name: 'Memora Signet Ring - Bold Geometric Fingerprint',
+        description:
+          'Mẫu nhẫn Signet phong cách mạnh mẽ với bề mặt hình học sắc nét, 2 viên đá quý 2 bên và trung tâm khắc vân tay vĩnh cửu.',
+        folderName: 'SIGNET_003_FP',
+      },
+    ];
+
+    const templateMap = new Map<string, string>();
+
+    // 3.1. Seed mẫu nhẫn test rẻ phục vụ QA / Live PayOS QR
+    const testBand = await prisma.ring_templates.upsert({
+      where: { code: 'T_TEST_BAND' },
+      update: {
+        name: 'Memora Test Payment Band',
+        status: 'ACTIVE',
+        design_supported_personalization_packages: [
+          'FINGERPRINT',
+          'SOUNDWAVE',
+          'INITIALS',
+          'NONE',
+        ],
+      },
+      create: {
+        id: randomUUID(),
         code: 'T_TEST_BAND',
         name: 'Memora Test Payment Band',
         description:
@@ -234,81 +303,144 @@ async function main(): Promise<void> {
         v_max_mm: new Prisma.Decimal(2.0),
         status: 'ACTIVE',
       },
-      {
-        code: 'T_SOLITAIRE_01',
-        name: 'Classic Solitaire Ring',
-        description:
-          'Mẫu nhẫn Solitaire kinh điển tôn vinh viên đá chủ trung tâm, hỗ trợ khắc vân tay lòng nhẫn',
-        glb_asset_key: 'models/solitaire_01.glb',
-        stone_layout: 'SOLITAIRE',
-        design_supported_personalization_packages: [
-          'FINGERPRINT',
-          'INITIALS',
-          'NONE',
-        ],
-        theta_min_deg: new Prisma.Decimal(-90.0),
-        theta_max_deg: new Prisma.Decimal(90.0),
-        v_min_mm: new Prisma.Decimal(-1.5),
-        v_max_mm: new Prisma.Decimal(1.5),
-        status: 'ACTIVE',
-      },
-      {
-        code: 'T_ETERNITY_01',
-        name: 'Eternity Pavé Band',
-        description:
-          'Mẫu nhẫn đính dải kim cương tấm Pavé tinh tế, lưu giữ sóng âm thanh đặc biệt',
-        glb_asset_key: 'models/eternity_01.glb',
-        stone_layout: 'PAVE',
-        design_supported_personalization_packages: [
-          'SOUNDWAVE',
-          'INITIALS',
-          'NONE',
-        ],
-        theta_min_deg: new Prisma.Decimal(-120.0),
-        theta_max_deg: new Prisma.Decimal(120.0),
-        v_min_mm: new Prisma.Decimal(-1.8),
-        v_max_mm: new Prisma.Decimal(1.8),
-        status: 'ACTIVE',
-      },
-      {
-        code: 'T_MINIMAL_01',
-        name: 'Minimalist Signature Band',
-        description:
-          'Mẫu nhẫn trơn hiện đại, bề mặt hoàn hảo cho việc khắc bản đồ tọa độ, vân tay và sóng âm',
-        glb_asset_key: 'models/minimal_01.glb',
-        stone_layout: 'NONE',
-        design_supported_personalization_packages: [
-          'FINGERPRINT',
-          'SOUNDWAVE',
-          'COORDINATES',
-          'INITIALS',
-          'NONE',
-        ],
-        theta_min_deg: new Prisma.Decimal(-180.0),
-        theta_max_deg: new Prisma.Decimal(180.0),
-        v_min_mm: new Prisma.Decimal(-2.5),
-        v_max_mm: new Prisma.Decimal(2.5),
-        status: 'ACTIVE',
-      },
-    ];
+    });
+    templateMap.set('T_TEST_BAND', testBand.id);
+    console.log(`  - Ring Template T_TEST_BAND -> id=${testBand.id}`);
 
-    const templateMap = new Map<string, string>();
-    for (const t of templatesData) {
+    // 3.2. Seed 5 Production 3D Ring Models từ JSON template
+    interface RawGemSlot {
+      slot: string;
+    }
+    interface RawTemplateJson {
+      engrave_surface?: {
+        boundary?: Prisma.InputJsonValue;
+        boundary_uv?: Prisma.InputJsonValue;
+        forbidden_zones?: Prisma.InputJsonValue;
+      };
+      packages?: Record<string, unknown>;
+      gems?: RawGemSlot[];
+    }
+
+    for (const item of productionTemplates) {
+      const jsonPath = resolve(
+        base3DModelDir,
+        item.folderName,
+        `${item.folderName}_template.json`,
+      );
+      let boundaryJson: Prisma.InputJsonValue | null = null;
+      let forbiddenZonesJson: Prisma.InputJsonValue = [];
+      let packages: string[] = ['NONE'];
+      let gemsList: RawGemSlot[] = [];
+      let stoneLayout = 'NONE';
+
+      if (existsSync(jsonPath)) {
+        try {
+          const raw = JSON.parse(
+            readFileSync(jsonPath, 'utf8'),
+          ) as RawTemplateJson;
+          boundaryJson =
+            raw.engrave_surface?.boundary ??
+            raw.engrave_surface?.boundary_uv ??
+            null;
+          forbiddenZonesJson = raw.engrave_surface?.forbidden_zones ?? [];
+          packages = raw.packages ? Object.keys(raw.packages) : ['NONE'];
+          gemsList = raw.gems ?? [];
+          if (gemsList.length === 1) {
+            stoneLayout = 'SOLITAIRE';
+          } else if (gemsList.length > 1) {
+            stoneLayout = 'ACCENT';
+          }
+        } catch (err) {
+          console.warn(`  ! Không đọc được JSON cho ${item.code}:`, err);
+        }
+      }
+
       const row = await prisma.ring_templates.upsert({
-        where: { code: t.code },
+        where: { code: item.code },
         update: {
-          name: t.name,
-          status: t.status,
-          design_supported_personalization_packages:
-            t.design_supported_personalization_packages,
+          name: item.name,
+          description: item.description,
+          glb_asset_key: `models/${item.code}.glb`,
+          stone_layout: stoneLayout,
+          design_supported_personalization_packages: packages,
+          boundary_json: boundaryJson ?? Prisma.DbNull,
+          forbidden_zones_json: forbiddenZonesJson,
+          status: 'ACTIVE',
         },
         create: {
           id: randomUUID(),
-          ...t,
+          code: item.code,
+          name: item.name,
+          description: item.description,
+          glb_asset_key: `models/${item.code}.glb`,
+          stone_layout: stoneLayout,
+          design_supported_personalization_packages: packages,
+          boundary_json: boundaryJson ?? Prisma.DbNull,
+          forbidden_zones_json: forbiddenZonesJson,
+          theta_min_deg: new Prisma.Decimal(-180.0),
+          theta_max_deg: new Prisma.Decimal(180.0),
+          v_min_mm: new Prisma.Decimal(-2.5),
+          v_max_mm: new Prisma.Decimal(2.5),
+          status: 'ACTIVE',
         },
       });
-      templateMap.set(t.code, row.id);
-      console.log(`  - Ring Template ${t.code} -> id=${row.id}`);
+
+      templateMap.set(item.code, row.id);
+      console.log(
+        `  - Production Ring Template ${item.code} (Layout: ${stoneLayout}) -> id=${row.id}`,
+      );
+
+      // Seed Gemstone Groups & Slots nếu mẫu có đính đá
+      if (gemsList.length > 0) {
+        const group = await prisma.gemstone_groups.upsert({
+          where: {
+            ring_template_id_code: {
+              ring_template_id: row.id,
+              code: 'MAIN_GEMS',
+            },
+          },
+          update: {
+            name: `${item.name} Accent Gems`,
+            selection_mode: 'INDEPENDENT',
+            is_required: false,
+          },
+          create: {
+            id: randomUUID(),
+            ring_template_id: row.id,
+            code: 'MAIN_GEMS',
+            name: `${item.name} Accent Gems`,
+            selection_mode: 'INDEPENDENT',
+            is_required: false,
+            sequence_no: 1,
+          },
+        });
+
+        for (let i = 0; i < gemsList.length; i++) {
+          const g = gemsList[i];
+          await prisma.gemstone_slots.upsert({
+            where: {
+              gemstone_group_id_code: {
+                gemstone_group_id: group.id,
+                code: g.slot,
+              },
+            },
+            update: {
+              glb_node_name: g.slot,
+              slot_index: i + 1,
+            },
+            create: {
+              id: randomUUID(),
+              gemstone_group_id: group.id,
+              code: g.slot,
+              slot_index: i + 1,
+              glb_node_name: g.slot,
+            },
+          });
+        }
+        console.log(
+          `    * Seeded ${gemsList.length} 3D gemstone slots for ${item.code}`,
+        );
+      }
     }
 
     // =========================================================================
@@ -368,7 +500,9 @@ async function main(): Promise<void> {
     };
 
     for (const [key, vId] of variantMap.entries()) {
-      const [tCode, mCode] = key.split('_');
+      const lastUnderscore = key.lastIndexOf('_');
+      const tCode = key.substring(0, lastUnderscore);
+      const mCode = key.substring(lastUnderscore + 1);
       let amount = baseMetalPrices[mCode] ?? 5000000;
       if (tCode === 'T_TEST_BAND') {
         amount = mCode === 'SS925' ? 5000 : 20000;
@@ -433,6 +567,27 @@ async function main(): Promise<void> {
           code: pCode,
           price_type: 'PERSONALIZATION',
           personalization_package: pkg,
+          status: 'ACTIVE',
+        },
+      });
+
+      await upsertPriceVersion(prisma, item.id, amount);
+    }
+
+    // D. Maintenance Plan Price (LIFETIME_POLISHING: 500k)
+    const maintenancePrices: Record<string, number> = {
+      LIFETIME_POLISHING: 500000,
+    };
+
+    for (const [planCode, amount] of Object.entries(maintenancePrices)) {
+      const pCode = `PLAN_${planCode}`;
+      const item = await prisma.price_items.upsert({
+        where: { code: pCode },
+        update: { status: 'ACTIVE' },
+        create: {
+          id: randomUUID(),
+          code: pCode,
+          price_type: 'MAINTENANCE_PLAN',
           status: 'ACTIVE',
         },
       });

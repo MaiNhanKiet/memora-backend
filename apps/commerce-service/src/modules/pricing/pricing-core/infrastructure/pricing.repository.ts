@@ -79,6 +79,24 @@ export class PricingRepository {
     });
   }
 
+  findActivePriceVersionByMaintenancePlan(
+    planCode: string,
+  ): Promise<(price_versions & { price_items: price_items }) | null> {
+    return this.prisma.price_versions.findFirst({
+      where: {
+        status: 'ACTIVE',
+        price_items: {
+          code: `PLAN_${planCode}`,
+          price_type: 'MAINTENANCE_PLAN',
+          status: 'ACTIVE',
+        },
+      },
+      include: {
+        price_items: true,
+      },
+    });
+  }
+
   findActiveResizeRule(
     variantId: string,
     direction: 'UP' | 'DOWN',

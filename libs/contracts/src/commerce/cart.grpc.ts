@@ -19,6 +19,7 @@ export interface CartItemDraft {
   targetSize: number;
   personalizationPackage: string;
   memoryEnabled: boolean;
+  maintenancePlan?: string;
   gemstoneSelections: GemstoneSelectionItem[];
   estimatedPrice: number;
   currency: string;
@@ -48,6 +49,7 @@ export interface AddCartItemRequest {
   gemstoneSelections: GemstoneSelectionItem[];
   personalizationPackage: string;
   memoryEnabled: boolean;
+  maintenancePlan?: string;
 }
 
 export interface AddCartItemResponse {
@@ -63,6 +65,7 @@ export interface UpdateCartItemRequest {
   targetSize?: number;
   personalizationPackage?: string;
   memoryEnabled?: boolean;
+  maintenancePlan?: string;
 }
 
 export interface UpdateCartItemResponse {

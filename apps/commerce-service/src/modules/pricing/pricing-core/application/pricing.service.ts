@@ -129,8 +129,25 @@ export class PricingService {
       }
     }
 
+    // 7. Maintenance Plan Fee
+    let maintenancePlanFee = 0;
+    const plan = request.maintenancePlan || 'NONE';
+    if (plan !== 'NONE') {
+      const planPriceVersion =
+        await this.repository.findActivePriceVersionByMaintenancePlan(plan);
+      if (planPriceVersion) {
+        maintenancePlanFee = Number(planPriceVersion.amount);
+      } else if (plan === 'LIFETIME_POLISHING') {
+        maintenancePlanFee = 500000;
+      }
+    }
+
     const estimatedTotal =
-      baseBlankPrice + gemstonesPrice + personalizationFee + resizeFee;
+      baseBlankPrice +
+      gemstonesPrice +
+      personalizationFee +
+      resizeFee +
+      maintenancePlanFee;
 
     return {
       estimatedTotal,
@@ -141,6 +158,7 @@ export class PricingService {
         gemstonesPrice,
         personalizationFee,
         resizeFee,
+        maintenancePlanFee,
       },
       gemstoneLineItems,
     };

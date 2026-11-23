@@ -4,7 +4,7 @@
     "noEmit": true,
     "declaration": false
   },
-  "include": ["apps/**/*.ts", "libs/**/*.ts"],
+  "include": ["apps/**/*.ts", "libs/**/*.ts", "test/**/*.ts"],
   "exclude": [
     "node_modules",
     "dist",

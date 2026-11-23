@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { RingItemSummary } from '@app/contracts';
 import { Prisma } from '../../../../../generated/prisma/client';
 import type {
   orders,
@@ -150,6 +151,7 @@ export class OrderingRepository {
 
       // 4. Create Ring Items, Versions, Gemstones and Quote Items
       let itemNumber = 1;
+      const createdItems: RingItemSummary[] = [];
       for (const draft of params.selectedDrafts) {
         // Create Ring Item
         const ringItem = await tx.ring_items.create({
@@ -160,6 +162,32 @@ export class OrderingRepository {
           },
         });
 
+        // Extract maintenance plan & gemstone selections from draft.gemstone_config_json
+        const draftConfig = draft.gemstone_config_json as
+          | Array<{
+              slotNumber?: number;
+              slot_number?: number;
+              gemstoneOptionId?: string;
+              gemstone_option_id?: string;
+            }>
+          | {
+              selections?: Array<{
+                slotNumber?: number;
+                slot_number?: number;
+                gemstoneOptionId?: string;
+                gemstone_option_id?: string;
+              }>;
+              maintenancePlan?: string;
+            };
+
+        const rawSelections = Array.isArray(draftConfig)
+          ? draftConfig
+          : (draftConfig?.selections ?? []);
+        const maintenancePlan =
+          !Array.isArray(draftConfig) && draftConfig?.maintenancePlan
+            ? draftConfig.maintenancePlan
+            : undefined;
+
         // Create Ring Item Version V1
         const ringItemVersion = await tx.ring_item_versions.create({
           data: {
@@ -169,6 +197,9 @@ export class OrderingRepository {
             target_size: draft.target_size,
             personalization_package: draft.personalization_package,
             memory_enabled: draft.memory_enabled,
+            preview_snapshot_json: maintenancePlan
+              ? { maintenancePlan }
+              : Prisma.JsonNull,
             status: 'DRAFT',
             change_reason: 'INITIAL_SNAPSHOT',
             created_by_customer_identity_id: params.ownerCustomerIdentityId,
@@ -182,10 +213,7 @@ export class OrderingRepository {
         });
 
         // Map gemstone selections to ring_item_version_gemstones
-        if (
-          Array.isArray(draft.gemstone_config_json) &&
-          draft.gemstone_config_json.length > 0
-        ) {
+        if (rawSelections.length > 0) {
           const slots = await tx.gemstone_slots.findMany({
             where: {
               gemstone_groups: {
@@ -195,12 +223,7 @@ export class OrderingRepository {
             orderBy: { slot_index: 'asc' },
           });
 
-          for (const item of draft.gemstone_config_json as Array<{
-            slotNumber?: number;
-            slot_number?: number;
-            gemstoneOptionId?: string;
-            gemstone_option_id?: string;
-          }>) {
+          for (const item of rawSelections) {
             const slotIdx = item.slotNumber ?? item.slot_number ?? 1;
             const optId = item.gemstoneOptionId ?? item.gemstone_option_id;
             const matchedSlot =
@@ -219,7 +242,16 @@ export class OrderingRepository {
         }
 
         // Create Quote Item for this Ring Item
-        const unitPrice = draft.estimated_price ?? new Prisma.Decimal(0);
+        const totalDraftPrice = draft.estimated_price
+          ? Number(draft.estimated_price)
+          : 0;
+        const maintenanceAmount =
+          maintenancePlan === 'LIFETIME_POLISHING' ? 500000 : 0;
+        const ringBlankAmount = Math.max(
+          0,
+          totalDraftPrice - maintenanceAmount,
+        );
+
         await tx.quote_items.create({
           data: {
             quote_id: quote.id,
@@ -227,10 +259,40 @@ export class OrderingRepository {
             component_type: 'RING_BLANK',
             description: `${draft.template_variants.ring_templates.name} - ${draft.template_variants.materials.name}`,
             quantity: new Prisma.Decimal(1),
-            unit_amount: unitPrice,
-            line_amount: unitPrice,
+            unit_amount: new Prisma.Decimal(ringBlankAmount),
+            line_amount: new Prisma.Decimal(ringBlankAmount),
             price_source_type: 'MANUAL',
           },
+        });
+
+        if (maintenancePlan === 'LIFETIME_POLISHING') {
+          await tx.quote_items.create({
+            data: {
+              quote_id: quote.id,
+              ring_item_id: ringItem.id,
+              component_type: 'MAINTENANCE_PLAN',
+              description: 'Gói bảo dưỡng trọn đời - Đánh bóng và xi mới',
+              quantity: new Prisma.Decimal(1),
+              unit_amount: new Prisma.Decimal(500000),
+              line_amount: new Prisma.Decimal(500000),
+              price_source_type: 'MANUAL',
+            },
+          });
+        }
+
+        createdItems.push({
+          id: ringItem.id,
+          itemNo: itemNumber,
+          sourceRingDesignDraftId: draft.id,
+          currentVersionId: ringItemVersion.id,
+          versionNo: 1,
+          templateVariantId: draft.template_variant_id,
+          templateCode: draft.template_variants.ring_templates.code,
+          templateName: draft.template_variants.ring_templates.name,
+          materialName: draft.template_variants.materials.name,
+          targetSize: Number(draft.target_size),
+          personalizationPackage: draft.personalization_package,
+          memoryEnabled: draft.memory_enabled,
         });
 
         itemNumber++;
@@ -258,6 +320,7 @@ export class OrderingRepository {
         quote,
         itemsCount: params.selectedDrafts.length,
         totalAmount,
+        items: createdItems,
       };
     });
   }

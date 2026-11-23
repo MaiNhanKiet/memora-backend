@@ -11,6 +11,7 @@ import {
   AdminOrderDetailsResponseDto,
   AdminOrderSummaryDto,
   CancelOrderResponseDto,
+  RingItemDetailResponseDto,
   RingItemVersionSummaryDto,
   UpdateCurrentRingItemVersionResponseDto,
 } from '../dto';
@@ -142,7 +143,7 @@ export function ApiGetRingItemDetailsDocs() {
       type: String,
     }),
     ApiSuccessResponse({
-      type: RingItemVersionSummaryDto,
+      type: RingItemDetailResponseDto,
       description: 'Ring item details returned successfully',
     }),
     unauthorized,
