@@ -8,6 +8,8 @@ export interface WorkerObject {
 export interface WorkerOutputs {
   readonly vectorSvg: WorkerObject;
   readonly manifest: WorkerObject;
+  /** Transparent PNG of the design (fingerprint v0 / crops); unset for older workers. */
+  readonly alphaPng?: WorkerObject;
   /** The 3 s segment (soundwave/process only); unset for older workers and render calls. */
   readonly audioSegment?: WorkerObject;
 }
@@ -40,10 +42,79 @@ export interface WavecodeResult {
   readonly nudgeCandidates: readonly (readonly number[])[];
 }
 
+/** High-resolution cleaned image the crops are cut from (deleted when a version is accepted). */
+export interface WorkerImage extends WorkerFile {
+  readonly widthPx: number;
+  readonly heightPx: number;
+}
+
+/** Parameters and measurements of one fingerprint design version (PERSO-036..039). */
+export interface FingerprintVersionInfo {
+  readonly versionId: string;
+  readonly shape: string;
+  readonly offsetX: number;
+  readonly offsetY: number;
+  readonly zoom: number;
+  readonly erasedRatio: number;
+  readonly ridgeWidthRatio: number;
+  readonly minEngraveSizeMm: number;
+  readonly coverage: number;
+}
+
 export interface FingerprintProcessed {
   readonly processorVersion: string;
   readonly outputs: WorkerOutputs;
   readonly artwork: FingerprintArtwork;
+  /** Unset for an older worker: the artwork then cannot be edited. */
+  readonly base?: WorkerImage;
+  readonly version?: FingerprintVersionInfo;
+}
+
+export interface EraseStrokeInput {
+  readonly radius: number;
+  readonly points: readonly (readonly [number, number])[];
+}
+
+export interface FingerprintCropInput {
+  readonly sourceId: string;
+  readonly outputPrefix: string;
+  readonly versionId: string;
+  readonly shape: string;
+  readonly offsetX: number;
+  readonly offsetY: number;
+  readonly zoom: number;
+  readonly eraseStrokes?: readonly EraseStrokeInput[];
+  readonly context: WorkerContext;
+}
+
+export interface FingerprintCropRendered {
+  readonly processorVersion: string | undefined;
+  readonly outputs: WorkerOutputs;
+  readonly artwork: FingerprintArtwork;
+  readonly version: FingerprintVersionInfo;
+}
+
+export interface SelectFingerprintVersionInput {
+  readonly sourceId: string;
+  readonly outputPrefix: string;
+  readonly versionId: string;
+  readonly context: WorkerContext;
+}
+
+export interface FingerprintVersionSelected {
+  readonly deleted: readonly string[];
+}
+
+export interface FingerprintFrame {
+  readonly code: string;
+  readonly name: string;
+  readonly description: string;
+  readonly sampleSvg: string;
+}
+
+export interface FingerprintFramesCatalog {
+  readonly defaultShape: string;
+  readonly shapes: readonly FingerprintFrame[];
 }
 
 export interface SoundwaveProcessed {
@@ -152,6 +223,16 @@ export interface ProcessingWorkerPort {
   selectWavecodeStyle(
     input: SelectWavecodeStyleInput,
   ): Promise<WavecodeStyleSelected>;
+  /** POST /v1/fingerprint/render-crop (PERSO-038). */
+  renderFingerprintCrop(
+    input: FingerprintCropInput,
+  ): Promise<FingerprintCropRendered>;
+  /** POST /v1/fingerprint/select-version (PERSO-039): keeps one version, deletes the rest and the base. */
+  selectFingerprintVersion(
+    input: SelectFingerprintVersionInput,
+  ): Promise<FingerprintVersionSelected>;
+  /** GET /v1/fingerprint/presets (PERSO-036). */
+  listFingerprintFrames(): Promise<FingerprintFramesCatalog>;
   /** GET /v1/soundwave/presets (PERSO-031). */
   listSoundwaveStyles(): Promise<SoundwaveStylesCatalog>;
 }

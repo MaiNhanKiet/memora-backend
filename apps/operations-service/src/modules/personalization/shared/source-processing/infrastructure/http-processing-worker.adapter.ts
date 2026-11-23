@@ -1,6 +1,14 @@
 import {
   ProcessingWorkerError,
+  type FingerprintArtwork,
+  type FingerprintCropInput,
+  type FingerprintCropRendered,
+  type FingerprintFramesCatalog,
   type FingerprintProcessed,
+  type FingerprintVersionInfo,
+  type FingerprintVersionSelected,
+  type SelectFingerprintVersionInput,
+  type WorkerImage,
   type ProcessFingerprintInput,
   type ProcessingWorkerPort,
   type ProcessSoundwaveInput,
@@ -17,6 +25,7 @@ import {
   type WorkerOutputs,
 } from '../application/processing-worker.port';
 import {
+  CROP_TIMEOUT_MS,
   FINGERPRINT_TIMEOUT_MS,
   RENDER_TIMEOUT_MS,
   SOUNDWAVE_TIMEOUT_MS,
@@ -43,26 +52,75 @@ export class HttpProcessingWorkerAdapter implements ProcessingWorkerPort {
       input,
       FINGERPRINT_TIMEOUT_MS,
     );
-    const artwork = record(body.artwork);
-    const hull = artwork?.hull;
-    if (
-      artwork === undefined ||
-      typeof artwork.aspectRatio !== 'number' ||
-      !Array.isArray(hull) ||
-      !hull.every(
-        (point: unknown) =>
-          Array.isArray(point) && point.every((v) => typeof v === 'number'),
-      )
-    ) {
-      throw malformed();
-    }
     return {
       processorVersion: text(body.processorVersion),
       outputs: outputs(body.outputs),
-      artwork: {
-        aspectRatio: artwork.aspectRatio,
-        hull: hull,
-      },
+      artwork: artworkOf(body.artwork),
+      ...(body.base === undefined ? {} : { base: image(body.base) }),
+      ...(body.version === undefined
+        ? {}
+        : { version: versionInfo(body.version) }),
+    };
+  }
+
+  async renderFingerprintCrop(
+    input: FingerprintCropInput,
+  ): Promise<FingerprintCropRendered> {
+    const body = await this.post(
+      '/v1/fingerprint/render-crop',
+      input,
+      CROP_TIMEOUT_MS,
+    );
+    return {
+      processorVersion:
+        typeof body.processorVersion === 'string'
+          ? body.processorVersion
+          : undefined,
+      outputs: outputs(body.outputs),
+      artwork: artworkOf(body.artwork),
+      version: versionInfo(body.version),
+    };
+  }
+
+  async selectFingerprintVersion(
+    input: SelectFingerprintVersionInput,
+  ): Promise<FingerprintVersionSelected> {
+    const body = await this.post(
+      '/v1/fingerprint/select-version',
+      input,
+      RENDER_TIMEOUT_MS,
+    );
+    return {
+      deleted: Array.isArray(body.deleted)
+        ? body.deleted.filter((key): key is string => typeof key === 'string')
+        : [],
+    };
+  }
+
+  async listFingerprintFrames(): Promise<FingerprintFramesCatalog> {
+    const data = await this.send(
+      'GET',
+      '/v1/fingerprint/presets',
+      undefined,
+      STYLES_TIMEOUT_MS,
+    );
+    if (!Array.isArray(data.shapes)) {
+      throw malformed();
+    }
+    return {
+      defaultShape: text(data.defaultShape),
+      shapes: data.shapes.map((value: unknown) => {
+        const item = record(value);
+        if (item === undefined) {
+          throw malformed();
+        }
+        return {
+          code: text(item.code),
+          name: text(item.name),
+          description: text(item.description),
+          sampleSvg: text(item.sampleSvg),
+        };
+      }),
     };
   }
 
@@ -273,6 +331,9 @@ function outputs(value: unknown): WorkerOutputs {
   return {
     vectorSvg: workerObject(item.vectorSvg),
     manifest: workerObject(item.manifest),
+    ...(item.alphaPng === undefined
+      ? {}
+      : { alphaPng: workerObject(item.alphaPng) }),
     ...(item.audioSegment === undefined
       ? {}
       : { audioSegment: workerObject(item.audioSegment) }),
@@ -311,6 +372,57 @@ function styleFiles(
     };
   }
   return result;
+}
+
+function finite(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw malformed();
+  }
+  return value;
+}
+
+function artworkOf(value: unknown): FingerprintArtwork {
+  const artwork = record(value);
+  const hull = artwork?.hull;
+  if (
+    artwork === undefined ||
+    typeof artwork.aspectRatio !== 'number' ||
+    !Array.isArray(hull) ||
+    !hull.every(
+      (point: unknown) =>
+        Array.isArray(point) && point.every((v) => typeof v === 'number'),
+    )
+  ) {
+    throw malformed();
+  }
+  return { aspectRatio: artwork.aspectRatio, hull: hull };
+}
+
+function image(value: unknown): WorkerImage {
+  const item = record(value);
+  return {
+    ...file(value),
+    widthPx: finite(item?.widthPx),
+    heightPx: finite(item?.heightPx),
+  };
+}
+
+function versionInfo(value: unknown): FingerprintVersionInfo {
+  const item = record(value);
+  if (item === undefined) {
+    throw malformed();
+  }
+  return {
+    versionId: text(item.versionId),
+    shape: text(item.shape),
+    offsetX: finite(item.offsetX),
+    offsetY: finite(item.offsetY),
+    zoom: finite(item.zoom),
+    erasedRatio: finite(item.erasedRatio),
+    ridgeWidthRatio: finite(item.ridgeWidthRatio),
+    minEngraveSizeMm: finite(item.minEngraveSizeMm),
+    coverage: finite(item.coverage),
+  };
 }
 
 function numbers(value: unknown): number[] {

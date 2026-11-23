@@ -3,6 +3,11 @@ import { GrpcMethod } from '@nestjs/microservices';
 import {
   PERSONALIZATION_SOURCE_SERVICE_NAME,
   type AcceptWavecodeStyleRequest,
+  type AcceptFingerprintArtworkRequest,
+  type CreateFingerprintCropRequest,
+  type FingerprintArtwork,
+  type GetFingerprintArtworkRequest,
+  type ListFingerprintFramesResponse,
   type GetSoundwaveWavecodeRequest,
   type ResegmentSoundwaveSourceRequest,
   type SelectWavecodeStyleRequest,
@@ -15,6 +20,12 @@ import {
 } from '@app/contracts';
 import { OperationsInternalGrpcAuthGuard } from '../../../../grpc/operations-internal-grpc-auth.guard';
 import { GetSourceProcessingUseCase } from '../application/get-source-processing.use-case';
+import {
+  AcceptFingerprintArtworkUseCase,
+  CreateFingerprintCropUseCase,
+  GetFingerprintArtworkUseCase,
+} from '../application/artwork.use-cases';
+import { ListFingerprintFramesUseCase } from '../application/list-fingerprint-frames.use-case';
 import { ListOrderSourcesUseCase } from '../application/list-order-sources.use-case';
 import { ResegmentSoundwaveSourceUseCase } from '../application/resegment-soundwave-source.use-case';
 import {
@@ -34,6 +45,10 @@ export class SourcesGrpcController implements PersonalizationSourceServiceHandle
     private readonly selectStyleUseCase: SelectWavecodeStyleUseCase,
     private readonly acceptStyleUseCase: AcceptWavecodeStyleUseCase,
     private readonly resegmentUseCase: ResegmentSoundwaveSourceUseCase,
+    private readonly framesUseCase: ListFingerprintFramesUseCase,
+    private readonly getArtworkUseCase: GetFingerprintArtworkUseCase,
+    private readonly cropUseCase: CreateFingerprintCropUseCase,
+    private readonly acceptArtworkUseCase: AcceptFingerprintArtworkUseCase,
   ) {}
 
   @GrpcMethod(PERSONALIZATION_SOURCE_SERVICE_NAME, 'ListOrderSources')
@@ -76,5 +91,31 @@ export class SourcesGrpcController implements PersonalizationSourceServiceHandle
     request: ResegmentSoundwaveSourceRequest,
   ): Promise<SoundwaveWavecode> {
     return this.resegmentUseCase.execute(request);
+  }
+
+  @GrpcMethod(PERSONALIZATION_SOURCE_SERVICE_NAME, 'ListFingerprintFrames')
+  listFingerprintFrames(): Promise<ListFingerprintFramesResponse> {
+    return this.framesUseCase.execute();
+  }
+
+  @GrpcMethod(PERSONALIZATION_SOURCE_SERVICE_NAME, 'GetFingerprintArtwork')
+  getFingerprintArtwork(
+    request: GetFingerprintArtworkRequest,
+  ): Promise<FingerprintArtwork> {
+    return this.getArtworkUseCase.execute(request);
+  }
+
+  @GrpcMethod(PERSONALIZATION_SOURCE_SERVICE_NAME, 'CreateFingerprintCrop')
+  createFingerprintCrop(
+    request: CreateFingerprintCropRequest,
+  ): Promise<FingerprintArtwork> {
+    return this.cropUseCase.execute(request);
+  }
+
+  @GrpcMethod(PERSONALIZATION_SOURCE_SERVICE_NAME, 'AcceptFingerprintArtwork')
+  acceptFingerprintArtwork(
+    request: AcceptFingerprintArtworkRequest,
+  ): Promise<FingerprintArtwork> {
+    return this.acceptArtworkUseCase.execute(request);
   }
 }

@@ -29,6 +29,11 @@ import {
   type ListSoundwaveStylesResponse,
   type SoundwaveUploadServiceClient,
   type AcceptWavecodeStyleRequest,
+  type AcceptFingerprintArtworkRequest,
+  type CreateFingerprintCropRequest,
+  type FingerprintArtwork,
+  type GetFingerprintArtworkRequest,
+  type ListFingerprintFramesResponse,
   type GetSoundwaveWavecodeRequest,
   type ResegmentSoundwaveSourceRequest,
   type SelectWavecodeStyleRequest,
@@ -62,6 +67,12 @@ export const OPERATIONS_PERSONALIZATION_GRPC_CLIENT =
 const FAILED_PRECONDITION_MESSAGE = 'Failed precondition';
 /** PERSO-010: the uploaded object failed verification. Sent as INVALID_ARGUMENT, answered 422. */
 const UPLOAD_INVALID_REASON = 'UPLOAD_INVALID';
+/** PERSO-038: the worker refused the crop. Sent as INVALID_ARGUMENT, answered 422. */
+const UNPROCESSABLE_REASONS: readonly string[] = [
+  UPLOAD_INVALID_REASON,
+  'ERASE_AREA_TOO_LARGE',
+  'FRAME_COVERAGE_TOO_LOW',
+];
 /** PERSO-031: no style list from the worker and nothing cached. Answered 503 with this reason. */
 const WORKER_UNAVAILABLE_REASON = 'PROCESSING_WORKER_UNAVAILABLE';
 
@@ -224,6 +235,36 @@ export class PersonalizationGrpcClient
     );
   }
 
+  listFingerprintFrames(): Promise<ListFingerprintFramesResponse> {
+    return this.unary((metadata) =>
+      this.sourceService.listFingerprintFrames({}, metadata),
+    );
+  }
+
+  getFingerprintArtwork(
+    request: GetFingerprintArtworkRequest,
+  ): Promise<FingerprintArtwork> {
+    return this.unary((metadata) =>
+      this.sourceService.getFingerprintArtwork(request, metadata),
+    );
+  }
+
+  createFingerprintCrop(
+    request: CreateFingerprintCropRequest,
+  ): Promise<FingerprintArtwork> {
+    return this.unary((metadata) =>
+      this.sourceService.createFingerprintCrop(request, metadata),
+    );
+  }
+
+  acceptFingerprintArtwork(
+    request: AcceptFingerprintArtworkRequest,
+  ): Promise<FingerprintArtwork> {
+    return this.unary((metadata) =>
+      this.sourceService.acceptFingerprintArtwork(request, metadata),
+    );
+  }
+
   resegmentSoundwaveSource(
     request: ResegmentSoundwaveSourceRequest,
   ): Promise<SoundwaveWavecode> {
@@ -279,9 +320,9 @@ export class PersonalizationGrpcClient
     }
     if (
       grpcStatus === GrpcStatus.INVALID_ARGUMENT &&
-      readReason(error) === UPLOAD_INVALID_REASON
+      UNPROCESSABLE_REASONS.includes(readReason(error))
     ) {
-      return unprocessable(UPLOAD_INVALID_REASON);
+      return unprocessable(readReason(error));
     }
     if (
       grpcStatus === GrpcStatus.UNAVAILABLE &&

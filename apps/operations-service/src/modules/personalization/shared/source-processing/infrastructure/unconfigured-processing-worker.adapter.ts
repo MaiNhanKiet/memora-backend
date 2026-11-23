@@ -1,6 +1,9 @@
 import {
   ProcessingWorkerError,
+  type FingerprintCropRendered,
+  type FingerprintFramesCatalog,
   type FingerprintProcessed,
+  type FingerprintVersionSelected,
   type ProcessingWorkerPort,
   type SoundwaveProcessed,
   type SoundwaveStylesCatalog,
@@ -22,6 +25,18 @@ export class UnconfiguredProcessingWorkerAdapter implements ProcessingWorkerPort
   }
 
   renderWavecode(): Promise<WavecodeRendered> {
+    return Promise.reject(unconfigured());
+  }
+
+  renderFingerprintCrop(): Promise<FingerprintCropRendered> {
+    return Promise.reject(unconfigured());
+  }
+
+  selectFingerprintVersion(): Promise<FingerprintVersionSelected> {
+    return Promise.reject(unconfigured());
+  }
+
+  listFingerprintFrames(): Promise<FingerprintFramesCatalog> {
     return Promise.reject(unconfigured());
   }
 

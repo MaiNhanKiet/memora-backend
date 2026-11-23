@@ -12,11 +12,13 @@ import {
   PROCESSING_WORKER_PORT,
   ProcessingWorkerError,
   type ProcessingWorkerPort,
+  type FingerprintProcessed,
   type WavecodeRendered,
   type WavecodeResult,
   type WorkerContext,
   type WorkerOutputs,
 } from './processing-worker.port';
+import { readArtworkState, writeArtworkState } from './artwork-state';
 import { readWavecodeState } from './wavecode-state';
 import {
   SOURCE_PROCESSING_REPOSITORY,
@@ -72,8 +74,11 @@ export class ProcessSourceUseCase {
     ) {
       return { kind: 'IGNORED' };
     }
-    // PERSO-034: an accepted style is final; never reprocess such a source.
-    if (readWavecodeState(source.metadata)?.acceptedStyle !== undefined) {
+    // PERSO-034 / PERSO-039: an accepted style or artwork is final; never reprocess such a source.
+    if (
+      readWavecodeState(source.metadata)?.acceptedStyle !== undefined ||
+      readArtworkState(source.metadata)?.acceptedVersionId !== undefined
+    ) {
       return { kind: 'IGNORED' };
     }
     if (source.status === 'ACCEPTED') {
@@ -115,10 +120,7 @@ export class ProcessSourceUseCase {
       ...outputFields(result.outputs),
       metadata: {
         processorVersion: result.processorVersion,
-        artwork: {
-          aspectRatio: result.artwork.aspectRatio,
-          hull: result.artwork.hull.map((point) => [...point]),
-        },
+        artwork: fingerprintArtwork(result),
         processedAt: new Date().toISOString(),
       },
     });
@@ -326,6 +328,47 @@ function styleEntries(wavecode: WavecodeResult): Record<string, JsonValue> {
     };
   }
   return entries;
+}
+
+/**
+ * metadata.artwork of a processed fingerprint. With `base` and `version` from the worker the
+ * design v0 is recorded and can be edited (PERSO-038); an older worker leaves only the
+ * aspect ratio and hull, so editing is refused with ARTWORK_NOT_EDITABLE.
+ */
+function fingerprintArtwork(
+  result: FingerprintProcessed,
+): Record<string, JsonValue> {
+  const hull = result.artwork.hull.map((point) => [...point]);
+  const { base, version } = result;
+  const png = result.outputs.alphaPng;
+  if (base === undefined || version === undefined || png === undefined) {
+    return { aspectRatio: result.artwork.aspectRatio, hull };
+  }
+  return writeArtworkState({
+    aspectRatio: result.artwork.aspectRatio,
+    hull,
+    baseKey: base.key,
+    currentVersionId: version.versionId,
+    versions: {
+      [version.versionId]: {
+        shape: version.shape,
+        offsetX: version.offsetX,
+        offsetY: version.offsetY,
+        zoom: version.zoom,
+        erasedRatio: version.erasedRatio,
+        ridgeWidthRatio: version.ridgeWidthRatio,
+        minEngraveSizeMm: version.minEngraveSizeMm,
+        coverage: version.coverage,
+        aspectRatio: result.artwork.aspectRatio,
+        svgKey: result.outputs.vectorSvg.key,
+        svgSha256: result.outputs.vectorSvg.sha256,
+        pngKey: png.key,
+        pngSha256: png.sha256,
+        hull,
+        createdAt: new Date().toISOString(),
+      },
+    },
+  });
 }
 
 function currentRevision(metadata: Readonly<Record<string, unknown>>): number {

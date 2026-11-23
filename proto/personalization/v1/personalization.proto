@@ -40,6 +40,93 @@ service PersonalizationSourceService {
   rpc AcceptWavecodeStyle (AcceptWavecodeStyleRequest) returns (SoundwaveWavecode);
   // PERSO-035 (approved 2026-11-23). Pick another 3 s segment without re-uploading; the source goes back to ACCEPTED and is processed again.
   rpc ResegmentSoundwaveSource (ResegmentSoundwaveSourceRequest) returns (SoundwaveWavecode);
+  // PERSO-036..039 (approved 2026-11-23): fingerprint artwork design. ListFingerprintFrames is a public read without actor.
+  // Reasons: NOT_FOUND SOURCE_NOT_FOUND / VERSION_NOT_FOUND; ALREADY_EXISTS SOURCE_NOT_READY / ARTWORK_LOCKED / ARTWORK_NOT_EDITABLE / ARTWORK_VERSION_LIMIT_REACHED;
+  // INVALID_ARGUMENT ERASE_AREA_TOO_LARGE / FRAME_COVERAGE_TOO_LOW (answered 422); UNAVAILABLE PROCESSING_WORKER_UNAVAILABLE.
+  rpc ListFingerprintFrames (ListFingerprintFramesRequest) returns (ListFingerprintFramesResponse);
+  rpc GetFingerprintArtwork (GetFingerprintArtworkRequest) returns (FingerprintArtwork);
+  rpc CreateFingerprintCrop (CreateFingerprintCropRequest) returns (FingerprintArtwork);
+  rpc AcceptFingerprintArtwork (AcceptFingerprintArtworkRequest) returns (FingerprintArtwork);
+}
+
+message ListFingerprintFramesRequest {}
+
+message FingerprintFrame {
+  // NATURAL | CIRCLE | HEART | SQUARE
+  string code = 1;
+  string name = 2;
+  string description = 3;
+  string sample_svg = 4;
+}
+
+message ListFingerprintFramesResponse {
+  string default_shape = 1;
+  repeated FingerprintFrame shapes = 2;
+}
+
+message GetFingerprintArtworkRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+}
+
+message ErasePoint {
+  // 0..1
+  double x = 1;
+  double y = 2;
+}
+
+message EraseStroke {
+  // 0.005..0.1
+  double radius = 1;
+  // 1..200 points
+  repeated ErasePoint points = 2;
+}
+
+message CreateFingerprintCropRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  string shape = 3;
+  // -1..1
+  double offset_x = 4;
+  double offset_y = 5;
+  // 1..3
+  double zoom = 6;
+  // at most 50 strokes
+  repeated EraseStroke erase_strokes = 7;
+}
+
+message AcceptFingerprintArtworkRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  string version_id = 3;
+}
+
+// Never carries object keys, checksums, hulls or erase strokes.
+message FingerprintArtworkVersion {
+  string version_id = 1;
+  string shape = 2;
+  double offset_x = 3;
+  double offset_y = 4;
+  double zoom = 5;
+  double erased_ratio = 6;
+  double min_engrave_size_mm = 7;
+  double coverage = 8;
+  // ISO-8601 UTC.
+  string created_at = 9;
+  // 300 s presigned GET URLs; credentials, never log them.
+  optional string preview_svg_url = 10;
+  optional string preview_png_url = 11;
+}
+
+message FingerprintArtwork {
+  // PENDING | ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 1;
+  optional string failure_code = 2;
+  // 300 s presigned GET URL; unset once a version is accepted (the base image is deleted).
+  optional string base_image_url = 3;
+  optional string current_version_id = 4;
+  optional string accepted_version_id = 5;
+  repeated FingerprintArtworkVersion versions = 6;
 }
 
 message ResegmentSoundwaveSourceRequest {

@@ -20,6 +20,8 @@ export const FINGERPRINT_TIMEOUT_MS = 60_000;
 export const SOUNDWAVE_TIMEOUT_MS = 90_000;
 export const RENDER_TIMEOUT_MS = 30_000;
 export const STYLES_TIMEOUT_MS = 10_000;
+/** render-crop vectorises a 2048 px image; kept below the 60 s artwork transaction timeout. */
+export const CROP_TIMEOUT_MS = 45_000;
 
 /** Output prefix every worker request uses (contract section 4). */
 export function sourceOutputPrefix(

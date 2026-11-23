@@ -10,6 +10,15 @@ import {
   GetSoundwaveWavecodeUseCase,
   SelectWavecodeStyleUseCase,
 } from './application/wavecode-style.use-cases';
+import { ArtworkSupport } from './application/artwork-support';
+import { ARTWORK_REPOSITORY } from './application/artwork.repository';
+import {
+  AcceptFingerprintArtworkUseCase,
+  CreateFingerprintCropUseCase,
+  GetFingerprintArtworkUseCase,
+} from './application/artwork.use-cases';
+import { ListFingerprintFramesUseCase } from './application/list-fingerprint-frames.use-case';
+import { PrismaArtworkRepository } from './infrastructure/prisma-artwork.repository';
 import { ResegmentSoundwaveSourceUseCase } from './application/resegment-soundwave-source.use-case';
 import { WavecodeSupport } from './application/wavecode-support';
 import { WAVECODE_REPOSITORY } from './application/wavecode.repository';
@@ -28,6 +37,15 @@ import { SourcesGrpcController } from './presentation/sources.grpc.controller';
     AcceptWavecodeStyleUseCase,
     ResegmentSoundwaveSourceUseCase,
     WavecodeSupport,
+    ListFingerprintFramesUseCase,
+    GetFingerprintArtworkUseCase,
+    CreateFingerprintCropUseCase,
+    AcceptFingerprintArtworkUseCase,
+    ArtworkSupport,
+    {
+      provide: ARTWORK_REPOSITORY,
+      useClass: PrismaArtworkRepository,
+    },
     {
       provide: WAVECODE_REPOSITORY,
       useClass: PrismaWavecodeRepository,

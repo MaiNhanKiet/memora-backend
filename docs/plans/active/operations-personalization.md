@@ -106,6 +106,10 @@ No approved code for: accepting/listing/revoking Consent, setting the source pla
 | PERSO-035 | POST | /api/v1/personalization-sources/{sourceId}/segment | MF01-S07 | DESIGN_SUBMIT_OWN | ResegmentSoundwaveSource | APPROVED (user 2026-11-23) |
 | PERSO-033 | POST | /api/v1/personalization-sources/{sourceId}/wavecode/style | MF01-S07 | DESIGN_SUBMIT_OWN | SelectWavecodeStyle | APPROVED (user 2026-11-23) |
 | PERSO-034 | POST | /api/v1/personalization-sources/{sourceId}/wavecode/accept | MF01-S07 | DESIGN_SUBMIT_OWN | AcceptWavecodeStyle | APPROVED (user 2026-11-23) |
+| PERSO-036 | GET | /api/v1/personalization/fingerprint/frames | MF01-S07 | public (no permission) | ListFingerprintFrames | APPROVED (user 2026-11-23) |
+| PERSO-037 | GET | /api/v1/personalization-sources/{sourceId}/artwork | MF01-S07 | DESIGN_SUBMIT_OWN | GetFingerprintArtwork | APPROVED (user 2026-11-23) |
+| PERSO-038 | POST | /api/v1/personalization-sources/{sourceId}/artwork/crops | MF01-S07 | DESIGN_SUBMIT_OWN | CreateFingerprintCrop | APPROVED (user 2026-11-23) |
+| PERSO-039 | POST | /api/v1/personalization-sources/{sourceId}/artwork/accept | MF01-S07 | DESIGN_SUBMIT_OWN | AcceptFingerprintArtwork | APPROVED (user 2026-11-23) |
 | PERSO-011 | GET | /api/v1/orders/{orderId}/personalization-sources | MF01-S07 | DESIGN_SUBMIT_OWN | ListOrderSources | APPROVED |
 | PERSO-012 | GET | /api/v1/personalization-sources/{sourceId}/processing | MF01-S07 | DESIGN_SUBMIT_OWN | GetSourceProcessing | APPROVED |
 | PERSO-013 | INTERNAL | BullMQ job in Operations → Python worker (D-P-09) | MF01-S07 | internal only | none (queue) + worker HTTP | APPROVED |
@@ -522,6 +526,54 @@ Storage layout (2026-11-23, user-approved): keys are package -> order -> session
 - Blocker: Commerce has no internal RPC for version status transitions (`ordering.proto` only has `UpdateCurrentRingItemVersion`, `UpdateOrderStatus`).
 - Tables: `design_reviews` (write), `personalization_placements` (read). Commerce RPC.
 
+### Fingerprint artwork design PERSO-036..039 (approved by the user 2026-11-23)
+
+Who does what (user, 2026-11-23): the Store Staff only captures and lets the customer pick the best attempt at the store (PERSO-005..008, `SOURCE_CAPTURE`). Designing the artwork is the customer's own job afterwards, in their app, like Soundwave: frame, position and zoom inside the frame, erase small marks, compare versions, accept one. Staff never edits the design.
+
+Decisions taken in the conversation (user, 2026-11-23):
+
+- Frames: `NATURAL` (default, natural oval outline), `CIRCLE`, `HEART`, `SQUARE` (rounded square). No `FINE` thin-ridge preset (ridges too thin to engrave; preview measured 0.039 mm at 3 mm).
+- Inside the frame only drag (offset) and zoom; rotation stays in the ring placement step (PERSO-015..017) so it is not applied twice.
+- Small black marks: (1) the worker drops solid blobs (high fill ratio, no ridge texture) and blobs that touch the image edge or sit far from the main ridge region; (2) the frame/zoom can push a mark out of the frame; (3) an eraser tool: the customer brushes over a mark, strokes are sent with the crop request. The eraser only removes ink, never adds ridges; total erased area at most 15 % of the ridge area (`422 ERASE_AREA_TOO_LARGE`); strokes are stored with the version for audit and reproducibility.
+- Engraving size: the worker measures the ridge width of each version and returns `minEngraveSizeMm` so that ridges stay >= 0.07 mm when engraved; PERSO-015..017 must not allow a smaller size. A frame must contain enough ridges (coverage >= 70 %, else `422 FRAME_COVERAGE_TOO_LOW`).
+
+Worker (memora-python-services, contract in `docs/api/personalization/processing-worker.md`):
+
+- `fingerprint/process` also stores a high-resolution cleaned `base.png` (about 2048 px, so zoom up to 3x stays sharp) and creates the default `NATURAL` version.
+- `GET /v1/fingerprint/presets`: frames with name, description and a sample SVG.
+- `POST /v1/fingerprint/render-crop` `{sourceId, outputPrefix, versionId, shape, offsetX, offsetY, zoom, eraseStrokes?, context?}`: crops `base.png`, applies erase strokes before vectorising, writes `versions/{versionId}/fingerprint.svg` and `fingerprint_alpha.png`, returns hull, ridge width, `minEngraveSizeMm`, coverage, `erasedRatio`.
+- `POST /v1/fingerprint/select-version` `{sourceId, outputPrefix, versionId}`: keeps one version, deletes the others, rewrites the manifest (idempotent).
+- Layout: `personalization/fingerprint/{orderId}/selected/{sourceId}/base.png`, `.../versions/{versionId}/...`, `manifest.json`.
+
+#### PERSO-036 — GET /api/v1/personalization/fingerprint/frames
+
+- Status: APPROVED (user 2026-11-23). Public read, same pattern as PERSO-031 (Operations calls the worker presets endpoint, in-memory cache 10 min, stale cache served when the worker is down, 503 `PROCESSING_WORKER_UNAVAILABLE` only without any cache).
+- Response: `{ defaultShape, shapes: [{ code, name, description, sampleSvg }] }`.
+
+#### PERSO-037 — GET /api/v1/personalization-sources/{sourceId}/artwork
+
+- Status: APPROVED (user 2026-11-23). Customer, `DESIGN_SUBMIT_OWN`, owner = `personalization_sources.owner_customer_identity_id` (else 404 `SOURCE_NOT_FOUND`); FINGERPRINT sources only.
+- Resume state: `{ status, failureCode, baseImageUrl|null, currentVersionId, acceptedVersionId|null, versions: [{ versionId, shape, offsetX, offsetY, zoom, erasedRatio, minEngraveSizeMm, coverage, createdAt, previewSvgUrl, previewPngUrl }] }`. Presigned URLs 300 s, `Cache-Control: no-store`, no keys or checksums.
+
+#### PERSO-038 — POST /api/v1/personalization-sources/{sourceId}/artwork/crops
+
+- Status: APPROVED (user 2026-11-23). Customer, `DESIGN_SUBMIT_OWN`. Body `{ shape, offsetX (-1..1), offsetY (-1..1), zoom (1..3), eraseStrokes?: [{ radius (0.005..0.1), points: [[x, y] in 0..1], max 200 points }], max 50 strokes }`.
+- Source FINGERPRINT and READY; not accepted (409 `ARTWORK_LOCKED`); at most 10 versions (409 `ARTWORK_VERSION_LIMIT_REACHED`). Under an advisory lock per source: call the worker `render-crop`, store the version in `metadata.artwork`, set it current, `vector_asset_key`/`vector_checksum` follow the current version. Worker 422s map to 422 with the same code; worker down → 503.
+- Response: the PERSO-037 body.
+
+#### PERSO-039 — POST /api/v1/personalization-sources/{sourceId}/artwork/accept
+
+- Status: APPROVED (user 2026-11-23). Customer, `DESIGN_SUBMIT_OWN`. Body `{ versionId }`. Same sequence as PERSO-034: DB commit (accepted version, current = accepted, lock), then the worker `select-version` deletes the others; a failed cleanup is retried on the next accept call with the same version. A different version already accepted → 409 `ARTWORK_LOCKED`.
+- Accepting the artwork does not replace customer approval PERSO-018; PERSO-018 should later require an accepted artwork (open, like PERSO-034).
+
+#### Acceptance (PERSO-036..039)
+
+- [ ] Frames list cached; worker down without cache → 503
+- [ ] Resume state per status; URLs only for existing keys; another customer → 404
+- [ ] Crop creates a version without touching earlier ones; erase over 15 % → 422; coverage too low → 422; 11th version → 409
+- [ ] Accept deletes the other versions, locks; crop after accept → 409; accept repeat is idempotent
+- [ ] `minEngraveSizeMm` stored per version for PERSO-015..017
+
 ### Remaining IDs after MF01 (summary)
 
 | API ID | Status | Key rules | Tables | Blockers |
@@ -626,3 +678,5 @@ Decided by the user on 2026-11-13. "Decided" means the direction is chosen. Each
 | 2026-11-23 | PERSO-031 (Soundwave styles list) + PERSO-010 `wavecodeStyle` + PERSO-013 `style` | IMPLEMENTED (not deployed, not committed) | New RPC `SoundwaveUploadService.ListSoundwaveStyles`, Gateway `GET /api/v1/personalization/soundwave/styles` (public), 10 min in-memory cache in Operations, worker `GET /v1/soundwave/presets` (10 s). PERSO-010 accepts `wavecodeStyle` (metadata_json); PERSO-013 sends `style` and stores `wavecode.style`. typecheck, proto:check, lint:check, build, build:operations PASS; jest 169 PASS / 4 skipped after removing the task specs (5 PASS with them: cache hit/expiry/stale, 503 without cache, style validation, presets adapter, style passed to worker); boundaries 0 findings (600 files); guardrails 8 PASS. NOT RUN: real worker, gRPC/HTTP E2E, deploy |
 | 2026-11-23 | PERSO-032/033/034 (WAVECODE style history, switch, accept) | IMPLEMENTED (not deployed, not committed) | RPCs `GetSoundwaveWavecode`, `SelectWavecodeStyle`, `AcceptWavecodeStyle`; Gateway routes under `/personalization-sources/{sourceId}/wavecode`; `metadata_json.wavecode.styles` filled by PERSO-013; worker port `selectWavecodeStyle`; also fixed `GetSourceProcessingUseCase` missing from `SourcesModule` providers (Operations would not have booted). Checks: see final report. NOT RUN: real worker, Garage, Postgres lock, E2E, deploy |
 | 2026-11-23 | PERSO-035 (re-segment) + PERSO-032 resume fields | IMPLEMENTED (not deployed, not committed) | RPC `ResegmentSoundwaveSource`, Gateway `POST /api/v1/personalization-sources/{sourceId}/segment`; PERSO-032 returns status, failureCode, durationMs, segmentStartMs, segmentDurationMs, rawAudioUrl, segmentAudioUrl for any non-deleted SOUNDWAVE; queue job id `{sourceId}-r{revision}` + revision in job data, stale jobs ignored; PERSO-013 stores `audioSegmentKey`. NOT RUN: real Redis/BullMQ, Garage, Postgres lock, E2E, deploy |
+| 2026-11-23 | PERSO-036..039 (fingerprint artwork design) | APPROVED (user 2026-11-23) | Frames NATURAL/CIRCLE/HEART/SQUARE, drag+zoom only, eraser with 15 % cap, minEngraveSizeMm >= 0.07 mm ridges; IMPLEMENTED 2026-11-23 (see the next row) |
+| 2026-11-23 | PERSO-036..039 (fingerprint artwork design) | IMPLEMENTED (not deployed, not committed) | RPCs `ListFingerprintFrames`, `GetFingerprintArtwork`, `CreateFingerprintCrop`, `AcceptFingerprintArtwork` on `PersonalizationSourceService`; Gateway `GET /api/v1/personalization/fingerprint/frames` (public, 10 min cache in Operations, stale when the worker is down), `GET /api/v1/personalization-sources/{sourceId}/artwork`, `POST .../artwork/crops`, `POST .../artwork/accept` (`DESIGN_SUBMIT_OWN`). `metadata_json.artwork` = `{ baseKey, currentVersionId, versions{vN{shape, offsetX, offsetY, zoom, erasedRatio, ridgeWidthRatio, minEngraveSizeMm, coverage, svgKey, svgSha256, pngKey, pngSha256, hull, createdAt, eraseStrokes?}}, acceptedVersionId?, acceptedAt? }` written by PERSO-013 from the worker `base` / `version` (older worker: no editing, 409 `ARTWORK_NOT_EDITABLE`). Advisory lock `artwork:{sourceId}`; worker 422 `ERASE_AREA_TOO_LARGE` / `FRAME_COVERAGE_TOO_LOW` pass through as 422; accept = commit, then worker `select-version`, cleanup retried on repeat; PERSO-013 never reprocesses an accepted artwork. Worker contract documented in `processing-worker.md` (2.1.1..2.1.3). PERSO-018 should later require an accepted artwork (open). NOT RUN: real worker, Garage, Postgres lock, E2E, deploy |

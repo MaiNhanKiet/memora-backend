@@ -24,6 +24,9 @@ Change it here first; a breaking change needs a new path version (`/v2`).
 |---|---|---|
 | GET | `/health` | Liveness, plus `potrace`, `ffmpeg` and storage reachability. |
 | POST | `/v1/fingerprint/process` | Fingerprint image → laser SVG + preview PNG. |
+| GET | `/v1/fingerprint/presets` | List the fingerprint frames (PERSO-036). |
+| POST | `/v1/fingerprint/render-crop` | Cut a new design version from the stored base image (PERSO-038). |
+| POST | `/v1/fingerprint/select-version` | Keep one version, delete the others and the base image (PERSO-039). |
 | POST | `/v1/soundwave/process` | Audio → 3 s segment → `MEMORA_WAVECODE_v1` SVG + PNG. |
 | POST | `/v1/soundwave/render-wavecode` | Re-render a WAVECODE from an exact level sequence (uniqueness nudge), or add another style for the same levels. |
 | POST | `/v1/soundwave/select-wavecode-style` | Keep one generated style and delete the others (PERSO-034). |
@@ -99,16 +102,100 @@ Response `200`:
       "aspectRatio": 1.0,
       "hull": [[0.12, 0.30], [0.50, 0.07], [0.88, 0.31], [0.86, 0.72], [0.50, 0.93], [0.14, 0.70]]
     },
-    "quality": { "score": 62.4, "message": "contrast ok" }
+    "quality": { "score": 62.4, "message": "contrast ok" },
+    "base": { "key": "…/base.png", "sha256": "hex", "sizeBytes": 0, "widthPx": 2048, "heightPx": 2048 },
+    "version": {
+      "versionId": "v0",
+      "shape": "NATURAL",
+      "offsetX": 0,
+      "offsetY": 0,
+      "zoom": 1,
+      "erasedRatio": 0,
+      "ridgeWidthRatio": 0.1,
+      "minEngraveSizeMm": 7.0,
+      "coverage": 0.93
+    }
   }
 }
 ```
+
+Design versions (2026-11-23, PERSO-036..039): the response also carries `base` (the cleaned high-resolution image,
+about 2048 px so a zoom of 3x stays sharp, written to `{outputPrefix}base.png`) and `version`, the default design
+`v0` (`shape` `NATURAL`, no offset, zoom 1, nothing erased). `outputs.vectorSvg` / `outputs.alphaPng` are the v0 files at
+`{outputPrefix}versions/v0/fingerprint.svg` and `.../fingerprint_alpha.png`. `ridgeWidthRatio` is the ridge width
+relative to the frame, `minEngraveSizeMm` the smallest engraving size that keeps ridges at 0.07 mm or more, and
+`coverage` the share of the frame covered by ridges (0..1). The worker drops solid blobs and blobs touching the image edge
+or far from the main ridge region. Operations stores `base` and `version` in `metadata_json.artwork`; a worker that does
+not send them leaves the artwork not editable (PERSO-038 answers 409 `ARTWORK_NOT_EDITABLE`).
 
 - The artwork sits on a square canvas. `vectorSvg` uses `viewBox="0 0 1000 1000"` (unitless); the placement
   scales it to `width_mm` × `height_mm`. `alphaPng` is the same canvas, transparent background, ridges opaque.
 - `artwork.hull` is the convex hull of the ridge pixels in normalized canvas coordinates (`0..1`, origin top-left,
   y down), at most 32 points. Placement validation (PERSO-017) checks this hull, not the square, against the
   surface boundary and forbidden zones.
+
+#### 2.1.1 `GET /v1/fingerprint/presets`
+
+No body; header `X-Memora-Worker-Secret`. Response `200`:
+
+```json
+{
+  "statusCode": 200,
+  "message": "Fingerprint presets",
+  "data": {
+    "defaultShape": "NATURAL",
+    "shapes": [
+      { "code": "NATURAL", "name": "Natural", "description": "Natural oval outline", "sampleSvg": "<svg ...>" }
+    ]
+  }
+}
+```
+
+`code` is one of `NATURAL`, `CIRCLE`, `HEART`, `SQUARE` (rounded square). Operations caches the answer in memory for 10
+minutes (serving a stale copy when the worker is down) and exposes it as `GET /api/v1/personalization/fingerprint/frames`
+(PERSO-036). Timeout 10 s.
+
+#### 2.1.2 `POST /v1/fingerprint/render-crop`
+
+Request: `{ "sourceId", "outputPrefix", "versionId", "shape", "offsetX", "offsetY", "zoom", "eraseStrokes"?, "context"? }`
+with `shape` one of the frame codes, `offsetX` / `offsetY` in -1..1, `zoom` in 1..3 and `eraseStrokes` at most 50 items
+`{ "radius": 0.005..0.1, "points": [[x, y], ...] }` (at most 200 points, coordinates 0..1). Rotation is not applied
+here; it stays in the ring placement step. The worker crops `{outputPrefix}base.png`, applies the erase strokes before
+vectorising (the eraser only removes ink), and writes `{outputPrefix}versions/{versionId}/fingerprint.svg` and
+`fingerprint_alpha.png` without touching other versions. Response `200` (inside `data`):
+
+```json
+{
+  "status": "READY",
+  "processorVersion": "1.0.0",
+  "outputs": { "vectorSvg": {}, "alphaPng": {}, "manifest": {} },
+  "artwork": { "aspectRatio": 1.0, "hull": [[0.12, 0.30]] },
+  "version": {
+    "versionId": "v0",
+    "shape": "NATURAL",
+    "offsetX": 0,
+    "offsetY": 0,
+    "zoom": 1,
+    "erasedRatio": 0,
+    "ridgeWidthRatio": 0.1,
+    "minEngraveSizeMm": 7.0,
+    "coverage": 0.93
+  }
+}
+```
+
+Errors: `422 ERASE_AREA_TOO_LARGE` (erased area over 15 % of the ridge area), `422 FRAME_COVERAGE_TOO_LOW` (coverage under
+70 %), `404 OBJECT_NOT_FOUND` (no base image, for example after acceptance). Operations passes the two 422 codes to the
+client as 422 with the same code and treats 404 as 409 `ARTWORK_NOT_EDITABLE`. Timeout 45 s.
+
+#### 2.1.3 `POST /v1/fingerprint/select-version`
+
+Request: `{ "sourceId", "outputPrefix", "versionId", "context"? }`. Deletes every other version's files **and**
+`base.png`, rewrites `manifest.json` for the accepted version only, and is idempotent. Unknown `versionId`:
+`422 VERSION_NOT_FOUND`. Response `200` (inside `data`): `{ "status": "READY", "processorVersion", "outputs": { "vectorSvg",
+"alphaPng", "manifest" }, "version": { ... }, "deleted": ["…keys"] }`. Operations calls it after it has saved the accepted
+version (PERSO-039); if it fails, the acceptance stays and the cleanup is retried the next time accept is called with the
+same version. Timeout 30 s.
 
 ### 2.2 `POST /v1/soundwave/process`
 
@@ -268,7 +355,7 @@ Non-`200` responses use the error envelope of section 2.0; `code` carries the va
 | 400 | `INVALID_REQUEST` | Fail at once (`PROCESSING_FAILED`), log as a bug. |
 | 401 | `UNAUTHORIZED` | Fail the job, alert: secret mismatch. |
 | 404 | `OBJECT_NOT_FOUND` | Fail at once. |
-| 422 | `IMAGE_UNREADABLE`, `FINGERPRINT_REGION_NOT_FOUND`, `AUDIO_UNREADABLE`, `AUDIO_DURATION_INVALID`, `SEGMENT_OUT_OF_RANGE`, `STYLE_NOT_GENERATED` | Fail at once; the code goes to `metadata_json.failureCode` (during processing). For PERSO-033/034 any worker failure is answered 503 `PROCESSING_WORKER_UNAVAILABLE`. |
+| 422 | `IMAGE_UNREADABLE`, `FINGERPRINT_REGION_NOT_FOUND`, `AUDIO_UNREADABLE`, `AUDIO_DURATION_INVALID`, `SEGMENT_OUT_OF_RANGE`, `STYLE_NOT_GENERATED`, `ERASE_AREA_TOO_LARGE`, `FRAME_COVERAGE_TOO_LOW`, `VERSION_NOT_FOUND` | Fail at once; the code goes to `metadata_json.failureCode` (during processing). For PERSO-033/034 any worker failure is answered 503 `PROCESSING_WORKER_UNAVAILABLE`. |
 | 404 | `NOT_FOUND` (unknown route) | Fail at once, log as a bug. |
 | 405 | `METHOD_NOT_ALLOWED` | Fail at once, log as a bug. |
 | 503 | `STORAGE_UNAVAILABLE`, `TOOL_UNAVAILABLE` | Transient: retry. |
@@ -282,7 +369,7 @@ Object keys are organized by package, then order, then session or source (user-a
 ```
 personalization/
   fingerprint/{orderId}/sessions/{sessionId}/attempt-{attemptId}.bmp   raw AS608 image per attempt (rows keep their stored key)
-  fingerprint/{orderId}/selected/{sourceId}/                           fingerprint.svg, fingerprint_alpha.png, manifest.json
+  fingerprint/{orderId}/selected/{sourceId}/                           base.png, versions/{versionId}/fingerprint.svg + fingerprint_alpha.png (v0, v1, ...), manifest.json
   soundwave/{orderId}/uploads/{sourceId}/raw.{wav|mp3|m4a|aac}         customer upload
   soundwave/{orderId}/selected/{sourceId}/                             wavecode-{style}.svg, wavecode-{style}_alpha.png per generated style (style lower-case: classic, hairline, oscilloscope), audio_segment.wav, manifest.json
 ```
