@@ -26,7 +26,13 @@ import {
   type CompleteSoundwaveUploadResponse,
   type InitiateSoundwaveUploadRequest,
   type InitiateSoundwaveUploadResponse,
+  type ListSoundwaveStylesResponse,
   type SoundwaveUploadServiceClient,
+  type AcceptWavecodeStyleRequest,
+  type GetSoundwaveWavecodeRequest,
+  type ResegmentSoundwaveSourceRequest,
+  type SelectWavecodeStyleRequest,
+  type SoundwaveWavecode,
   type CaptureAttemptImage,
   type CaptureSession,
   type CloseCaptureSessionRequest,
@@ -56,6 +62,8 @@ export const OPERATIONS_PERSONALIZATION_GRPC_CLIENT =
 const FAILED_PRECONDITION_MESSAGE = 'Failed precondition';
 /** PERSO-010: the uploaded object failed verification. Sent as INVALID_ARGUMENT, answered 422. */
 const UPLOAD_INVALID_REASON = 'UPLOAD_INVALID';
+/** PERSO-031: no style list from the worker and nothing cached. Answered 503 with this reason. */
+const WORKER_UNAVAILABLE_REASON = 'PROCESSING_WORKER_UNAVAILABLE';
 
 /**
  * Gateway client for `memora.personalization.v1.ConsentService` and
@@ -192,6 +200,38 @@ export class PersonalizationGrpcClient
     );
   }
 
+  getSoundwaveWavecode(
+    request: GetSoundwaveWavecodeRequest,
+  ): Promise<SoundwaveWavecode> {
+    return this.unary((metadata) =>
+      this.sourceService.getSoundwaveWavecode(request, metadata),
+    );
+  }
+
+  selectWavecodeStyle(
+    request: SelectWavecodeStyleRequest,
+  ): Promise<SoundwaveWavecode> {
+    return this.unary((metadata) =>
+      this.sourceService.selectWavecodeStyle(request, metadata),
+    );
+  }
+
+  acceptWavecodeStyle(
+    request: AcceptWavecodeStyleRequest,
+  ): Promise<SoundwaveWavecode> {
+    return this.unary((metadata) =>
+      this.sourceService.acceptWavecodeStyle(request, metadata),
+    );
+  }
+
+  resegmentSoundwaveSource(
+    request: ResegmentSoundwaveSourceRequest,
+  ): Promise<SoundwaveWavecode> {
+    return this.unary((metadata) =>
+      this.sourceService.resegmentSoundwaveSource(request, metadata),
+    );
+  }
+
   initiateSoundwaveUpload(
     request: InitiateSoundwaveUploadRequest,
   ): Promise<InitiateSoundwaveUploadResponse> {
@@ -205,6 +245,14 @@ export class PersonalizationGrpcClient
   ): Promise<CompleteSoundwaveUploadResponse> {
     return this.unary((metadata) =>
       this.soundwaveUploadService.completeSoundwaveUpload(request, metadata),
+    );
+  }
+
+  listSoundwaveStyles(
+    request: Record<string, never>,
+  ): Promise<ListSoundwaveStylesResponse> {
+    return this.unary((metadata) =>
+      this.soundwaveUploadService.listSoundwaveStyles(request, metadata),
     );
   }
 
@@ -235,6 +283,12 @@ export class PersonalizationGrpcClient
     ) {
       return unprocessable(UPLOAD_INVALID_REASON);
     }
+    if (
+      grpcStatus === GrpcStatus.UNAVAILABLE &&
+      readReason(error) === WORKER_UNAVAILABLE_REASON
+    ) {
+      return unavailable(WORKER_UNAVAILABLE_REASON);
+    }
     if (grpcStatus === GrpcStatus.FAILED_PRECONDITION) {
       return conflict(readReason(error));
     }
@@ -242,13 +296,13 @@ export class PersonalizationGrpcClient
   }
 }
 
-function unavailable(): HttpException {
+function unavailable(message?: string): HttpException {
   const mapped = mapGrpcError({ code: GrpcStatus.UNAVAILABLE });
   return new HttpException(
     {
       statusCode: HttpStatus.SERVICE_UNAVAILABLE,
       code: mapped.code,
-      message: mapped.message,
+      message: message ?? mapped.message,
     },
     HttpStatus.SERVICE_UNAVAILABLE,
   );

@@ -9,19 +9,24 @@ import {
   SOURCE_PROCESSING_QUEUE,
 } from '../source-processing.constants';
 
-/** Producer side of PERSO-013. Job id = source id, so a second enqueue is a no-op. */
+/**
+ * Producer side of PERSO-013. Job id = `${sourceId}-r${revision}` (BullMQ refuses a `:` in a
+ * custom id), so a repeated enqueue of the same revision is a no-op while a re-segmentation
+ * (PERSO-035, new revision) is a new job. Jobs queued before this change keep the id
+ * `sourceId` and carry no revision; the consumer treats them as current.
+ */
 @Injectable()
 export class BullMqSourceProcessingTrigger implements SourceProcessingTrigger {
   constructor(
     @InjectQueue(SOURCE_PROCESSING_QUEUE) private readonly queue: Queue,
   ) {}
 
-  async enqueue(sourceId: string): Promise<void> {
+  async enqueue(sourceId: string, revision = 0): Promise<void> {
     await this.queue.add(
       SOURCE_PROCESSING_JOB_NAME,
-      { sourceId },
+      { sourceId, revision },
       {
-        jobId: sourceId,
+        jobId: `${sourceId}-r${revision}`,
         attempts: SOURCE_PROCESSING_ATTEMPTS,
         backoff: { type: SOURCE_PROCESSING_BACKOFF_TYPE },
       },

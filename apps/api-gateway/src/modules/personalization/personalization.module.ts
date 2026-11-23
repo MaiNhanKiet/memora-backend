@@ -8,6 +8,7 @@ import {
 } from './clients/personalization-grpc.client';
 import { ConsentController } from './consent/controllers/consent.controller';
 import { FingerprintCaptureController } from './fingerprint-capture/controllers/fingerprint-capture.controller';
+import { SoundwaveStylesController } from './sources/controllers/soundwave-styles.controller';
 import { SoundwaveUploadController } from './sources/controllers/soundwave-upload.controller';
 import { SourcesController } from './sources/controllers/sources.controller';
 
@@ -28,6 +29,7 @@ import { SourcesController } from './sources/controllers/sources.controller';
     FingerprintCaptureController,
     SourcesController,
     SoundwaveUploadController,
+    SoundwaveStylesController,
   ],
   providers: [PersonalizationGrpcClient],
   exports: [PersonalizationGrpcClient],

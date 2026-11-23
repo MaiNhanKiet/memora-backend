@@ -63,6 +63,6 @@ import { SOURCE_PROCESSING_TRIGGER } from './source-processing.port';
       },
     },
   ],
-  exports: [SOURCE_PROCESSING_TRIGGER],
+  exports: [SOURCE_PROCESSING_TRIGGER, PROCESSING_WORKER_PORT],
 })
 export class SourceProcessingModule {}

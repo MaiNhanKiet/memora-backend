@@ -3,6 +3,8 @@ import {
   type FingerprintProcessed,
   type ProcessingWorkerPort,
   type SoundwaveProcessed,
+  type SoundwaveStylesCatalog,
+  type WavecodeStyleSelected,
   type WavecodeRendered,
 } from '../application/processing-worker.port';
 
@@ -20,6 +22,14 @@ export class UnconfiguredProcessingWorkerAdapter implements ProcessingWorkerPort
   }
 
   renderWavecode(): Promise<WavecodeRendered> {
+    return Promise.reject(unconfigured());
+  }
+
+  selectWavecodeStyle(): Promise<WavecodeStyleSelected> {
+    return Promise.reject(unconfigured());
+  }
+
+  listSoundwaveStyles(): Promise<SoundwaveStylesCatalog> {
     return Promise.reject(unconfigured());
   }
 }

@@ -78,6 +78,7 @@ export class SoundwaveUploadController {
       orderId,
       uploadId: body.uploadId,
       segmentStartMs: body.segmentStartMs,
+      wavecodeStyle: body.wavecodeStyle,
     });
     return toCompleteSoundwaveUploadResponse(source);
   }

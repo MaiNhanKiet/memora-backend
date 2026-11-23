@@ -47,6 +47,8 @@ export interface AcceptUploadInput {
   readonly consentId: string;
   readonly orderId: string;
   readonly segmentStartMs: number;
+  /** Validated; stored as metadata_json.wavecodeStyle. */
+  readonly wavecodeStyle: string;
   readonly bindingMode: SourcePlanMode;
   readonly now: Date;
 }

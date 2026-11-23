@@ -6,6 +6,13 @@ export interface ProcessableSource {
   readonly sourceType: string;
   readonly status: string;
   readonly rawAssetKey: string | undefined;
+  /** From the linked consent, else the active bindings, else the capture session. */
+  readonly orderId: string | undefined;
+  /** Capture session and accepted attempt number (fingerprint only). */
+  readonly sessionId: string | undefined;
+  readonly attemptNo: number | undefined;
+  /** Ring items of the active bindings. */
+  readonly ringItemIds: readonly string[];
   readonly metadata: Readonly<Record<string, unknown>>;
 }
 

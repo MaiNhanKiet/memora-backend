@@ -26,16 +26,47 @@ export class PrismaSourceProcessingRepository implements SourceProcessingReposit
         status: true,
         raw_asset_key: true,
         metadata_json: true,
+        consents: {
+          where: { order_id: { not: null } },
+          select: { order_id: true },
+          orderBy: { created_at: 'asc' },
+          take: 1,
+        },
+        source_bindings: {
+          where: { released_at: null },
+          select: { order_id: true, ring_item_id: true },
+          orderBy: { bound_at: 'asc' },
+        },
+        capture_sessions: {
+          select: {
+            id: true,
+            order_id: true,
+            capture_attempts: {
+              where: { result: 'ACCEPTED' },
+              select: { attempt_no: true },
+              take: 1,
+            },
+          },
+        },
       },
     });
     if (row === null) {
       return undefined;
     }
+    const session = row.capture_sessions;
     return {
       id: row.id,
       sourceType: row.source_type,
       status: row.status,
       rawAssetKey: row.raw_asset_key ?? undefined,
+      orderId:
+        row.consents[0]?.order_id ??
+        row.source_bindings[0]?.order_id ??
+        session?.order_id ??
+        undefined,
+      sessionId: session?.id,
+      attemptNo: session?.capture_attempts[0]?.attempt_no,
+      ringItemIds: row.source_bindings.map((binding) => binding.ring_item_id),
       metadata: asRecord(row.metadata_json),
     };
   }

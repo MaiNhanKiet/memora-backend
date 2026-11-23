@@ -65,6 +65,61 @@ export interface SourceProcessing {
   finishedAt?: string;
 }
 
+/** PERSO-032..034. Never carries object keys or checksums. */
+export interface GetSoundwaveWavecodeRequest {
+  actor: VerifiedActor;
+  sourceId: string;
+}
+
+export interface SelectWavecodeStyleRequest {
+  actor: VerifiedActor;
+  sourceId: string;
+  style: string;
+}
+
+export interface AcceptWavecodeStyleRequest {
+  actor: VerifiedActor;
+  sourceId: string;
+  /** Unset or empty means the current style. */
+  style?: string;
+}
+
+export interface WavecodeStyleState {
+  code: string;
+  name: string;
+  generated: boolean;
+  /** 300 s presigned URL: a credential, never log it. Unset unless generated. */
+  previewSvgUrl?: string;
+  previewPngUrl?: string;
+}
+
+export interface ResegmentSoundwaveSourceRequest {
+  actor: VerifiedActor;
+  sourceId: string;
+  /** Integer >= 0; segmentStartMs + 3000 must not exceed the audio duration. */
+  segmentStartMs: number;
+  /** Unset or empty keeps the current style. */
+  wavecodeStyle?: string;
+}
+
+export interface SoundwaveWavecode {
+  /** Source status: PENDING | ACCEPTED | PROCESSING | READY | PROCESSING_FAILED. */
+  status: string;
+  /** Unset unless processing failed. */
+  failureCode?: string;
+  /** Worker-measured duration when known, else the declared one. */
+  durationMs?: number;
+  segmentStartMs?: number;
+  segmentDurationMs: number;
+  /** 300 s presigned URLs: credentials, never log them. Unset when there is no object. */
+  rawAudioUrl?: string;
+  segmentAudioUrl?: string;
+  currentStyle: string;
+  /** Unset until PERSO-034. */
+  acceptedStyle?: string;
+  styles: WavecodeStyleState[];
+}
+
 export interface PersonalizationSourceServiceHandler {
   listOrderSources(
     request: ListOrderSourcesRequest,
@@ -72,6 +127,18 @@ export interface PersonalizationSourceServiceHandler {
   getSourceProcessing(
     request: GetSourceProcessingRequest,
   ): Promise<SourceProcessing>;
+  getSoundwaveWavecode(
+    request: GetSoundwaveWavecodeRequest,
+  ): Promise<SoundwaveWavecode>;
+  selectWavecodeStyle(
+    request: SelectWavecodeStyleRequest,
+  ): Promise<SoundwaveWavecode>;
+  acceptWavecodeStyle(
+    request: AcceptWavecodeStyleRequest,
+  ): Promise<SoundwaveWavecode>;
+  resegmentSoundwaveSource(
+    request: ResegmentSoundwaveSourceRequest,
+  ): Promise<SoundwaveWavecode>;
 }
 
 export interface PersonalizationSourceServiceClient {
@@ -83,4 +150,20 @@ export interface PersonalizationSourceServiceClient {
     request: GetSourceProcessingRequest,
     metadata?: Metadata,
   ): Observable<SourceProcessing>;
+  getSoundwaveWavecode(
+    request: GetSoundwaveWavecodeRequest,
+    metadata?: Metadata,
+  ): Observable<SoundwaveWavecode>;
+  selectWavecodeStyle(
+    request: SelectWavecodeStyleRequest,
+    metadata?: Metadata,
+  ): Observable<SoundwaveWavecode>;
+  acceptWavecodeStyle(
+    request: AcceptWavecodeStyleRequest,
+    metadata?: Metadata,
+  ): Observable<SoundwaveWavecode>;
+  resegmentSoundwaveSource(
+    request: ResegmentSoundwaveSourceRequest,
+    metadata?: Metadata,
+  ): Observable<SoundwaveWavecode>;
 }

@@ -26,6 +26,16 @@ export const SOUNDWAVE_MIN_DURATION_MS = 3000;
 export const SOUNDWAVE_MAX_DURATION_MS = 30_000;
 export const SOUNDWAVE_SEGMENT_MS = 3000;
 
+/** PERSO-010 / PERSO-031: selectable WAVECODE looks. Static list; the worker is never asked to validate. */
+export const SOUNDWAVE_WAVECODE_STYLES = [
+  'CLASSIC',
+  'HAIRLINE',
+  'OSCILLOSCOPE',
+] as const;
+export type SoundwaveWavecodeStyle = (typeof SOUNDWAVE_WAVECODE_STYLES)[number];
+export const SOUNDWAVE_DEFAULT_WAVECODE_STYLE: SoundwaveWavecodeStyle =
+  'CLASSIC';
+
 export interface InitiateSoundwaveUploadRequest {
   actor: VerifiedActor;
   orderId: string;
@@ -51,12 +61,30 @@ export interface CompleteSoundwaveUploadRequest {
   orderId: string;
   uploadId: string;
   segmentStartMs: number;
+  /** Unset or empty means CLASSIC. */
+  wavecodeStyle?: string;
 }
 
 export interface CompleteSoundwaveUploadResponse {
   sourceId: string;
   sourceType: string;
   status: string;
+}
+
+/** PERSO-031. No actor: public read. */
+export type ListSoundwaveStylesRequest = Record<string, never>;
+
+export interface SoundwaveStyle {
+  code: string;
+  name: string;
+  description: string;
+  decoder: string;
+  sampleSvg: string;
+}
+
+export interface ListSoundwaveStylesResponse {
+  defaultStyle: string;
+  styles: SoundwaveStyle[];
 }
 
 export interface SoundwaveUploadServiceHandler {
@@ -66,6 +94,9 @@ export interface SoundwaveUploadServiceHandler {
   completeSoundwaveUpload(
     request: CompleteSoundwaveUploadRequest,
   ): Promise<CompleteSoundwaveUploadResponse>;
+  listSoundwaveStyles(
+    request: ListSoundwaveStylesRequest,
+  ): Promise<ListSoundwaveStylesResponse>;
 }
 
 export interface SoundwaveUploadServiceClient {
@@ -77,4 +108,8 @@ export interface SoundwaveUploadServiceClient {
     request: CompleteSoundwaveUploadRequest,
     metadata?: Metadata,
   ): Observable<CompleteSoundwaveUploadResponse>;
+  listSoundwaveStyles(
+    request: ListSoundwaveStylesRequest,
+    metadata?: Metadata,
+  ): Observable<ListSoundwaveStylesResponse>;
 }

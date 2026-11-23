@@ -107,7 +107,7 @@ export class CompleteCaptureSessionUseCase {
       const sourceId = outcome.session.acceptedSourceId;
       if (sourceId !== null) {
         try {
-          await this.processing.enqueue(sourceId);
+          await this.processing.enqueue(sourceId, 0);
         } catch (error) {
           this.logger.warn(
             `Processing was not queued for source ${sourceId}: ${describe(error)}`,

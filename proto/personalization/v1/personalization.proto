@@ -33,6 +33,67 @@ service PersonalizationSourceService {
   rpc ListOrderSources (ListOrderSourcesRequest) returns (ListOrderSourcesResponse);
   // PERSO-012 (approved 2026-11-19). Owner only; a foreign, missing or DELETED source is NOT_FOUND.
   rpc GetSourceProcessing (GetSourceProcessingRequest) returns (SourceProcessing);
+  // PERSO-032..034 (approved 2026-11-23). Owner only; foreign, missing or DELETED is NOT_FOUND; not a READY SOUNDWAVE is ALREADY_EXISTS (SOURCE_NOT_READY).
+  rpc GetSoundwaveWavecode (GetSoundwaveWavecodeRequest) returns (SoundwaveWavecode);
+  // ALREADY_EXISTS WAVECODE_STYLE_LOCKED after accept; UNAVAILABLE PROCESSING_WORKER_UNAVAILABLE when the worker is needed and down.
+  rpc SelectWavecodeStyle (SelectWavecodeStyleRequest) returns (SoundwaveWavecode);
+  rpc AcceptWavecodeStyle (AcceptWavecodeStyleRequest) returns (SoundwaveWavecode);
+  // PERSO-035 (approved 2026-11-23). Pick another 3 s segment without re-uploading; the source goes back to ACCEPTED and is processed again.
+  rpc ResegmentSoundwaveSource (ResegmentSoundwaveSourceRequest) returns (SoundwaveWavecode);
+}
+
+message ResegmentSoundwaveSourceRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  // >= 0; segment_start_ms + 3000 <= audio duration.
+  int32 segment_start_ms = 3;
+  // CLASSIC | HAIRLINE | OSCILLOSCOPE. Unset or empty keeps the current style.
+  optional string wavecode_style = 4;
+}
+
+message GetSoundwaveWavecodeRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+}
+
+message SelectWavecodeStyleRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  // CLASSIC | HAIRLINE | OSCILLOSCOPE
+  string style = 3;
+}
+
+message AcceptWavecodeStyleRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string source_id = 2;
+  // Unset or empty means the current style.
+  optional string style = 3;
+}
+
+message WavecodeStyleState {
+  string code = 1;
+  string name = 2;
+  bool generated = 3;
+  // 300 s presigned GET URLs; credentials, never log them. Unset unless generated.
+  optional string preview_svg_url = 4;
+  optional string preview_png_url = 5;
+}
+
+// Never carries object keys or checksums.
+message SoundwaveWavecode {
+  string current_style = 1;
+  optional string accepted_style = 2;
+  repeated WavecodeStyleState styles = 3;
+  // PENDING | ACCEPTED | PROCESSING | READY | PROCESSING_FAILED
+  string status = 4;
+  optional string failure_code = 5;
+  // Worker-measured duration when known, else the declared one.
+  optional int32 duration_ms = 6;
+  optional int32 segment_start_ms = 7;
+  int32 segment_duration_ms = 8;
+  // 300 s presigned GET URLs; credentials, never log them.
+  optional string raw_audio_url = 9;
+  optional string segment_audio_url = 10;
 }
 
 message Consent {
@@ -202,6 +263,8 @@ message SourceProcessing {
 service SoundwaveUploadService {
   rpc InitiateSoundwaveUpload (InitiateSoundwaveUploadRequest) returns (InitiateSoundwaveUploadResponse);
   rpc CompleteSoundwaveUpload (CompleteSoundwaveUploadRequest) returns (CompleteSoundwaveUploadResponse);
+  // PERSO-031 (approved 2026-11-23). Public read, no actor. Operations asks the processing worker and caches the answer.
+  rpc ListSoundwaveStyles (ListSoundwaveStylesRequest) returns (ListSoundwaveStylesResponse);
 }
 
 message InitiateSoundwaveUploadRequest {
@@ -235,6 +298,26 @@ message CompleteSoundwaveUploadRequest {
   string upload_id = 3;
   // >= 0 and segment_start_ms + 3000 <= duration_ms.
   int32 segment_start_ms = 4;
+  // CLASSIC | HAIRLINE | OSCILLOSCOPE. Unset or empty means CLASSIC. Stored in metadata_json.
+  optional string wavecode_style = 5;
+}
+
+message ListSoundwaveStylesRequest {}
+
+message SoundwaveStyle {
+  // CLASSIC | HAIRLINE | OSCILLOSCOPE
+  string code = 1;
+  string name = 2;
+  string description = 3;
+  // BAR_HEIGHT | PEAK_HEIGHT
+  string decoder = 4;
+  // Small preview SVG supplied by the worker.
+  string sample_svg = 5;
+}
+
+message ListSoundwaveStylesResponse {
+  string default_style = 1;
+  repeated SoundwaveStyle styles = 2;
 }
 
 message CompleteSoundwaveUploadResponse {

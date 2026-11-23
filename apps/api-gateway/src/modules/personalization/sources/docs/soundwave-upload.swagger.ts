@@ -57,7 +57,7 @@ export function ApiCompleteSoundwaveUploadDocs() {
     ApiOperation({
       summary: '[PERSO-010] Complete a Soundwave audio upload (Customer)',
       description:
-        'Requires Bearer auth and permission SOURCE_AUDIO_UPLOAD_OWN. Operations reads the uploaded object and checks size, SHA-256 and file signature against what initiate declared. On success the source is ACCEPTED, linked to the consent and bound to its Ring Items, and processing is queued. Idempotent for an ACCEPTED, PROCESSING or READY source. A missing object answers 422 UPLOAD_INVALID and keeps the upload PENDING (PUT again); any other mismatch deletes the upload (422 UPLOAD_INVALID, start over with initiate).',
+        'Requires Bearer auth and permission SOURCE_AUDIO_UPLOAD_OWN. Operations reads the uploaded object and checks size, SHA-256 and file signature against what initiate declared. On success the source is ACCEPTED, linked to the consent and bound to its Ring Items, and processing is queued. Optional body field wavecodeStyle (CLASSIC | HAIRLINE | OSCILLOSCOPE, default CLASSIC) picks the WAVECODE look; an unknown value answers 400. Idempotent for an ACCEPTED, PROCESSING or READY source. A missing object answers 422 UPLOAD_INVALID and keeps the upload PENDING (PUT again); any other mismatch deletes the upload (422 UPLOAD_INVALID, start over with initiate).',
     }),
     ...commonErrors(
       'Validation failed, or reason SEGMENT_OUT_OF_RANGE in the message',

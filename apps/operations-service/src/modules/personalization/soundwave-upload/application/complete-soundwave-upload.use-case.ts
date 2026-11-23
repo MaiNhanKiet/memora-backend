@@ -44,11 +44,13 @@ import {
 import {
   requireSegmentStartMs,
   requireUuid,
+  requireWavecodeStyle,
 } from './soundwave-upload.validation';
 
 /**
  * PERSO-010. Reads the uploaded object and verifies it against what PERSO-009 declared
- * before the source becomes ACCEPTED. Processing (PERSO-013) starts after commit.
+ * before the source becomes ACCEPTED. The WAVECODE style (default CLASSIC) is validated
+ * against a static list and stored with the segment. Processing (PERSO-013) starts after commit.
  */
 @Injectable()
 export class CompleteSoundwaveUploadUseCase {
@@ -77,6 +79,7 @@ export class CompleteSoundwaveUploadUseCase {
       SoundwaveUploadReason.INVALID_UPLOAD_ID,
     );
     const segmentStartMs = requireSegmentStartMs(request.segmentStartMs);
+    const wavecodeStyle = requireWavecodeStyle(request.wavecodeStyle);
 
     // Throws (503) when Commerce is down: fail closed, never "not found".
     const order = assertOrderOwned(
@@ -130,6 +133,7 @@ export class CompleteSoundwaveUploadUseCase {
       consentId: consent.id,
       orderId,
       segmentStartMs,
+      wavecodeStyle,
       bindingMode: order.sourcePlanMode,
       now: new Date(),
     });
@@ -137,7 +141,7 @@ export class CompleteSoundwaveUploadUseCase {
     // After commit. The source stays ACCEPTED if the seam fails; PERSO-013 can pick it up.
     if (outcome.accepted) {
       try {
-        await this.processing.enqueue(source.id);
+        await this.processing.enqueue(source.id, 0);
       } catch (error: unknown) {
         this.logger.warn(
           `Processing was not queued for source ${source.id}: ${describe(error)}`,

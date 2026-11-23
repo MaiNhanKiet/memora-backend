@@ -5,6 +5,7 @@ import { OrderContextModule } from '../shared/order-context/order-context.module
 import { SourceProcessingModule } from '../shared/source-processing/source-processing.module';
 import { CompleteSoundwaveUploadUseCase } from './application/complete-soundwave-upload.use-case';
 import { InitiateSoundwaveUploadUseCase } from './application/initiate-soundwave-upload.use-case';
+import { ListSoundwaveStylesUseCase } from './application/list-soundwave-styles.use-case';
 import {
   SOUNDWAVE_UPLOAD_CONFIG,
   type SoundwaveUploadConfig,
@@ -19,6 +20,7 @@ import { SoundwaveUploadGrpcController } from './presentation/soundwave-upload.g
   providers: [
     InitiateSoundwaveUploadUseCase,
     CompleteSoundwaveUploadUseCase,
+    ListSoundwaveStylesUseCase,
     {
       provide: SOUNDWAVE_UPLOAD_REPOSITORY,
       useClass: PrismaSoundwaveUploadRepository,

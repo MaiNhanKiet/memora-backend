@@ -223,6 +223,7 @@ export class PrismaSoundwaveUploadRepository implements SoundwaveUploadRepositor
           metadata_json: {
             ...metadataRecord(source.metadata_json),
             segmentStartMs: input.segmentStartMs,
+            wavecodeStyle: input.wavecodeStyle,
           },
         },
       });

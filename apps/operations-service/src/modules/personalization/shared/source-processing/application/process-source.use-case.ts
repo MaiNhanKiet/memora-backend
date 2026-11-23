@@ -1,5 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  SOUNDWAVE_DEFAULT_WAVECODE_STYLE,
+  SOUNDWAVE_WAVECODE_STYLES,
+} from '@app/contracts';
+import {
   FailureCode,
   SOUNDWAVE_SEGMENT_DURATION_MS,
   sourceOutputPrefix,
@@ -10,10 +14,13 @@ import {
   type ProcessingWorkerPort,
   type WavecodeRendered,
   type WavecodeResult,
+  type WorkerContext,
   type WorkerOutputs,
 } from './processing-worker.port';
+import { readWavecodeState } from './wavecode-state';
 import {
   SOURCE_PROCESSING_REPOSITORY,
+  type JsonValue,
   type ProcessableSource,
   type SourceProcessingRepository,
 } from './source-processing.repository';
@@ -51,9 +58,22 @@ export class ProcessSourceUseCase {
   async execute(
     sourceId: string,
     isFinalAttempt: boolean,
+    revision?: number,
   ): Promise<ProcessSourceOutcome> {
     let source = await this.sources.find(sourceId);
     if (source === undefined || !isProcessable(source.status)) {
+      return { kind: 'IGNORED' };
+    }
+    // PERSO-035: a job of an older revision is stale (the customer picked another segment).
+    // Jobs queued before revisions existed carry none and are treated as current.
+    if (
+      revision !== undefined &&
+      revision !== currentRevision(source.metadata)
+    ) {
+      return { kind: 'IGNORED' };
+    }
+    // PERSO-034: an accepted style is final; never reprocess such a source.
+    if (readWavecodeState(source.metadata)?.acceptedStyle !== undefined) {
       return { kind: 'IGNORED' };
     }
     if (source.status === 'ACCEPTED') {
@@ -83,10 +103,12 @@ export class ProcessSourceUseCase {
         FailureCode.SOURCE_INVALID,
       );
     }
+    const orderId = requireOrderId(source);
     const result = await this.worker.processFingerprint({
       sourceId: source.id,
       rawKey: source.rawAssetKey,
-      outputPrefix: sourceOutputPrefix(source.id),
+      outputPrefix: sourceOutputPrefix('FINGERPRINT', orderId, source.id),
+      context: workerContext(source, orderId),
     });
     const saved = await this.sources.saveReady({
       sourceId: source.id,
@@ -119,7 +141,10 @@ export class ProcessSourceUseCase {
         FailureCode.SOURCE_INVALID,
       );
     }
-    const outputPrefix = sourceOutputPrefix(source.id);
+    const orderId = requireOrderId(source);
+    const outputPrefix = sourceOutputPrefix('SOUNDWAVE', orderId, source.id);
+    const context = workerContext(source, orderId);
+    const style = storedWavecodeStyle(source.metadata.wavecodeStyle);
     const first = await this.worker.processSoundwave({
       sourceId: source.id,
       rawKey: source.rawAssetKey,
@@ -128,6 +153,8 @@ export class ProcessSourceUseCase {
       declaredDurationMs: durationMs,
       segmentStartMs,
       segmentDurationMs: SOUNDWAVE_SEGMENT_DURATION_MS,
+      style,
+      context,
     });
 
     // Candidate 0 is the measured sequence (already rendered); the rest need render-wavecode.
@@ -150,6 +177,8 @@ export class ProcessSourceUseCase {
           sourceId: source.id,
           outputPrefix,
           levels: candidates[index] ?? [],
+          style,
+          context,
         });
         outputs = rendered.outputs;
         wavecode = rendered.wavecode;
@@ -164,10 +193,15 @@ export class ProcessSourceUseCase {
           processorVersion,
           wavecode: {
             scheme: wavecode.scheme,
+            style: wavecode.style ?? style,
+            styles: styleEntries(wavecode),
             levels: [...wavecode.levels],
             checkBars: [...wavecode.checkBars],
           },
           measuredDurationMs: first.measuredDurationMs,
+          ...(first.outputs.audioSegment === undefined
+            ? {}
+            : { audioSegmentKey: first.outputs.audioSegment.key }),
           processedAt: new Date().toISOString(),
         },
       });
@@ -241,6 +275,61 @@ export class ProcessSourceUseCase {
     this.logger.warn(`Source ${sourceId} PROCESSING_FAILED (${failureCode})`);
     return { kind: 'FAILED', failureCode };
   }
+}
+
+function requireOrderId(source: ProcessableSource): string {
+  if (source.orderId === undefined) {
+    throw new ProcessingWorkerError(
+      'DATA',
+      'Source has no order',
+      FailureCode.SOURCE_INVALID,
+    );
+  }
+  return source.orderId;
+}
+
+export function workerContext(
+  source: ProcessableSource,
+  orderId: string,
+): WorkerContext {
+  return {
+    orderId,
+    ...(source.sourceType === 'FINGERPRINT' && source.sessionId !== undefined
+      ? { sessionId: source.sessionId }
+      : {}),
+    ...(source.sourceType === 'FINGERPRINT' && source.attemptNo !== undefined
+      ? { attemptNo: source.attemptNo }
+      : {}),
+    ringItemIds: source.ringItemIds,
+  };
+}
+
+/** Style chosen at PERSO-010; anything unknown (older rows) falls back to the default. */
+function storedWavecodeStyle(value: unknown): string {
+  return (
+    SOUNDWAVE_WAVECODE_STYLES.find((style) => style === value) ??
+    SOUNDWAVE_DEFAULT_WAVECODE_STYLE
+  );
+}
+
+/** Generated styles as stored in metadata_json.wavecode.styles (PERSO-032..034). */
+function styleEntries(wavecode: WavecodeResult): Record<string, JsonValue> {
+  const entries: Record<string, JsonValue> = {};
+  for (const [code, files] of Object.entries(wavecode.styles ?? {})) {
+    entries[code] = {
+      svgKey: files.vectorSvg.key,
+      svgSha256: files.vectorSvg.sha256,
+      svgSize: files.vectorSvg.sizeBytes,
+      pngKey: files.alphaPng.key,
+      pngSha256: files.alphaPng.sha256,
+      pngSize: files.alphaPng.sizeBytes,
+    };
+  }
+  return entries;
+}
+
+function currentRevision(metadata: Readonly<Record<string, unknown>>): number {
+  return typeof metadata.revision === 'number' ? metadata.revision : 0;
 }
 
 function isProcessable(status: string): boolean {

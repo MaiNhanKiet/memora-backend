@@ -22,6 +22,7 @@ export const SoundwaveUploadReason = {
   INVALID_SHA256: 'INVALID_SHA256',
   INVALID_ORIGIN: 'INVALID_ORIGIN',
   INVALID_SEGMENT_START: 'INVALID_SEGMENT_START',
+  INVALID_WAVECODE_STYLE: 'INVALID_WAVECODE_STYLE',
   AUDIO_DURATION_INVALID: 'AUDIO_DURATION_INVALID',
   SEGMENT_OUT_OF_RANGE: 'SEGMENT_OUT_OF_RANGE',
   UPLOAD_INVALID: 'UPLOAD_INVALID',
@@ -37,6 +38,7 @@ export const SoundwaveUploadReason = {
   UPLOAD_NOT_PENDING: 'UPLOAD_NOT_PENDING',
   RING_ITEM_ALREADY_BOUND: 'RING_ITEM_ALREADY_BOUND',
   STORAGE_UNAVAILABLE: 'STORAGE_UNAVAILABLE',
+  PROCESSING_WORKER_UNAVAILABLE: 'PROCESSING_WORKER_UNAVAILABLE',
 } as const;
 
 export const soundwaveUploadErrors = {
@@ -47,4 +49,8 @@ export const soundwaveUploadErrors = {
   alreadyExists: (reason: string) => new ConflictException(reason),
   storageUnavailable: () =>
     new ServiceUnavailableException(SoundwaveUploadReason.STORAGE_UNAVAILABLE),
+  workerUnavailable: () =>
+    new ServiceUnavailableException(
+      SoundwaveUploadReason.PROCESSING_WORKER_UNAVAILABLE,
+    ),
 };

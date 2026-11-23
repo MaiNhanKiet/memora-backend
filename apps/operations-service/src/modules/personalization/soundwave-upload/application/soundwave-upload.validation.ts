@@ -1,11 +1,14 @@
 import {
   SOUNDWAVE_CONTENT_TYPES,
+  SOUNDWAVE_DEFAULT_WAVECODE_STYLE,
   SOUNDWAVE_MAX_DURATION_MS,
   SOUNDWAVE_MAX_SIZE_BYTES,
   SOUNDWAVE_MIN_DURATION_MS,
   SOUNDWAVE_UPLOAD_ORIGINS,
+  SOUNDWAVE_WAVECODE_STYLES,
   type SoundwaveContentType,
   type SoundwaveUploadOrigin,
+  type SoundwaveWavecodeStyle,
 } from '@app/contracts';
 import {
   soundwaveUploadErrors,
@@ -82,4 +85,17 @@ export function requireSegmentStartMs(value: unknown): number {
     );
   }
   return value;
+}
+/** Unset, null or empty means the default (CLASSIC). Checked against a static list, never the worker. */
+export function requireWavecodeStyle(value: unknown): SoundwaveWavecodeStyle {
+  if (value === undefined || value === null || value === '') {
+    return SOUNDWAVE_DEFAULT_WAVECODE_STYLE;
+  }
+  const match = SOUNDWAVE_WAVECODE_STYLES.find((style) => style === value);
+  if (match === undefined) {
+    throw soundwaveUploadErrors.invalid(
+      SoundwaveUploadReason.INVALID_WAVECODE_STYLE,
+    );
+  }
+  return match;
 }

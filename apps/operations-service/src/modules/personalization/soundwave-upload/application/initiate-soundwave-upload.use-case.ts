@@ -95,7 +95,7 @@ export class InitiateSoundwaveUploadUseCase {
 
     // Signing is local, so a storage failure leaves no row behind.
     const sourceId = randomUUID();
-    const rawAssetKey = soundwaveRawAssetKey(sourceId);
+    const rawAssetKey = soundwaveRawAssetKey(orderId, sourceId, contentType);
     let presigned: PresignedUrl;
     try {
       presigned = await this.storage.presignPut(rawAssetKey, {

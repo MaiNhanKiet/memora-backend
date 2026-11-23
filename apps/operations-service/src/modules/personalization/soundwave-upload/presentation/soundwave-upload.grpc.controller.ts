@@ -6,11 +6,13 @@ import {
   type CompleteSoundwaveUploadResponse,
   type InitiateSoundwaveUploadRequest,
   type InitiateSoundwaveUploadResponse,
+  type ListSoundwaveStylesResponse,
   type SoundwaveUploadServiceHandler,
 } from '@app/contracts';
 import { OperationsInternalGrpcAuthGuard } from '../../../../grpc/operations-internal-grpc-auth.guard';
 import { CompleteSoundwaveUploadUseCase } from '../application/complete-soundwave-upload.use-case';
 import { InitiateSoundwaveUploadUseCase } from '../application/initiate-soundwave-upload.use-case';
+import { ListSoundwaveStylesUseCase } from '../application/list-soundwave-styles.use-case';
 
 /** Thin gRPC adapter. Actor parsing and resource authorization live in the use cases. */
 @Controller()
@@ -19,6 +21,7 @@ export class SoundwaveUploadGrpcController implements SoundwaveUploadServiceHand
   constructor(
     private readonly initiateUseCase: InitiateSoundwaveUploadUseCase,
     private readonly completeUseCase: CompleteSoundwaveUploadUseCase,
+    private readonly stylesUseCase: ListSoundwaveStylesUseCase,
   ) {}
 
   @GrpcMethod(
@@ -39,5 +42,13 @@ export class SoundwaveUploadGrpcController implements SoundwaveUploadServiceHand
     request: CompleteSoundwaveUploadRequest,
   ): Promise<CompleteSoundwaveUploadResponse> {
     return this.completeUseCase.execute(request);
+  }
+
+  @GrpcMethod(
+    PERSONALIZATION_SOUNDWAVE_UPLOAD_SERVICE_NAME,
+    'ListSoundwaveStyles',
+  )
+  listSoundwaveStyles(): Promise<ListSoundwaveStylesResponse> {
+    return this.stylesUseCase.execute();
   }
 }

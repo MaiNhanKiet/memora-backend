@@ -1,4 +1,15 @@
-import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '@app/auth';
 import type { AuthenticatedPrincipal } from '@app/auth';
@@ -10,6 +21,19 @@ import {
   ApiGetSourceProcessingDocs,
   ApiListOrderSourcesDocs,
 } from '../docs/sources.swagger';
+import {
+  ApiAcceptWavecodeStyleDocs,
+  ApiGetWavecodeDocs,
+  ApiResegmentSoundwaveDocs,
+  ApiSelectWavecodeStyleDocs,
+} from '../docs/wavecode.swagger';
+import {
+  AcceptWavecodeStyleRequestDto,
+  ResegmentSoundwaveRequestDto,
+  SelectWavecodeStyleRequestDto,
+  type WavecodeResponseDto,
+} from '../dto/wavecode.dto';
+import { toWavecodeResponse } from '../mappers/wavecode-http.mapper';
 import type { PersonalizationSourceResponseDto } from '../dto/personalization-source.response.dto';
 import type { SourceProcessingResponseDto } from '../dto/source-processing.response.dto';
 import { toPersonalizationSourceListResponse } from '../mappers/personalization-source-http.mapper';
@@ -49,5 +73,84 @@ export class SourcesController {
       sourceId,
     });
     return toSourceProcessingResponse(response);
+  }
+
+  // [PERSO-032] GET /api/v1/personalization-sources/:sourceId/wavecode
+  @Get('personalization-sources/:sourceId/wavecode')
+  @ApiGetWavecodeDocs()
+  async getWavecode(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('sourceId', ParseUUIDPipe) sourceId: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<WavecodeResponseDto> {
+    // Preview URLs are short-lived credentials: never cache them.
+    response.setHeader('Cache-Control', 'no-store');
+    return toWavecodeResponse(
+      await this.personalizationClient.getSoundwaveWavecode({
+        actor: toVerifiedActor(principal),
+        sourceId,
+      }),
+    );
+  }
+
+  // [PERSO-033] POST /api/v1/personalization-sources/:sourceId/wavecode/style
+  @Post('personalization-sources/:sourceId/wavecode/style')
+  @HttpCode(HttpStatus.OK)
+  @ApiSelectWavecodeStyleDocs()
+  async selectWavecodeStyle(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('sourceId', ParseUUIDPipe) sourceId: string,
+    @Body() body: SelectWavecodeStyleRequestDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<WavecodeResponseDto> {
+    response.setHeader('Cache-Control', 'no-store');
+    return toWavecodeResponse(
+      await this.personalizationClient.selectWavecodeStyle({
+        actor: toVerifiedActor(principal),
+        sourceId,
+        style: body.style,
+      }),
+    );
+  }
+
+  // [PERSO-035] POST /api/v1/personalization-sources/:sourceId/segment
+  @Post('personalization-sources/:sourceId/segment')
+  @HttpCode(HttpStatus.OK)
+  @ApiResegmentSoundwaveDocs()
+  async resegmentSoundwave(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('sourceId', ParseUUIDPipe) sourceId: string,
+    @Body() body: ResegmentSoundwaveRequestDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<WavecodeResponseDto> {
+    response.setHeader('Cache-Control', 'no-store');
+    return toWavecodeResponse(
+      await this.personalizationClient.resegmentSoundwaveSource({
+        actor: toVerifiedActor(principal),
+        sourceId,
+        segmentStartMs: body.segmentStartMs,
+        wavecodeStyle: body.wavecodeStyle,
+      }),
+    );
+  }
+
+  // [PERSO-034] POST /api/v1/personalization-sources/:sourceId/wavecode/accept
+  @Post('personalization-sources/:sourceId/wavecode/accept')
+  @HttpCode(HttpStatus.OK)
+  @ApiAcceptWavecodeStyleDocs()
+  async acceptWavecodeStyle(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('sourceId', ParseUUIDPipe) sourceId: string,
+    @Body() body: AcceptWavecodeStyleRequestDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<WavecodeResponseDto> {
+    response.setHeader('Cache-Control', 'no-store');
+    return toWavecodeResponse(
+      await this.personalizationClient.acceptWavecodeStyle({
+        actor: toVerifiedActor(principal),
+        sourceId,
+        style: body.style,
+      }),
+    );
   }
 }

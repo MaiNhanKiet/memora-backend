@@ -208,6 +208,7 @@ The rejected attempt still counts as used and its image is deleted. The device m
 
 - `remainingAttempts > 0` (`sessionStatus = IN_PROGRESS`): go back to waiting for a finger and publish the next attempt with a new nonce.
 - `remainingAttempts = 0` (`sessionStatus = FAILED`): stop. An `end` command with `status = FAILED` follows; staff must create a new session.
+- `remainingAttempts = 0` with `sessionStatus = IN_PROGRESS` (other attempts are still `PENDING_REVIEW`): stay waiting for the staff; do not scan again. The session ends with `end` (`COMPLETED` with `acceptedAttemptNo`, or `CANCELLED`). Only `sessionStatus = FAILED` ends the session from a result.
 
 Match this message by `sessionId` and `attemptNo`/`nonce`. When the staff accept an image, no result is sent; the `end` command (`COMPLETED`) is the signal.
 
@@ -219,7 +220,7 @@ Match this message by `sessionId` and `attemptNo`/`nonce`. When the staff accept
 - The file starts with the bytes `BM`, and the little-endian uint32 at offset 2 (the BMP file size) must equal the exact byte length of the decoded file. Otherwise the attempt is answered with `INVALID_MESSAGE` and nothing is recorded.
 - At most 180000 bytes decoded (a 256 x 288 8-bit BMP is about 74.8 KB).
 
-Operations stores the file with `Content-Type: image/bmp`.
+Operations stores the file with `Content-Type: image/bmp` under `personalization/fingerprint/{orderId}/sessions/{sessionId}/attempt-{attemptId}.bmp`.
 
 ### 4.6 Quality score
 

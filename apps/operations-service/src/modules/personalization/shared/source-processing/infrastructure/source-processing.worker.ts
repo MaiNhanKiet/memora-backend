@@ -76,9 +76,20 @@ export class SourceProcessingWorker implements OnModuleInit, OnModuleDestroy {
     if (sourceId === undefined) {
       throw new UnrecoverableError('Job has no sourceId');
     }
+    const revision =
+      typeof data === 'object' &&
+      data !== null &&
+      'revision' in data &&
+      typeof data.revision === 'number'
+        ? data.revision
+        : undefined;
     const attempts = job.opts.attempts ?? 1;
     const isFinalAttempt = job.attemptsMade + 1 >= attempts;
-    const outcome = await this.processSource.execute(sourceId, isFinalAttempt);
+    const outcome = await this.processSource.execute(
+      sourceId,
+      isFinalAttempt,
+      revision,
+    );
     if (outcome.kind === 'FAILED') {
       throw new UnrecoverableError(outcome.failureCode);
     }
