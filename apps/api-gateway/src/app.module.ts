@@ -20,6 +20,7 @@ import { DesignModule } from './modules/design/design.module';
 import { OrderingModule } from './modules/ordering/ordering.module';
 import { PersonalizationModule } from './modules/personalization/personalization.module';
 import { MemoryModule } from './modules/memory/memory.module';
+import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { MemoryModule } from './modules/memory/memory.module';
     OrderingModule,
     PersonalizationModule,
     MemoryModule,
+    PlatformModule,
   ],
   providers: [
     {

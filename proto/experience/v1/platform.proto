@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package memora.experience.v1;
+
+import "common/v1/actor.proto";
+
+service PlatformSharingService {
+  rpc ResolveShareLink (ResolveShareLinkRequest) returns (ResolveShareLinkResponse);
+  rpc CreateShareLink (CreateShareLinkRequest) returns (CreateShareLinkResponse);
+  rpc RevokeShareLink (RevokeShareLinkRequest) returns (RevokeShareLinkResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Resolve Share Link (Public 3D Preview)
+// ---------------------------------------------------------------------------
+
+message ResolveShareLinkRequest {
+  string share_token = 1;
+}
+
+message ResolveShareLinkResponse {
+  string id = 1;
+  string share_token = 2;
+  string status = 3;
+  string expires_at = 4;
+  string ring_template_id = 5;
+  string ring_design_draft_id = 6;
+  string sanitized_snapshot_json = 7;
+  string created_at = 8;
+}
+
+// ---------------------------------------------------------------------------
+// Create Share Link
+// ---------------------------------------------------------------------------
+
+message CreateShareLinkRequest {
+  common.v1.Actor actor = 1;
+  string ring_design_draft_id = 2;
+  string ring_template_id = 3;
+  string sanitized_snapshot_json = 4;
+  int32 expires_in_days = 5;
+}
+
+message CreateShareLinkResponse {
+  string id = 1;
+  string share_token = 2;
+  string share_url = 3;
+  string status = 4;
+  string expires_at = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Revoke Share Link
+// ---------------------------------------------------------------------------
+
+message RevokeShareLinkRequest {
+  common.v1.Actor actor = 1;
+  string share_link_id = 2;
+}
+
+message RevokeShareLinkResponse {
+  string id = 1;
+  string status = 2;
+  string revoked_at = 3;
+}
