@@ -115,6 +115,13 @@ POSTGRES_USER=memora
 POSTGRES_PASSWORD=${pg_pass}
 POSTGRES_DB=memora
 REDIS_PASSWORD=${redis_pass}
+GARAGE_RPC_SECRET=$(random_hex 32)
+GARAGE_ADMIN_TOKEN=$(random_hex 32)
+GARAGE_ACCESS_KEY_ID=GK$(random_hex 12)
+GARAGE_SECRET_ACCESS_KEY=$(random_hex 32)
+GARAGE_BUCKET=memora-personalization
+MQTT_OPERATIONS_PASSWORD=$(random_hex 24)
+MQTT_DEVICE_USERS=
 EOF
     chmod 600 "${MEMORA_SECRETS_DIR}/infra.env"
     log "wrote infra.env (generated once)"
@@ -124,6 +131,12 @@ EOF
 
   load_env_file "${MEMORA_SECRETS_DIR}/infra.env"
   [[ ${#REDIS_PASSWORD} -ge 16 ]] || die "REDIS_PASSWORD must be at least 16 characters"
+  if [[ -z "${GARAGE_RPC_SECRET:-}" || -z "${GARAGE_ACCESS_KEY_ID:-}" || -z "${GARAGE_SECRET_ACCESS_KEY:-}" ]]; then
+    err "WARN: infra.env has no GARAGE_* values; memora-garage cannot start. See deploy/infra/.env.example."
+  fi
+  if [[ ${#MQTT_OPERATIONS_PASSWORD} -lt 16 ]]; then
+    err "WARN: infra.env has no MQTT_OPERATIONS_PASSWORD (>=16 chars); memora-mosquitto cannot start. See deploy/infra/.env.example."
+  fi
 
   if [[ ! -f "${MEMORA_SECRETS_DIR}/iam.env" ]]; then
     die "create ${MEMORA_SECRETS_DIR}/iam.env from iam.env.example (JWT/peppers/email URL required)"
@@ -143,11 +156,19 @@ cmd_bootstrap_infra() {
   assert_managed_or_absent memora-postgres infra
   assert_managed_or_absent memora-redis infra
   assert_managed_or_absent memora-cloudflared infra
+  assert_managed_or_absent memora-garage infra
+  assert_managed_or_absent memora-mosquitto infra
   export MEMORA_SECRETS_DIR
   load_env_file "${MEMORA_SECRETS_DIR}/infra.env"
   compose_infra up -d --no-recreate
   wait_healthy memora-postgres
   wait_healthy memora-redis
+  if [[ -n "${GARAGE_RPC_SECRET:-}" ]]; then
+    wait_healthy memora-garage
+  fi
+  if [[ ${#MQTT_OPERATIONS_PASSWORD} -ge 16 ]]; then
+    wait_healthy memora-mosquitto
+  fi
   touch "${MEMORA_STATE_DIR}/infra-ready"
   log "infra ready"
 }

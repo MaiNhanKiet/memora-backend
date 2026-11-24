@@ -22,16 +22,22 @@
     "build:commerce": "nest build commerce-service",
     "prisma:commerce:validate": "prisma validate --config apps/commerce-service/prisma.config.ts",
     "prisma:commerce:generate": "node apps/commerce-service/prisma/generate-if-ready.cjs",
+    "prisma:commerce:migrate:status": "prisma migrate status --config apps/commerce-service/prisma.config.ts",
+    "prisma:commerce:migrate:deploy": "prisma migrate deploy --config apps/commerce-service/prisma.config.ts",
     "start:operations": "nest start operations-service",
     "start:operations:dev": "nest start operations-service --watch",
     "build:operations": "nest build operations-service",
     "prisma:operations:validate": "prisma validate --config apps/operations-service/prisma.config.ts",
     "prisma:operations:generate": "node apps/operations-service/prisma/generate-if-ready.cjs",
+    "prisma:operations:migrate:status": "prisma migrate status --config apps/operations-service/prisma.config.ts",
+    "prisma:operations:migrate:deploy": "prisma migrate deploy --config apps/operations-service/prisma.config.ts",
     "start:experience": "nest start experience-service",
     "start:experience:dev": "nest start experience-service --watch",
     "build:experience": "nest build experience-service",
     "prisma:experience:validate": "prisma validate --config apps/experience-service/prisma.config.ts",
     "prisma:experience:generate": "node apps/experience-service/prisma/generate-if-ready.cjs",
+    "prisma:experience:migrate:status": "prisma migrate status --config apps/experience-service/prisma.config.ts",
+    "prisma:experience:migrate:deploy": "prisma migrate deploy --config apps/experience-service/prisma.config.ts",
     "prisma:iam:validate": "prisma validate --config apps/iam-service/prisma.config.ts",
     "prisma:iam:generate": "prisma generate --config apps/iam-service/prisma.config.ts",
     "prisma:iam:migrate:dev": "prisma migrate dev --config apps/iam-service/prisma.config.ts",
@@ -53,9 +59,13 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "test:commerce:e2e": "tsx test/automation/commerce/run-commerce-e2e.ts",
+    "test:memory:e2e": "tsx test/automation/experience/run-memory-e2e.ts",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1169.0",
+    "@aws-sdk/s3-request-presigner": "^3.1169.0",
     "@grpc/grpc-js": "^1.14.6",
     "@grpc/proto-loader": "^0.8.1",
     "@nestjs/axios": "^4.0.1",
@@ -81,6 +91,7 @@
     "hash-wasm": "^4.12.0",
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
+    "mqtt": "^5.16.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.23.1",
@@ -153,5 +164,8 @@
       "^@app/queue(|/.*)$": "<rootDir>/libs/queue/src/$1",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     }
+  },
+  "overrides": {
+    "effect": "^3.22.5"
   }
 }

@@ -25,7 +25,9 @@ async function bootstrap() {
       transport: Transport.GRPC,
       options: {
         url: grpcUrl,
-        package: COMMERCE_GRPC_PROTOS.map((proto) => proto.package),
+        package: Array.from(
+          new Set(COMMERCE_GRPC_PROTOS.map((proto) => proto.package)),
+        ),
         protoPath: COMMERCE_GRPC_PROTOS.map((proto) =>
           join(process.cwd(), 'proto', proto.file),
         ),

@@ -142,6 +142,8 @@ export interface ConfirmGuestIdentityVerificationResponse {
   customerIdentityId: string;
   guestProof: string;
   expiresInSeconds: number;
+  guestAccessToken: string;
+  guestAccessExpiresInSeconds: number;
 }
 
 export interface CustomerIdentityProjectionMessage {
@@ -171,6 +173,41 @@ export interface LinkGuestIdentityToMyAccountResponse {
   userId: string;
   isPrimaryForUser: boolean;
   accountLinkedAt: string;
+}
+
+export interface CreateGuestSessionRequest {
+  clientIp: string;
+}
+
+export interface CreateGuestSessionResponse {
+  guestSessionToken: string;
+  expiresAt: string;
+}
+
+export interface ValidateGuestSessionRequest {
+  guestSessionToken: string;
+}
+
+export interface ValidateGuestSessionResponse {
+  guestSessionId: string;
+  expiresAt: string;
+}
+
+export interface ValidateGuestAccessTokenRequest {
+  guestAccessToken: string;
+}
+
+export interface ValidateGuestAccessTokenResponse {
+  customerIdentityId: string;
+  expiresAt: string;
+}
+
+export interface RevokeGuestSessionRequest {
+  guestSessionToken: string;
+}
+
+export interface RevokeGuestSessionResponse {
+  revoked: boolean;
 }
 
 export interface GetUserByIdRequest {
@@ -477,4 +514,16 @@ export interface IamServiceHandler {
   linkGuestIdentityToMyAccount(
     request: LinkGuestIdentityToMyAccountRequest,
   ): Promise<LinkGuestIdentityToMyAccountResponse>;
+  createGuestSession(
+    request: CreateGuestSessionRequest,
+  ): Promise<CreateGuestSessionResponse>;
+  validateGuestSession(
+    request: ValidateGuestSessionRequest,
+  ): Promise<ValidateGuestSessionResponse>;
+  validateGuestAccessToken(
+    request: ValidateGuestAccessTokenRequest,
+  ): Promise<ValidateGuestAccessTokenResponse>;
+  revokeGuestSession(
+    request: RevokeGuestSessionRequest,
+  ): Promise<RevokeGuestSessionResponse>;
 }

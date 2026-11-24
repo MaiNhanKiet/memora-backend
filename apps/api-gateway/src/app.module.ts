@@ -13,6 +13,13 @@ import { GatewayThrottlerGuard } from './common/guards/gateway-throttler.guard';
 import { ResponseTransformInterceptor } from './common/interceptors/response-transform.interceptor';
 import { HealthModule } from './modules/health/health.module';
 import { IamModule } from './modules/iam/iam.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { PricingModule } from './modules/pricing/pricing.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { DesignModule } from './modules/design/design.module';
+import { OrderingModule } from './modules/ordering/ordering.module';
+import { PersonalizationModule } from './modules/personalization/personalization.module';
+import { MemoryModule } from './modules/memory/memory.module';
 
 @Module({
   imports: [
@@ -37,6 +44,13 @@ import { IamModule } from './modules/iam/iam.module';
     ObservabilityModule,
     HealthModule,
     IamModule,
+    CatalogModule,
+    PricingModule,
+    InventoryModule,
+    DesignModule,
+    OrderingModule,
+    PersonalizationModule,
+    MemoryModule,
   ],
   providers: [
     {

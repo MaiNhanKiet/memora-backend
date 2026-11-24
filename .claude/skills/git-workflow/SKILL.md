@@ -78,11 +78,11 @@ Add a body explaining **what and why**, and operational implications, when the c
 
 - Database schema or Prisma migration; include rollout/backward-compatibility notes.
 - Changes to HTTP/gRPC/event contracts, authentication, authorization, or ownership checks.
-- Behavior spanning multiple MEMORA services or multiple main flows (MF01–MF06).
+- Behavior spanning multiple MEMORA services or multiple main flows (MF01–MF04).
 - Production deployment, bootstrap, secret-handling behavior, or CI/CD release changes.
 - Changes that are not obvious from the summary alone.
 
-When applicable, include relevant flow references (`MF01`–`MF06`), impacted services, and related GitHub issues (`Refs #123`) in the body/footer. Do not invent issue numbers.
+When applicable, include relevant flow references (`MF01`–`MF04`), impacted services, and related GitHub issues (`Refs #123`) in the body/footer. Do not invent issue numbers.
 
 ## 5. Breaking changes
 
@@ -194,7 +194,7 @@ Before proposing code changes:
 - Task branches target `dev`. A release PR merges `dev` into `main` after CI on `dev` is green.
 - Use a descriptive title consistent with Conventional Commits where practical.
 - PR description must cover:
-  - Owning domain and relevant Main Flow (`MF01`–`MF06`, when applicable).
+  - Owning domain and relevant Main Flow (`MF01`–`MF04`, when applicable).
   - User-visible behavior and affected apps/services.
   - HTTP/gRPC/event-contract changes and compatibility.
   - Database schema/migration changes, including rollback considerations.

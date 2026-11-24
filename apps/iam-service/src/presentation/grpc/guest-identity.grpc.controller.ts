@@ -1,6 +1,14 @@
 import { BadRequestException, Controller, UseGuards } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import type {
+  CreateGuestSessionRequest,
+  CreateGuestSessionResponse,
+  RevokeGuestSessionRequest,
+  RevokeGuestSessionResponse,
+  ValidateGuestAccessTokenRequest,
+  ValidateGuestAccessTokenResponse,
+  ValidateGuestSessionRequest,
+  ValidateGuestSessionResponse,
   ConfirmGuestIdentityVerificationRequest,
   ConfirmGuestIdentityVerificationResponse,
   CustomerIdentityProjectionMessage,
@@ -12,6 +20,7 @@ import type {
   RequestGuestIdentityVerificationResponse,
 } from '@app/contracts';
 import type { CustomerIdentity } from '../../../generated/prisma/client';
+import { GuestAccessService } from '../../application/users/guest-access.service';
 import { GuestIdentityService } from '../../application/users/guest-identity.service';
 import { requireCredential, requireText } from './grpc-request';
 import { InternalGrpcAuthGuard } from './internal-grpc-auth.guard';
@@ -19,7 +28,10 @@ import { InternalGrpcAuthGuard } from './internal-grpc-auth.guard';
 @Controller()
 @UseGuards(InternalGrpcAuthGuard)
 export class GuestIdentityGrpcController {
-  constructor(private readonly guests: GuestIdentityService) {}
+  constructor(
+    private readonly guests: GuestIdentityService,
+    private readonly guestAccess: GuestAccessService,
+  ) {}
 
   @GrpcMethod('IamService', 'RequestGuestIdentityVerification')
   requestGuestIdentityVerification(
@@ -62,6 +74,34 @@ export class GuestIdentityGrpcController {
       requireCredential(request.accessCredential),
       requireText(request.guestProof, 'guest_proof', 256),
     );
+  }
+
+  @GrpcMethod('IamService', 'CreateGuestSession')
+  createGuestSession(
+    request: CreateGuestSessionRequest,
+  ): Promise<CreateGuestSessionResponse> {
+    return this.guestAccess.createSession(clientIp(request.clientIp));
+  }
+
+  @GrpcMethod('IamService', 'ValidateGuestSession')
+  validateGuestSession(
+    request: ValidateGuestSessionRequest,
+  ): Promise<ValidateGuestSessionResponse> {
+    return this.guestAccess.validateSession(request.guestSessionToken ?? '');
+  }
+
+  @GrpcMethod('IamService', 'ValidateGuestAccessToken')
+  validateGuestAccessToken(
+    request: ValidateGuestAccessTokenRequest,
+  ): Promise<ValidateGuestAccessTokenResponse> {
+    return this.guestAccess.validateAccessToken(request.guestAccessToken ?? '');
+  }
+
+  @GrpcMethod('IamService', 'RevokeGuestSession')
+  revokeGuestSession(
+    request: RevokeGuestSessionRequest,
+  ): Promise<RevokeGuestSessionResponse> {
+    return this.guestAccess.revokeSession(request.guestSessionToken ?? '');
   }
 }
 

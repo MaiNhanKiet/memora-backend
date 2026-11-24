@@ -131,22 +131,36 @@ Platform table ownership is **explicit**, not an invitation for all services to 
 
 **Important:** An Experience outage must not allow an unsafe financial, consent or production transition, nor silently lose a business-critical audit event. Use locally persisted outbox/audit evidence, retry and reconciliation.
 
-## 4. Main Flow ownership (MF01–MF06)
+## 4. Main Flow ownership (MF01–MF04)
 
-| Main Flow | Lead owner | Integration boundary |
-|---|---|---|
-| **MF01 — Discovery, Configuration & Design Draft** | Commerce | Experience for LightRAG / share links; IAM for identity when required |
-| **MF02 — Order, Deposit & Personalization** | Commerce + Operations | Commerce for Order / Quote / P1; Operations for Consent / Source / Capture; IAM for verified ownership |
-| **MF03 — Review, Final Quote, Design Lock & Authorization** | Operations + Commerce | Operations for reviews, changes and lock; Commerce for Final Quote, Final Confirmation and P2 |
-| **MF04 — Production, Remake & Final QC** | Operations | Commerce for inventory reservations/consumption |
-| **MF05 — Final Payment, Handover & Digital Memory** | Operations + Experience | Commerce for P3 and payment ledger; Operations for handover; Experience for card activation/grants |
-| **MF06 — After-sales Claim Handling** | Operations | Commerce for SERVICE quotes/refunds; IAM for identity; Experience for Memory/data-rights cases |
+The business flows follow the **post-Review 2 baseline** in [`docs/requirements/`](../requirements/) (`MF01.md`–`MF04.md`, BM04 Review 2 Commitment). Those files are snapshots; the Drive file linked in each header wins if they differ. Step IDs use the form `MF0x-Snn`.
+
+| Main Flow | Steps | Lead owner | Integration boundary |
+|---|---|---|---|
+| **MF01 — Configure & Place Ring Order** | S01 Explore & advice · S02 Configure (package NONE/FP/SW) · S03 Preview, estimate & Cart · S04 Checkout & identity (FP/SW privacy notice before P1) · S05 Create Order & Provisional Quote · S06 P1 gate (30%, FP/SW only) · S07 Personalization by package (Consent after P1 → FP in-store capture / SW audio → processing → placement or segment) · S08 Customer Approval & Submit | Commerce + Operations | Commerce for catalog, pricing, Cart/Draft, Order, Provisional Quote, P1 and inventory HOLD; Operations for Consent, Source, Capture, processing, placement, Customer Approval and Submit; Experience for LightRAG / share links; IAM for account and guest identity |
+| **MF02 — Produce & Quality Check Ring Order** | S01 Manager Design Review · S02 Order design readiness · S03 Final Quote · S04 Customer Final Confirmation · S05 P2 / Certified reservation gate · S06 Production Lock · S07 Planning & allocation · S08 Production execution · S09 Manager Final QC · S10 `READY_FOR_HANDOVER` | Operations + Commerce | Operations for design review, Production Lock, work orders, laser, remake and QC; Commerce for Final Quote, Final Confirmation, P2 and inventory reservation/consumption |
+| **MF03 — Complete Payment & Handover Order** | S01 Verify readiness · S02 Final balance · S03 Final payment (P3) · S04 Final Invoice & receipts · S05 Prepare fulfillment · S06 Verify recipient (QR) · S07 Full-Order handover · S08 `COMPLETED` · S09 Post-handover benefits (warranty, Maintenance Plan, Digital Memory) | Operations + Commerce + Experience | Commerce for P3, payment ledger, invoice and receipts; Operations for pickup/delivery, recipient verification, handover proof and plan activation; Experience for memory card activation and grants |
+| **MF04 — Manage After-sales Services** | S01 Submit issue · S02 Identity & triage · S03 Inspect & Manager decision · S04 Authorize resolution · S05 Intake & custody · S06 Execute · S07 QC / refund settlement · S08 Handback · S09 Close claim | Operations | Commerce for SERVICE quotes, payments and refunds; IAM for identity; Experience for Memory entitlement changes |
+
+**DATA_RIGHTS** (export or delete personalization data, delete Digital Memory, revoke shared access) is a separate supporting use case handled by an Administrator. It is not an MF04 claim type (MF04-BR34).
+
+### 4.0 Legacy six-flow numbering
+
+Older sources use the pre-Review 2 numbering: the Business Flow Decision Tracker, the 2026-10 API Master, and the `businessSource` of RBAC permissions (for example `MF05-15`, `MF06-02` in [iam-permission-matrix.md](iam-permission-matrix.md) and `libs/contracts/src/iam/permissions.ts`). Read them with this map. Do not renumber those historical citations.
+
+| Legacy (six flows) | Current (four flows) |
+|---|---|
+| MF01 Discovery, Configuration & Design Draft + MF02 Order, Deposit & Personalization | **MF01** Configure & Place Ring Order |
+| MF03 Review, Final Quote, Design Lock & Authorization + MF04 Production, Remake & Final QC | **MF02** Produce & Quality Check Ring Order |
+| MF05 Final Payment, Handover & Digital Memory | **MF03** Complete Payment & Handover Order |
+| MF06 After-sales Claim Handling (incl. data rights) | **MF04** Manage After-sales Services; data rights moved to the DATA_RIGHTS supporting use case |
 
 ### 4.1 Business invariants
 
 - Guest/Customer Identity must be verified for actions requiring ownership. A login account is optional for a Guest Order.
-- MF01 stores pre-order configuration/drafts; protected biometric/audio source collection requires MF02 policy, consent and appropriate authorization.
-- Fingerprint capture requires successful **P1**, accepted consent and authorized staff/device; session and attempt history remain auditable.
+- Before Checkout/P1 (MF01-S04), an FP/SW order shows the privacy/Consent notice and records the acknowledgement. That acknowledgement is **not** the formal Consent.
+- Formal Consent is collected **after P1 SUCCEEDED and before** any source capture, upload or processing (MF01-S06/S07). A customer who refuses Consent after P1 gets no source collection or Submit; P1 is not refunded by default (MF01 AF14).
+- Fingerprint capture happens in store on AS608 + ESP32 with Store Staff, at most 3 attempts per Capture Session; only an accepted sample is processed, and a failed session is replaced by a new one (MF01-BR14, AF06). Session and attempt history remain auditable.
 - Ring Item Versions, quotes, payments and final confirmations follow the documented immutable/versioned gates.
 - **Never** Production Lock until the full approval/confirmation/quote/P2 boundary is satisfied.
 - A remake creates a new production attempt with lineage. It does not overwrite QC or automatically create another sale.
@@ -272,16 +286,16 @@ infra/mini-pc-bootstrap
 ci/ghcr-publish
 ```
 
-A feature branch may change Gateway, owning microservice, contracts, tests and migrations together. **Do not** create long-lived branches named only `iam-service`, `commerce-service`, `operations-service`, etc. PRs should identify associated MF01–MF06, impacted domains, schema/proto changes and automated test evidence.
+A feature branch may change Gateway, owning microservice, contracts, tests and migrations together. **Do not** create long-lived branches named only `iam-service`, `commerce-service`, `operations-service`, etc. PRs should identify associated MF01–MF04 (step `MF0x-Snn` when useful), impacted domains, schema/proto changes and automated test evidence.
 
 ## 8. Implementation stages
 
 | Stage | Scope | Exit criteria (summary) |
 |---|---|---|
 | **G0 — Current foundation** | API Gateway, IAM, Mini PC infrastructure, CI/CD | Identity/RBAC verified; runner, secrets, image publish and health validated |
-| **G1 — Commerce** | Catalog → Pricing → Design/Cart → Ordering/Payment → Inventory | MF01 and relevant MF02/MF03 financial flows tested, migrations/contracts reviewed |
-| **G2 — Operations** | Consent/Capture → Review/Lock → Production/QC → Handover/After-sales | Critical MF02–MF06 flows, audit, idempotency and failure recovery verified |
-| **G3 — Experience** | LightRAG/share support for MF01; Digital Memory and platform capabilities for MF05 | Governed AI content, secure memory activation, notifications/audit pipelines |
+| **G1 — Commerce** | Catalog → Pricing → Design/Cart → Ordering/Payment → Inventory | MF01-S01..S06 and the MF02/MF03 financial gates (Final Quote, P2, P3, invoice) tested, migrations/contracts reviewed |
+| **G2 — Operations** | Consent/Capture → Review/Lock → Production/QC → Handover/After-sales | MF01-S07/S08, MF02, MF03 handover and MF04 flows: audit, idempotency and failure recovery verified |
+| **G3 — Experience** | LightRAG/share support for MF01; Digital Memory and platform capabilities for MF03-S09 | Governed AI content, secure memory activation, notifications/audit pipelines |
 | **G4 — Hardening** | Security, performance, backup/restore, release procedures | E2E/regression, restore rehearsal, access review and controlled release |
 
 The stage order describes **ownership and priorities**, not a strict requirement to finish one entire service before starting another dependent feature. Experience capabilities needed for MF01 may be implemented early.
@@ -307,7 +321,8 @@ The stage order describes **ownership and priorities**, not a strict requirement
 ## 10. References
 
 - [MEMORA Database Master Tracker — Guest v1.0](https://docs.google.com/spreadsheets/d/1TAcBkuald9TVt4B-GN46UD0j8ddT7IH8mwgVD3ALiak/edit): `OVERVIEW`, `DOMAINS`, `TABLES`, `DECISIONS`.
-- [MEMORA Business Flow Decision Tracker](https://docs.google.com/spreadsheets/d/1czN5EyjeTFN3wAwguPuk-Boh4YBlKmjdeOCUVx_C_cE/edit): MF01–MF06 decision summary.
+- [`docs/requirements/`](../requirements/): post-Review 2 Main Flows `MF01.md`–`MF04.md` and `MEMORA_BM04_Review2_Commitment.md` (WF-xx, F-xx). Current business baseline.
+- [MEMORA Business Flow Decision Tracker](https://docs.google.com/spreadsheets/d/1czN5EyjeTFN3wAwguPuk-Boh4YBlKmjdeOCUVx_C_cE/edit): decision summary in the legacy six-flow numbering (see section 4.0).
 - MEMORA `REPORT 3.docx` and `REPORT 7.docx`: business behavior, requirements and architecture context.
 - MEMORA architecture decision made 2026-10-17: four service topology and domain ownership.
 - [Business service structure](business-service-structure.md): target Domain → Feature → Layer convention for Commerce, Operations, and Experience.

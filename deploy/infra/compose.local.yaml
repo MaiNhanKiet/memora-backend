@@ -2,6 +2,8 @@
 #   docker compose -f deploy/infra/compose.yaml -f deploy/infra/compose.local.yaml --env-file .env up -d
 #
 # Replaces Tailscale-bound ports with loopback. Skips cloudflared (no tunnel token on a laptop).
+# Garage S3 API on 127.0.0.1:3900 so services run on the laptop can reach it.
+# Mosquitto on 127.0.0.1:1883 (MQTT) and 127.0.0.1:9001 (MQTT over WebSocket, no TLS). Needs MQTT_OPERATIONS_PASSWORD (and optional MQTT_DEVICE_USERS) in .env.
 
 services:
   postgres:
@@ -10,6 +12,13 @@ services:
   redis:
     ports: !override
       - '127.0.0.1:6379:6379'
+  garage:
+    ports: !override
+      - '127.0.0.1:3900:3900'
+  mosquitto:
+    ports: !override
+      - '127.0.0.1:1883:1883'
+      - '127.0.0.1:9001:9001'
   cloudflared:
     profiles:
       - mini-pc-only

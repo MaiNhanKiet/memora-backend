@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package memora.commerce.v1;
+
+service PricingService {
+  rpc EstimatePrice (EstimatePriceRequest) returns (EstimatePriceResponse);
+  rpc ListPriceItems (ListPriceItemsRequest) returns (ListPriceItemsResponse);
+  rpc CreatePriceItem (CreatePriceItemRequest) returns (PriceItemResponse);
+  rpc ListPriceVersions (ListPriceVersionsRequest) returns (ListPriceVersionsResponse);
+  rpc CreatePriceVersion (CreatePriceVersionRequest) returns (PriceVersionResponse);
+  rpc ApprovePriceVersion (ApprovePriceVersionRequest) returns (PriceVersionResponse);
+  rpc RejectPriceVersion (RejectPriceVersionRequest) returns (PriceVersionResponse);
+  rpc ListPricingRules (ListPricingRulesRequest) returns (ListPricingRulesResponse);
+  rpc CreatePricingRule (CreatePricingRuleRequest) returns (PricingRuleResponse);
+  rpc ActivatePricingRule (ActivatePricingRuleRequest) returns (PricingRuleResponse);
+}
+
+message EstimatePriceRequest {
+  string template_variant_id = 1;
+  double target_size = 2;
+  repeated string gemstone_option_ids = 3;
+  string personalization_package = 4;
+  optional string maintenance_plan = 5;
+}
+
+message PriceBreakdown {
+  double base_blank_price = 1;
+  double gemstones_price = 2;
+  double personalization_fee = 3;
+  double resize_fee = 4;
+  double maintenance_plan_fee = 5;
+}
+
+message GemstonePriceLineItem {
+  string gemstone_option_id = 1;
+  double price = 2;
+}
+
+message EstimatePriceResponse {
+  double estimated_total = 1;
+  string currency = 2;
+  string estimated_at = 3;
+  PriceBreakdown breakdown = 4;
+  repeated GemstonePriceLineItem gemstone_line_items = 5;
+}
+
+// Admin Price Items
+message ListPriceItemsRequest {
+  string price_type = 1;
+  string status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message PriceItemResponse {
+  string id = 1;
+  string price_type = 2;
+  string template_variant_id = 3;
+  string gemstone_option_id = 4;
+  string certified_gemstone_id = 5;
+  string personalization_package = 6;
+  string code = 7;
+  string status = 8;
+  string created_at = 9;
+  string updated_at = 10;
+  PriceVersionResponse active_price_version = 11;
+}
+
+message ListPriceItemsResponse {
+  repeated PriceItemResponse items = 1;
+  int32 total = 2;
+}
+
+message CreatePriceItemRequest {
+  string price_type = 1;
+  string code = 2;
+  string template_variant_id = 3;
+  string gemstone_option_id = 4;
+  string certified_gemstone_id = 5;
+  string personalization_package = 6;
+  string status = 7;
+}
+
+// Admin Price Versions
+message ListPriceVersionsRequest {
+  string price_item_id = 1;
+  string status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message PriceVersionResponse {
+  string id = 1;
+  string price_item_id = 2;
+  double amount = 3;
+  string currency = 4;
+  int32 version_no = 5;
+  string status = 6;
+  string effective_from = 7;
+  string effective_to = 8;
+  string source_type = 9;
+  string market_snapshot_json = 10;
+  string review_note = 11;
+  string created_by_user_id = 12;
+  string reviewed_by_user_id = 13;
+  string reviewed_at = 14;
+  string created_at = 15;
+}
+
+message ListPriceVersionsResponse {
+  repeated PriceVersionResponse versions = 1;
+  int32 total = 2;
+}
+
+message CreatePriceVersionRequest {
+  string price_item_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string effective_from = 4;
+  string effective_to = 5;
+  string source_type = 6;
+  string market_snapshot_json = 7;
+  string created_by_user_id = 8;
+}
+
+message ApprovePriceVersionRequest {
+  string version_id = 1;
+  string review_note = 2;
+  string reviewed_by_user_id = 3;
+}
+
+message RejectPriceVersionRequest {
+  string version_id = 1;
+  string review_note = 2;
+  string reviewed_by_user_id = 3;
+}
+
+// Admin Pricing Rules
+message ListPricingRulesRequest {
+  string rule_type = 1;
+  string status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message PricingRuleResponse {
+  string id = 1;
+  string rule_type = 2;
+  string code = 3;
+  string name = 4;
+  string template_variant_id = 5;
+  string resize_direction = 6;
+  string delivery_zone_code = 7;
+  string cancellation_stage = 8;
+  string redelivery_reason = 9;
+  string config_json = 10;
+  int32 version_no = 11;
+  string status = 12;
+  string effective_from = 13;
+  string effective_to = 14;
+  string created_by_user_id = 15;
+  string approved_by_user_id = 16;
+  string approved_at = 17;
+  string created_at = 18;
+}
+
+message ListPricingRulesResponse {
+  repeated PricingRuleResponse rules = 1;
+  int32 total = 2;
+}
+
+message CreatePricingRuleRequest {
+  string rule_type = 1;
+  string code = 2;
+  string name = 3;
+  string template_variant_id = 4;
+  string resize_direction = 5;
+  string delivery_zone_code = 6;
+  string cancellation_stage = 7;
+  string redelivery_reason = 8;
+  string config_json = 9;
+  string effective_from = 10;
+  string effective_to = 11;
+  string created_by_user_id = 12;
+}
+
+message ActivatePricingRuleRequest {
+  string rule_id = 1;
+  string approved_by_user_id = 2;
+}

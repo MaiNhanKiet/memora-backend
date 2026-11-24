@@ -21,6 +21,22 @@ Applies to Commerce, Operations, and Experience. Read `docs/architecture/busines
 - Another domain in the same service may call an exported application port. It may not import that domain's repository.
 - Do not add a proto RPC, event, migration, or seed unless the task asks for that behavior.
 - Authorize the resource in the owning use case. Do not trust a client-supplied actor id.
+- Actor context (decision D-P-03; full contract in `business-service-api-recipe.md` section 5):
+  - A user-scoped RPC takes `memora.common.v1.VerifiedActor actor = 1` (`proto/common/v1/actor.proto`). Gateway fills it only from the authenticated principal. The service never receives or validates the access token.
+  - The controller parses `actor` once with `parseVerifiedActor` (`@app/common`, `INVALID_ARGUMENT` if invalid), then narrows it with `requireUserActor`, `requireCustomerActor` or `requireCustomerIdentity`. Gateway builds it with `toVerifiedActor`. The use case checks owner, store, order and state.
+  - Guest actors (`VERIFIED_GUEST`, `GUEST_SESSION`, D-P-17) come only from an IAM-verified guest credential, which is not built yet. Never read guest identity from a client header.
+  - Do not re-check the route permission in the service. Do not put roles or permissions in the request. Use one RPC per access scope.
+  - `x-actor-*` / `x-customer-identity-id` metadata is log correlation only, never authorization.
 - For a new API, follow `docs/architecture/business-service-api-recipe.md` (skill `implement-business-api`). gRPC hosting, the internal auth guard, `PrismaService` and Gateway client helpers already exist: reuse them, do not add parallel copies.
 - Register a new proto in `src/grpc/<service>-grpc.registry.ts`. Guard every business gRPC controller with `<Service>InternalGrpcAuthGuard`.
 - There are no database foreign keys across services. Verify cross-service ids through a contract in the owning use case.
+
+## More than one inbound protocol
+
+- gRPC is the default and the only inbound transport wired today (`NestFactory.createMicroservice` in `main.ts`, plus the plain HTTP health server). Do not change `main.ts` to add a transport unless the task needs it.
+- When a service must also consume events or run another protocol, keep the gRPC microservice and attach each extra transport with `connectMicroservice` / `startAllMicroservices`. Do not replace the gRPC server, and do not split the service just because it has a second transport.
+- A feature with one transport keeps its files directly in `presentation/` (for example `ring-templates.grpc.controller.ts`). Once a feature has two or more transports, move each into its own folder under `presentation/` (`grpc/`, `events/`). Create only the folders the feature uses. Do not restructure existing features only to follow this.
+- Transport adapters stay thin: validate and map the payload, call one application service, map the result or error. Business rules, transactions and idempotency live in `application/` and `domain/`, never duplicated per transport.
+- An event consumer must be idempotent, must not trust the payload as authorization, and must follow the contract in `libs/contracts`. Do not add an event, queue, topic or outbox table unless the task asks for it.
+- The event transport between services is **not decided** (see `docs/architecture/memora-backend-4-service.md`, "Event transport TBD"). Do not introduce RabbitMQ, a new broker dependency or a new Redis role on your own: ask first. BullMQ (`@app/queue`) is for background jobs inside one service, not for cross-service events.
+- The producer side (publishing an event) is an `infrastructure/` adapter behind an application port. It is not a consumer transport and needs no `connectMicroservice`.

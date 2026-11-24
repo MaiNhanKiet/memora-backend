@@ -34,12 +34,12 @@ Create a layer directory only when that feature has code for it. Do not scaffold
 
 | Layer | Owns | Does not own |
 |---|---|---|
-| `presentation/` | Inbound adapters: gRPC controllers, RabbitMQ or other event consumers, transport DTO mapping, transport errors | Business decisions, Prisma, transactions |
+| `presentation/` | Inbound adapters: gRPC controllers, event consumers (transport not decided yet), transport DTO mapping, transport errors | Business decisions, Prisma, transactions |
 | `application/` | Use cases. Load state, call domain policy, ask infrastructure to persist, define transaction boundaries | gRPC decorators, Prisma models, HTTP |
 | `domain/` | Entities, value objects, policies, invariants, domain errors | Nest modules, Prisma, brokers, clocks from the framework |
 | `infrastructure/` | Prisma repositories, object storage, outbound HTTP, outbound gRPC clients, event publishers | Use-case branching and invariants |
 
-Inbound gRPC controllers and event consumers live in the feature `presentation/` folder (`*.grpc.controller.ts`, `*.rmq.controller.ts`). They validate the transport payload, call one application service, and map the result or error.
+Inbound gRPC controllers and event consumers live in the feature `presentation/` folder (`*.grpc.controller.ts`; an event consumer gets its own file under `events/` once a transport is chosen). They validate the transport payload, call one application service, and map the result or error.
 
 Application services and use cases live in `application/`. One class per use case is enough when the behavior is separate. A small feature may keep a single application service.
 

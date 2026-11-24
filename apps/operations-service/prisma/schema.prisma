@@ -1,4 +1,4 @@
-// Introspected from database memora (BM04 baseline, db/). Cross-service FKs are omitted here; they exist only in PostgreSQL. Operations owns these four schemas only.
+// Introspected from database memora (BM04 baseline, db/). No cross-service FKs exist (db/MEMORA_BM04_Drop_Cross_Service_FKs.sql). DDL history: prisma/migrations (0_baseline = db/ for this service). Operations owns these four schemas only.
 // Logical IDs such as user_id, order_id and customer_identity_id are not foreign keys to other services.
 
 generator client {
@@ -33,9 +33,9 @@ model chain_of_custody_events {
   received_by_user_id   String?              @db.Uuid
   handoff_at            DateTime             @db.Timestamptz(6)
   created_at            DateTime             @default(now()) @db.Timestamptz(6)
-  claims                claims               @relation(fields: [claim_id], references: [id], onUpdate: Restrict, map: "fk_after_sales_chain_of_custody_events_claim_id")
-  production_attempts   production_attempts? @relation(fields: [production_attempt_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_after_sales_chain_of_custody_events_production_attempt_id")
-  work_orders           work_orders?         @relation(fields: [work_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_after_sales_chain_of_custody_events_work_order_id")
+  claims                claims               @relation(fields: [claim_id], references: [id], onUpdate: Restrict, map: "after_sales_chain_of_custody_events_claim_id_fk")
+  production_attempts   production_attempts? @relation(fields: [production_attempt_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "after_sales_chain_of_custody_events_production_attem_e208e314")
+  work_orders           work_orders?         @relation(fields: [work_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "after_sales_chain_of_custody_events_work_order_id_fk")
 
   @@schema("after_sales")
 }
@@ -54,7 +54,7 @@ model claim_events {
   metadata_json              Json?    @default("{}")
   occurred_at                DateTime @default(now()) @db.Timestamptz(6)
   actor_customer_identity_id String?  @db.Uuid
-  claims                     claims   @relation(fields: [claim_id], references: [id], onUpdate: Restrict, map: "fk_after_sales_claim_events_claim_id")
+  claims                     claims   @relation(fields: [claim_id], references: [id], onUpdate: Restrict, map: "after_sales_claim_events_claim_id_fk")
 
   @@schema("after_sales")
 }
@@ -86,7 +86,7 @@ model claims {
   created_by_customer_identity_id String?                   @db.Uuid
   chain_of_custody_events         chain_of_custody_events[]
   claim_events                    claim_events[]
-  maintenance_plans               maintenance_plans?        @relation(fields: [maintenance_plan_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_after_sales_claims_maintenance_plan_id")
+  maintenance_plans               maintenance_plans?        @relation(fields: [maintenance_plan_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "after_sales_claims_maintenance_plan_id_fk")
   deliveries                      deliveries[]
   handover_records                handover_records[]
   handover_sessions               handover_sessions[]
@@ -146,10 +146,10 @@ model deliveries {
   handover_record_id         String?            @db.Uuid
   created_at                 DateTime           @default(now()) @db.Timestamptz(6)
   updated_at                 DateTime           @default(now()) @db.Timestamptz(6)
-  claims                     claims?            @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_deliveries_claim_id")
-  handover_records           handover_records?  @relation(fields: [handover_record_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_deliveries_handover_record_id")
-  handover_sessions          handover_sessions? @relation(fields: [handover_session_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_deliveries_handover_session_id")
-  deliveries                 deliveries?        @relation("deliveriesTodeliveries", fields: [parent_delivery_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_deliveries_parent_delivery_id")
+  claims                     claims?            @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fulfillment_deliveries_claim_id_fk")
+  handover_records           handover_records?  @relation(fields: [handover_record_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fulfillment_deliveries_handover_record_id_fk")
+  handover_sessions          handover_sessions? @relation(fields: [handover_session_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fulfillment_deliveries_handover_session_id_fk")
+  deliveries                 deliveries?        @relation("deliveriesTodeliveries", fields: [parent_delivery_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fulfillment_deliveries_parent_delivery_id_fk")
   other_deliveries           deliveries[]       @relation("deliveriesTodeliveries")
 
   @@unique([claim_id, attempt_no], map: "fulfillment_deliveries_claim_id_attempt_no_f199aa5_uq", where: raw("(claim_id IS NOT NULL)"))
@@ -177,8 +177,8 @@ model handover_records {
   completed_at                    DateTime          @db.Timestamptz(6)
   created_at                      DateTime          @default(now()) @db.Timestamptz(6)
   deliveries                      deliveries[]
-  claims                          claims?           @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_handover_records_claim_id")
-  handover_sessions               handover_sessions @relation(fields: [handover_session_id], references: [id], onUpdate: Restrict, map: "fk_fulfillment_handover_records_handover_session_id")
+  claims                          claims?           @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fulfillment_handover_records_claim_id_fk")
+  handover_sessions               handover_sessions @relation(fields: [handover_session_id], references: [id], onUpdate: Restrict, map: "fulfillment_handover_records_handover_session_id_fk")
 
   @@schema("fulfillment")
 }
@@ -204,7 +204,7 @@ model handover_sessions {
   created_at                   DateTime          @default(now()) @db.Timestamptz(6)
   deliveries                   deliveries[]
   handover_records             handover_records?
-  claims                       claims?           @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_fulfillment_handover_sessions_claim_id")
+  claims                       claims?           @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fulfillment_handover_sessions_claim_id_fk")
 
   @@schema("fulfillment")
 }
@@ -212,7 +212,7 @@ model handover_sessions {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model capture_attempts {
   id                         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  capture_session_id         String           @unique(map: "personalization_capture_attempts_capture_session_id__3798e77c", where: raw("((result)::text = 'ACCEPTED'::text)")) @db.Uuid
+  capture_session_id         String           @db.Uuid
   attempt_no                 Int              @db.SmallInt
   quality_score              Decimal?         @db.Decimal(10, 3)
   quality_threshold_snapshot Decimal?         @db.Decimal(10, 3)
@@ -220,9 +220,11 @@ model capture_attempts {
   failure_reason             String?          @db.VarChar(100)
   metadata_json              Json?            @default("{}")
   attempted_at               DateTime         @default(now()) @db.Timestamptz(6)
-  capture_sessions           capture_sessions @relation(fields: [capture_session_id], references: [id], onUpdate: Restrict, map: "fk_personalization_capture_attempts_capture_session_id")
+  capture_sessions           capture_sessions @relation(fields: [capture_session_id], references: [id], onUpdate: Restrict, map: "personalization_capture_attempts_capture_session_id_fk")
 
   @@unique([capture_session_id, attempt_no], map: "personalization_capture_attempts_capture_session_id__00d71a5e")
+  /// At most one ACCEPTED attempt per session. Partial unique, so the relation stays 1:n (D-P-12).
+  @@unique([capture_session_id], map: "personalization_capture_attempts_capture_session_id__3798e77c", where: raw("((result)::text = 'ACCEPTED'::text)"))
   @@schema("personalization")
 }
 
@@ -240,9 +242,9 @@ model capture_sessions {
   ended_at                DateTime?                @db.Timestamptz(6)
   failure_reason          String?
   created_at              DateTime                 @default(now()) @db.Timestamptz(6)
-  capture_attempts        capture_attempts?
-  personalization_sources personalization_sources? @relation(fields: [accepted_source_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_personalization_capture_sessions_accepted_source_id")
-  consents                consents                 @relation(fields: [consent_id], references: [id], onUpdate: Restrict, map: "fk_personalization_capture_sessions_consent_id")
+  capture_attempts        capture_attempts[]
+  personalization_sources personalization_sources? @relation(fields: [accepted_source_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "personalization_capture_sessions_accepted_source_id_fk")
+  consents                consents                 @relation(fields: [consent_id], references: [id], onUpdate: Restrict, map: "personalization_capture_sessions_consent_id_fk")
 
   @@schema("personalization")
 }
@@ -272,7 +274,7 @@ model consent_ring_items {
   consent_id   String   @db.Uuid
   ring_item_id String   @db.Uuid
   created_at   DateTime @default(now()) @db.Timestamptz(6)
-  consents     consents @relation(fields: [consent_id], references: [id], onUpdate: Restrict, map: "fk_personalization_consent_ring_items_consent_id")
+  consents     consents @relation(fields: [consent_id], references: [id], onUpdate: Restrict, map: "personalization_consent_ring_items_consent_id_fk")
 
   @@unique([consent_id, ring_item_id], map: "personalization_consent_ring_items_consent_id_ring_i_a805b4ff")
   @@schema("personalization")
@@ -294,7 +296,7 @@ model consents {
   created_at                DateTime                 @default(now()) @db.Timestamptz(6)
   capture_sessions          capture_sessions[]
   consent_ring_items        consent_ring_items[]
-  personalization_sources   personalization_sources? @relation(fields: [personalization_source_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_personalization_consents_personalization_source_id")
+  personalization_sources   personalization_sources? @relation(fields: [personalization_source_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "personalization_consents_personalization_source_id_fk")
 
   @@schema("personalization")
 }
@@ -333,7 +335,7 @@ model personalization_placements {
   created_by_user_id              String?                 @db.Uuid
   created_at                      DateTime                @default(now()) @db.Timestamptz(6)
   created_by_customer_identity_id String?                 @db.Uuid
-  personalization_sources         personalization_sources @relation(fields: [personalization_source_id], references: [id], onUpdate: Restrict, map: "fk_personalization_personalization_placements_pers_38e0390f92")
+  personalization_sources         personalization_sources @relation(fields: [personalization_source_id], references: [id], onUpdate: Restrict, map: "personalization_personalization_placements_personali_ae9c9ed7")
 
   @@schema("personalization")
 }
@@ -373,7 +375,7 @@ model source_bindings {
   binding_mode              String                  @db.VarChar(15)
   bound_at                  DateTime                @default(now()) @db.Timestamptz(6)
   released_at               DateTime?               @db.Timestamptz(6)
-  personalization_sources   personalization_sources @relation(fields: [personalization_source_id], references: [id], onUpdate: Restrict, map: "fk_personalization_source_bindings_personalization_source_id")
+  personalization_sources   personalization_sources @relation(fields: [personalization_source_id], references: [id], onUpdate: Restrict, map: "personalization_source_bindings_personalization_sour_b635a8e4")
 
   @@schema("personalization")
 }
@@ -386,7 +388,7 @@ model design_lock_items {
   ring_item_version_id String       @db.Uuid
   item_hash            String       @db.VarChar(128)
   created_at           DateTime     @default(now()) @db.Timestamptz(6)
-  design_locks         design_locks @relation(fields: [design_lock_id], references: [id], onUpdate: Restrict, map: "fk_production_design_lock_items_design_lock_id")
+  design_locks         design_locks @relation(fields: [design_lock_id], references: [id], onUpdate: Restrict, map: "production_design_lock_items_design_lock_id_fk")
 
   @@unique([design_lock_id, ring_item_id], map: "production_design_lock_items_design_lock_id_ring_ite_0547535e")
   @@schema("production")
@@ -449,9 +451,9 @@ model laser_executions {
   error_note                 String?
   execution_metadata_json    Json?                  @default("{}")
   created_at                 DateTime               @default(now()) @db.Timestamptz(6)
-  laser_process_profiles     laser_process_profiles @relation(fields: [laser_process_profile_id], references: [id], onUpdate: Restrict, map: "fk_production_laser_executions_laser_process_profile_id")
-  production_packages        production_packages    @relation(fields: [production_package_id], references: [id], onUpdate: Restrict, map: "fk_production_laser_executions_production_package_id")
-  work_order_steps           work_order_steps       @relation(fields: [work_order_step_id], references: [id], onUpdate: Restrict, map: "fk_production_laser_executions_work_order_step_id")
+  laser_process_profiles     laser_process_profiles @relation(fields: [laser_process_profile_id], references: [id], onUpdate: Restrict, map: "production_laser_executions_laser_process_profile_id_fk")
+  production_packages        production_packages    @relation(fields: [production_package_id], references: [id], onUpdate: Restrict, map: "production_laser_executions_production_package_id_fk")
+  work_order_steps           work_order_steps       @relation(fields: [work_order_step_id], references: [id], onUpdate: Restrict, map: "production_laser_executions_work_order_step_id_fk")
 
   @@schema("production")
 }
@@ -502,8 +504,8 @@ model production_attempts {
   completed_at              DateTime?                 @db.Timestamptz(6)
   created_at                DateTime                  @default(now()) @db.Timestamptz(6)
   chain_of_custody_events   chain_of_custody_events[]
-  claims                    claims?                   @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_attempts_claim_id")
-  production_attempts       production_attempts?      @relation("production_attemptsToproduction_attempts", fields: [parent_attempt_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_attempts_parent_attempt_id")
+  claims                    claims?                   @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "production_production_attempts_claim_id_fk")
+  production_attempts       production_attempts?      @relation("production_attemptsToproduction_attempts", fields: [parent_attempt_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "production_production_attempts_parent_attempt_id_fk")
   other_production_attempts production_attempts[]     @relation("production_attemptsToproduction_attempts")
   production_exceptions     production_exceptions[]
   qc_results                qc_results[]
@@ -528,9 +530,9 @@ model production_exceptions {
   resolution_note       String?
   resolved_at           DateTime?           @db.Timestamptz(6)
   created_at            DateTime            @default(now()) @db.Timestamptz(6)
-  production_attempts   production_attempts @relation(fields: [production_attempt_id], references: [id], onUpdate: Restrict, map: "fk_production_production_exceptions_production_attempt_id")
-  work_orders           work_orders         @relation(fields: [work_order_id], references: [id], onUpdate: Restrict, map: "fk_production_production_exceptions_work_order_id")
-  work_order_steps      work_order_steps?   @relation(fields: [work_order_step_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_exceptions_work_order_step_id")
+  production_attempts   production_attempts @relation(fields: [production_attempt_id], references: [id], onUpdate: Restrict, map: "production_production_exceptions_production_attempt_id_fk")
+  work_orders           work_orders         @relation(fields: [work_order_id], references: [id], onUpdate: Restrict, map: "production_production_exceptions_work_order_id_fk")
+  work_order_steps      work_order_steps?   @relation(fields: [work_order_step_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "production_production_exceptions_work_order_step_id_fk")
 
   @@schema("production")
 }
@@ -561,9 +563,9 @@ model production_packages {
   supersedes_package_id       String?                 @db.Uuid
   created_at                  DateTime                @default(now()) @db.Timestamptz(6)
   laser_executions            laser_executions[]
-  design_locks                design_locks            @relation(fields: [design_lock_id], references: [id], onUpdate: Restrict, map: "fk_production_production_packages_design_lock_id")
-  laser_process_profiles      laser_process_profiles? @relation(fields: [laser_process_profile_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_packages_laser_process_profile_id")
-  production_packages         production_packages?    @relation("production_packagesToproduction_packages", fields: [supersedes_package_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_production_packages_supersedes_package_id")
+  design_locks                design_locks            @relation(fields: [design_lock_id], references: [id], onUpdate: Restrict, map: "production_production_packages_design_lock_id_fk")
+  laser_process_profiles      laser_process_profiles? @relation(fields: [laser_process_profile_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "production_production_packages_laser_process_profile_id_fk")
+  production_packages         production_packages?    @relation("production_packagesToproduction_packages", fields: [supersedes_package_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "production_production_packages_supersedes_package_id_fk")
   other_production_packages   production_packages[]   @relation("production_packagesToproduction_packages")
   work_orders                 work_orders[]
 
@@ -606,9 +608,9 @@ model qc_results {
   notes                 String?
   inspected_at          DateTime            @default(now()) @db.Timestamptz(6)
   created_at            DateTime            @default(now()) @db.Timestamptz(6)
-  claims                claims?             @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_qc_results_claim_id")
-  production_attempts   production_attempts @relation(fields: [production_attempt_id], references: [id], onUpdate: Restrict, map: "fk_production_qc_results_production_attempt_id")
-  work_orders           work_orders?        @relation(fields: [work_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_qc_results_work_order_id")
+  claims                claims?             @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "production_qc_results_claim_id_fk")
+  production_attempts   production_attempts @relation(fields: [production_attempt_id], references: [id], onUpdate: Restrict, map: "production_qc_results_production_attempt_id_fk")
+  work_orders           work_orders?        @relation(fields: [work_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "production_qc_results_work_order_id_fk")
 
   @@schema("production")
 }
@@ -627,7 +629,7 @@ model work_order_assignments {
   jeweler_skill_snapshot_json  Json        @default("[]")
   status                       String      @default("ACTIVE") @db.VarChar(20)
   created_at                   DateTime    @default(now()) @db.Timestamptz(6)
-  work_orders                  work_orders @relation(fields: [work_order_id], references: [id], onUpdate: Restrict, map: "fk_production_work_order_assignments_work_order_id")
+  work_orders                  work_orders @relation(fields: [work_order_id], references: [id], onUpdate: Restrict, map: "production_work_order_assignments_work_order_id_fk")
 
   @@unique([work_order_id, jeweler_user_id], map: "production_work_order_assignments_work_order_id_jewe_550fb12e", where: raw("((status)::text = 'ACTIVE'::text)"))
   @@schema("production")
@@ -653,7 +655,7 @@ model work_order_steps {
   created_at                    DateTime                @default(now()) @db.Timestamptz(6)
   laser_executions              laser_executions[]
   production_exceptions         production_exceptions[]
-  work_orders                   work_orders             @relation(fields: [work_order_id], references: [id], onUpdate: Restrict, map: "fk_production_work_order_steps_work_order_id")
+  work_orders                   work_orders             @relation(fields: [work_order_id], references: [id], onUpdate: Restrict, map: "production_work_order_steps_work_order_id_fk")
 
   @@unique([work_order_id, sequence_no], map: "production_work_order_steps_work_order_id_sequence_n_f54ecc72")
   @@schema("production")
@@ -682,10 +684,10 @@ model work_orders {
   qc_results              qc_results[]
   work_order_assignments  work_order_assignments[]
   work_order_steps        work_order_steps[]
-  claims                  claims?                   @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_work_orders_claim_id")
-  production_attempts     production_attempts       @relation(fields: [production_attempt_id], references: [id], onUpdate: Restrict, map: "fk_production_work_orders_production_attempt_id")
-  production_packages     production_packages?      @relation(fields: [production_package_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_production_work_orders_production_package_id")
-  production_routes       production_routes         @relation(fields: [production_route_id], references: [id], onUpdate: Restrict, map: "fk_production_work_orders_production_route_id")
+  claims                  claims?                   @relation(fields: [claim_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "production_work_orders_claim_id_fk")
+  production_attempts     production_attempts       @relation(fields: [production_attempt_id], references: [id], onUpdate: Restrict, map: "production_work_orders_production_attempt_id_fk")
+  production_packages     production_packages?      @relation(fields: [production_package_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "production_work_orders_production_package_id_fk")
+  production_routes       production_routes         @relation(fields: [production_route_id], references: [id], onUpdate: Restrict, map: "production_work_orders_production_route_id_fk")
 
   @@schema("production")
 }

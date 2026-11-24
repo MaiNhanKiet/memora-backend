@@ -1,4 +1,4 @@
-// Introspected from database memora (BM04 baseline, db/). Cross-service FKs are omitted here; they exist only in PostgreSQL. Experience owns memory and platform only.
+// Introspected from database memora (BM04 baseline, db/). No cross-service FKs exist (db/MEMORA_BM04_Drop_Cross_Service_FKs.sql). DDL history: prisma/migrations (0_baseline = db/ for this service). Experience owns memory and platform only.
 // Logical IDs such as user_id and order_id are not foreign keys to other services.
 
 generator client {
@@ -28,7 +28,7 @@ model access_grants {
   revoked_at            DateTime?    @db.Timestamptz(6)
   last_accessed_at      DateTime?    @db.Timestamptz(6)
   created_at            DateTime     @default(now()) @db.Timestamptz(6)
-  memory_cards          memory_cards @relation(fields: [memory_card_id], references: [id], onUpdate: Restrict, map: "fk_memory_access_grants_memory_card_id")
+  memory_cards          memory_cards @relation(fields: [memory_card_id], references: [id], onUpdate: Restrict, map: "memory_access_grants_memory_card_id_fk")
 
   @@schema("memory")
 }
@@ -71,7 +71,7 @@ model memory_contents {
   deleted_at                      DateTime?    @db.Timestamptz(6)
   created_by_customer_identity_id String?      @db.Uuid
   layout_json                     Json?
-  memory_cards                    memory_cards @relation(fields: [memory_card_id], references: [id], onUpdate: Restrict, map: "fk_memory_memory_contents_memory_card_id")
+  memory_cards                    memory_cards @relation(fields: [memory_card_id], references: [id], onUpdate: Restrict, map: "memory_memory_contents_memory_card_id_fk")
 
   @@schema("memory")
 }
@@ -104,7 +104,7 @@ model ai_messages {
   retrieval_trace_json    Json?            @default("{}")
   model_name              String?          @db.VarChar(100)
   created_at              DateTime         @default(now()) @db.Timestamptz(6)
-  ai_conversations        ai_conversations @relation(fields: [conversation_id], references: [id], onUpdate: Restrict, map: "fk_platform_ai_messages_conversation_id")
+  ai_conversations        ai_conversations @relation(fields: [conversation_id], references: [id], onUpdate: Restrict, map: "platform_ai_messages_conversation_id_fk")
 
   @@schema("platform")
 }
@@ -173,7 +173,7 @@ model lightrag_knowledge_documents {
   last_ingestion_error               String?
   reviewed_at                        DateTime?                      @db.Timestamptz(6)
   index_config_json                  Json?                          @default("{}")
-  lightrag_knowledge_documents       lightrag_knowledge_documents?  @relation("lightrag_knowledge_documentsTolightrag_knowledge_documents", fields: [supersedes_document_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_platform_lightrag_knowledge_documents_supersedes_document_id")
+  lightrag_knowledge_documents       lightrag_knowledge_documents?  @relation("lightrag_knowledge_documentsTolightrag_knowledge_documents", fields: [supersedes_document_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "platform_lightrag_knowledge_documents_supersedes_doc_2a6e2e80")
   other_lightrag_knowledge_documents lightrag_knowledge_documents[] @relation("lightrag_knowledge_documentsTolightrag_knowledge_documents")
 
   @@unique([document_key, version_no], map: "platform_lightrag_knowledge_documents_document_key_v_a2b3d73f")

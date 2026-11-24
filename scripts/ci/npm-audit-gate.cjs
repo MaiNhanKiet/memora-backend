@@ -66,7 +66,8 @@ for (const [name, entry] of Object.entries(vulns)) {
     continue;
   }
   const ghsa = collectGhsa(name, new Set());
-  const allowlisted = ghsa.length > 0 && ghsa.every((id) => allowedHigh.has(id));
+  const allowlisted =
+    ghsa.length > 0 && ghsa.every((id) => allowedHigh.has(id));
   if (allowlisted) {
     allowed.push(`${name}: ${ghsa.join(', ')}`);
   } else {
@@ -75,7 +76,9 @@ for (const [name, entry] of Object.entries(vulns)) {
 }
 
 for (const line of allowed) {
-  process.stdout.write(`::warning::Allowlisted production high advisory: ${line}\n`);
+  process.stdout.write(
+    `::warning::Allowlisted production high advisory: ${line}\n`,
+  );
 }
 
 if (blocking.length > 0) {

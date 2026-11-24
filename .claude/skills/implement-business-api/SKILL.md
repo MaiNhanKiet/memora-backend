@@ -19,7 +19,8 @@ Layer placement rules are in `.claude/rules/13-business-service-structure.md`.
 3. Check `git status --short` and the current branch. Do not commit, push, merge or switch
    branches unless the user asks. New branches start from the latest `dev`.
 4. State the owner service, files to touch, and which cross-service ids the use case must
-   verify through a contract.
+   verify through a contract. Say whether the RPC is user-scoped (`VerifiedActor`) and which
+   resource checks the use case performs.
 
 ## Do not redo what is wired
 
@@ -32,8 +33,16 @@ Gateway client helper, env validation for the secret, or a `proto:check` list en
 
 - Only the owning service touches its schemas. No Prisma in the Gateway or in another service.
 - No foreign keys exist across services. Verify cross-service ids over gRPC in the use case.
-- The internal secret authenticates the Gateway, not the user. Derive the actor from the
-  verified token and check ownership in the owning use case. Never trust client actor fields.
+- The internal secret authenticates the Gateway, not the user. Follow the actor contract in
+  recipe section 5:
+  - A user-scoped RPC takes `memora.common.v1.VerifiedActor actor = 1`.
+  - Gateway builds it with `toVerifiedActor(principal)` (`apps/api-gateway/src/common/grpc/verified-actor.ts`)
+    from `@CurrentUser()` only, and never forwards the token.
+  - The service controller calls `parseVerifiedActor(request.actor)` and narrows the `kind` with
+    `requireUserActor`, `requireCustomerActor` or `requireCustomerIdentity` from `@app/common`.
+    The use case checks owner, store, order and state. Guest actors (D-P-17) are not available
+    until IAM verifies guest credentials; never read guest identity from a client header.
+  - Never trust client actor fields or `x-actor-*` / `x-customer-identity-id` metadata.
 - Create only the layers the feature needs. No empty folders, modules, providers or RPCs.
 - Domain code imports no Nest, Prisma or gRPC. `presentation` never imports `infrastructure`.
 - Do not add a Nest app, GHCR image, Compose service, Postgres instance, migration, seed,

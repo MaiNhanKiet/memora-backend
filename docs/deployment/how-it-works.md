@@ -43,9 +43,9 @@ memora-backend/
   proto/                  Hợp đồng gRPC
   docker/                 Dockerfile Gateway, IAM, migrate, Commerce, Operations, Experience
   deploy/
-    infra/compose.yaml    Postgres + Redis + cloudflared (Arcane / Mini PC)
-    infra/compose.local.yaml   Chỉ laptop: publish 127.0.0.1:5432/6379, bỏ tunnel
-    infra/.env.example    USER/PASSWORD Postgres + Redis + CLOUDFLARE_TUNNEL_TOKEN
+    infra/compose.yaml    Postgres + Redis + Garage (S3) + Mosquitto (MQTT) + cloudflared (Arcane / Mini PC)
+    infra/compose.local.yaml   Chỉ laptop: publish 127.0.0.1:5432/6379/3900/1883, bỏ tunnel
+    infra/.env.example    Postgres + Redis + Garage + Mosquitto + CLOUDFLARE_TUNNEL_TOKEN
     backend/compose.yaml  Mặc định Gateway + IAM. Profile domain-services bị helper chặn
     secrets/*.example     Mẫu ghcr/gateway/iam — không commit mật khẩu
     host/                 Cài helper, sudoers, memora-deploy.sh
@@ -96,13 +96,41 @@ Dán `deploy/infra/compose.yaml`. **Không** dán `compose.local.yaml` (file đ�
 
 Tạo:
 
-- Network `memora-network` (DNS: `postgres`, `redis`, `cloudflared`; `api-gateway` sau khi backend up)
-- Container `memora-postgres`, `memora-redis`, `memora-cloudflared`
+- Network `memora-network` (DNS: `postgres`, `redis`, `garage`, `mosquitto`, `cloudflared`; `api-gateway` sau khi backend up)
+- Container `memora-postgres`, `memora-redis`, `memora-garage`, `memora-mosquitto`, `memora-cloudflared`
 - Volume `memora-infra_*`
 
 IAM trên Mini PC vẫn kết nối `postgres` / `redis` (Docker DNS), **không** `127.0.0.1` hay `172.x`.
 
 Host publish (Tailscale `100.78.222.34`): Postgres `5432`, Redis `6379`. Gateway thêm `127.0.0.1:3000` (curl trên Mini PC) + Tailscale `:3000`. Cloudflare Tunnel chạy **trong** `memora-infra` và origin `http://api-gateway:3000` trên Docker DNS — không `0.0.0.0`, không `127.0.0.1` từ trong container. Từ laptop (đã Tailscale): `http://100.78.222.34:3000/health/live`. Swagger `/api/docs` tắt trên production.
+
+#### Garage (object storage, D-P-08)
+
+- Image `dxflrs/garage:v2.5.0`. Container dùng `http://garage:3900`. Chỉ cổng S3 3900 publish trên IP Tailscale (`100.78.222.34:3900`) cho backend dev trên laptop; RPC 3901 và admin 3903 không publish. Cấu hình `garage.toml` nằm inline trong `compose.yaml` (`configs.garage_toml`), không cần file riêng.
+- Khởi động bằng `--single-node --default-bucket`: tự tạo layout 1 node, access key `GARAGE_ACCESS_KEY_ID` / `GARAGE_SECRET_ACCESS_KEY` và bucket `GARAGE_BUCKET` (chạy lại không tạo trùng). Bucket private: truy cập ẩn danh bị 403, chỉ key này hoặc URL ký sẵn đọc được.
+- Thêm vào Arcane: dán `compose.yaml` mới, thêm 5 biến `GARAGE_*` vào `.env` của project (sinh bằng `openssl rand -hex 32`; access key id = `GK` + `openssl rand -hex 12`), rồi Redeploy. Compose chỉ tạo `memora-garage`; Postgres, Redis, cloudflared không đổi cấu hình nên không bị tạo lại.
+- Volume `memora-infra_garagemeta` và `memora-infra_garagedata` chứa dữ liệu vân tay/âm thanh: không xóa, chưa nằm trong backup trước deploy (cần bổ sung khi có dữ liệu thật).
+- Operations dùng key này qua biến env riêng khi API upload/capture đầu tiên được làm; chưa thêm vào `operations.env`.
+- Operations đọc `OPERATIONS_OBJECT_STORAGE_*` (endpoint, region, bucket, key) khi có code S3; mẫu trong `.env.example` và `deploy/secrets/operations.env.example`.
+- Web UI: project Arcane riêng `memora-garage-webui` từ `deploy/infra/garage-webui.compose.yaml` (`khairul169/garage-webui:1.1.0`, `100.78.222.34:3909`, bắt buộc `AUTH_USER_PASS`). Nút Share chỉ tạo link cho bucket bật website access (public); không bật cho `memora-personalization`, dùng URL ký sẵn.
+- Domain công khai qua Cloudflare Tunnel: route trỏ Docker DNS (`http://garage:3900`, `http://api-gateway:3000`), không trỏ IP container. Web UI public phải đứng sau Cloudflare Access.
+- CORS của bucket `memora-personalization` (trình duyệt PUT/GET thẳng bằng URL ký, PERSO-009/010 và preview 3D): cấu hình lưu trong metadata bucket, bản gốc ở `deploy/infra/garage/cors.memora-personalization.json`. Áp dụng lại bằng S3 API với key có quyền owner, ví dụ `aws s3api put-bucket-cors --endpoint-url http://100.78.222.34:3900 --region garage --bucket memora-personalization --cors-configuration file://deploy/infra/garage/cors.memora-personalization.json`. Garage so `AllowedHeaders` phân biệt hoa thường, nên giữ cả `content-type` (trình duyệt gửi chữ thường). Hiện `AllowedOrigins` là `*` (2026-11-19); thu hẹp về domain FE khi có. CORS không cấp quyền: bucket vẫn private, không có chữ ký thì 403.
+
+#### Mosquitto (MQTT broker, D-P-07)
+
+- Image `eclipse-mosquitto:2.0.21` (biến `MOSQUITTO_IMAGE`). Thiết bị lấy vân tay (ESP32-S3 + AS608) nói MQTT với broker này; operations-service subscribe/publish. Trong Docker dùng `mqtt://mosquitto:1883`, user `memora-operations`, mật khẩu `OPERATIONS_MQTT_PASSWORD` trong `operations.env`.
+- Cổng `1883` chỉ publish trên IP Tailscale (`100.78.222.34:1883`), giống Garage; bản local publish `127.0.0.1:1883` và `127.0.0.1:9001`.
+- Listener `9001` (`protocol websockets`) **không** publish ra host. Thiết bị ngoài tailnet (ESP32 ở cửa hàng) kết nối `wss://mqtt.memora.style` qua Cloudflare Tunnel: Zero Trust → Tunnels → Public Hostname `mqtt.memora.style` → Service `HTTP` `mosquitto:9001`. Cloudflare lo TLS; broker vẫn bắt user/mật khẩu + ACL như cổng 1883.
+- `mosquitto.conf` và ACL nằm inline trong `compose.yaml` (`configs.mosquitto_conf`, `configs.mosquitto_acl`): `allow_anonymous false`, giới hạn gói 262144 byte, log ra stdout không kèm payload, persistence trong volume `memora-infra_mosquittodata`.
+- ACL: `memora-operations` có `readwrite memora/capture/#`. Thiết bị (username = `deviceCode`): ghi `memora/capture/<user>/attempts` và `/hello`, đọc `/commands` và `/results` của chính mình.
+- User broker lấy từ `.env` của project infra (Arcane), không có file passwd trên host:
+  - `MQTT_OPERATIONS_PASSWORD`: mật khẩu user `memora-operations` (≥16 ký tự), trùng `OPERATIONS_MQTT_PASSWORD` trong `operations.env`.
+  - `MQTT_DEVICE_USERS`: `deviceCode:mật-khẩu` cách nhau bằng dấu phẩy, ví dụ `esp32-store-01:xxxx,esp32-store-02:yyyy` (mật khẩu ≥16 ký tự, không chứa `,` hoặc khoảng trắng). Username = `deviceCode`, phải có trong `OPERATIONS_CAPTURE_DEVICE_CODES`.
+  - Mỗi lần container khởi động, entrypoint băm các user vào `/mosquitto/passwd` (mode 600, owner `mosquitto`) rồi chạy broker. Thiếu hoặc sai định dạng thì container dừng với lỗi rõ ràng.
+- Thêm/đổi thiết bị: sửa `MQTT_DEVICE_USERS` trong Arcane rồi deploy lại riêng `mosquitto` (vài giây; thiết bị và Operations tự kết nối lại).
+- `memora-deploy provision-secrets` (khi tạo infra.env mới) sinh `MQTT_OPERATIONS_PASSWORD` ngẫu nhiên và để `MQTT_DEVICE_USERS` trống. Healthcheck chỉ kiểm tra TCP `nc -z 127.0.0.1 1883` (không cần secret).
+- Local (laptop): thêm `MQTT_OPERATIONS_PASSWORD` (và `MQTT_DEVICE_USERS` nếu cần) vào `.env` gốc rồi:
+  `docker compose -f deploy/infra/compose.yaml -f deploy/infra/compose.local.yaml --env-file .env up -d mosquitto`
 
 ### C. Secrets (chỉ trên Mini PC, không GitHub Secrets)
 

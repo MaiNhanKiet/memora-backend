@@ -1,0 +1,380 @@
+syntax = "proto3";
+
+package memora.commerce.v1;
+
+import "common/v1/pagination.proto";
+
+service CatalogService {
+  rpc ListTemplates (ListTemplatesRequest) returns (ListTemplatesResponse);
+  rpc GetTemplateById (GetTemplateByIdRequest) returns (TemplateResponse);
+  rpc GetTemplateConfigurationOptions (GetTemplateConfigurationOptionsRequest) returns (TemplateConfigurationOptionsResponse);
+  rpc GetTemplate3DAssets (GetTemplate3DAssetsRequest) returns (Template3DAssetsResponse);
+  rpc ListMaterials (ListMaterialsRequest) returns (ListMaterialsResponse);
+  rpc ListTemplateVariants (ListTemplateVariantsRequest) returns (ListTemplateVariantsResponse);
+  rpc ListGemstoneOptions (ListGemstoneOptionsRequest) returns (ListGemstoneOptionsResponse);
+  rpc ListGemstoneSlots (ListGemstoneSlotsRequest) returns (ListGemstoneSlotsResponse);
+  rpc ValidateConfiguration (ValidateConfigurationRequest) returns (ValidateConfigurationResponse);
+
+  // Admin APIs
+  rpc CreateTemplate (CreateTemplateRequest) returns (TemplateResponse);
+  rpc UpdateTemplate (UpdateTemplateRequest) returns (TemplateResponse);
+  rpc PublishTemplate (PublishTemplateRequest) returns (TemplateResponse);
+  rpc ArchiveTemplate (ArchiveTemplateRequest) returns (TemplateResponse);
+  rpc CreateMaterial (CreateMaterialRequest) returns (MaterialResponse);
+  rpc UpdateMaterial (UpdateMaterialRequest) returns (MaterialResponse);
+  rpc CreateVariant (CreateVariantRequest) returns (TemplateVariantResponse);
+  rpc UpdateVariant (UpdateVariantRequest) returns (TemplateVariantResponse);
+  rpc CreateGemstoneOption (CreateGemstoneOptionRequest) returns (GemstoneOptionResponse);
+  rpc UpdateCompatibilities (UpdateCompatibilitiesRequest) returns (UpdateCompatibilitiesResponse);
+  rpc GetResizePolicies (GetResizePoliciesRequest) returns (ResizePoliciesResponse);
+  rpc UpdateResizePolicies (UpdateResizePoliciesRequest) returns (ResizePoliciesResponse);
+}
+
+// -----------------------------------------------------------------------------
+// Templates
+// -----------------------------------------------------------------------------
+
+message ListTemplatesRequest {
+  memora.common.v1.PaginationRequest pagination = 1;
+  optional string gender = 2;
+  optional string search = 3;
+}
+
+message TemplateResponse {
+  string id = 1;
+  string template_code = 2;
+  string name = 3;
+  string description = 4;
+  string gender = 5;
+  string engrave_surface_type = 6;
+  string model_3d_asset_key = 7;
+  string glb_url = 8;
+  string mapping_version = 9;
+  string default_material_id = 10;
+  string status = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}
+
+message ListTemplatesResponse {
+  repeated TemplateResponse data = 1;
+  memora.common.v1.PaginationMeta pagination = 2;
+}
+
+message GetTemplateByIdRequest {
+  string template_id = 1;
+}
+
+// -----------------------------------------------------------------------------
+// Materials
+// -----------------------------------------------------------------------------
+
+message ListMaterialsRequest {
+  optional string status = 1;
+}
+
+message MaterialResponse {
+  string id = 1;
+  string material_code = 2;
+  string name = 3;
+  string metal_type = 4;
+  int32 purity_karat = 5;
+  double density_g_cm3 = 6;
+  string status = 7;
+}
+
+message ListMaterialsResponse {
+  repeated MaterialResponse data = 1;
+}
+
+// -----------------------------------------------------------------------------
+// Template Variants (Material + Size + Wall thickness + Resize bounds)
+// -----------------------------------------------------------------------------
+
+message ListTemplateVariantsRequest {
+  string template_id = 1;
+  optional string material_id = 2;
+}
+
+message TemplateVariantResponse {
+  string id = 1;
+  string ring_template_id = 2;
+  string material_id = 3;
+  double standard_size = 4;
+  optional double max_up_delta = 5;
+  optional double max_down_delta = 6;
+  optional string resize_method = 7;
+  bool added_metal_allowed = 8;
+  double local_wall_thickness_mm = 9;
+  double min_remaining_wall_thickness_mm = 10;
+  double max_safe_engraving_depth_mm = 11;
+  string status = 12;
+}
+
+message ListTemplateVariantsResponse {
+  repeated TemplateVariantResponse data = 1;
+}
+
+// -----------------------------------------------------------------------------
+// Gemstone Options
+// -----------------------------------------------------------------------------
+
+message ListGemstoneOptionsRequest {
+  memora.common.v1.PaginationRequest pagination = 1;
+  optional string stone_type = 2;
+  optional string shape = 3;
+  optional bool is_certified = 4;
+}
+
+message GemstoneOptionResponse {
+  string id = 1;
+  string stone_code = 2;
+  string name = 3;
+  string stone_type = 4;
+  string shape = 5;
+  string color = 6;
+  string clarity = 7;
+  double dimension_length_mm = 8;
+  double dimension_width_mm = 9;
+  bool is_certified = 10;
+  string status = 11;
+}
+
+message ListGemstoneOptionsResponse {
+  repeated GemstoneOptionResponse data = 1;
+  memora.common.v1.PaginationMeta pagination = 2;
+}
+
+// -----------------------------------------------------------------------------
+// Gemstone Slots
+// -----------------------------------------------------------------------------
+
+message ListGemstoneSlotsRequest {
+  string template_id = 1;
+}
+
+message GemstoneSlotResponse {
+  string id = 1;
+  string ring_template_id = 2;
+  int32 slot_number = 3;
+  string slot_type = 4;
+  string gemstone_group_id = 5;
+  string anchor_node_name = 6;
+  bool is_required = 7;
+}
+
+message ListGemstoneSlotsResponse {
+  repeated GemstoneSlotResponse data = 1;
+}
+
+// -----------------------------------------------------------------------------
+// 3D Assets & Anchors
+// -----------------------------------------------------------------------------
+
+message GetTemplate3DAssetsRequest {
+  string template_id = 1;
+}
+
+message AnchorNode {
+  string node_name = 1;
+  optional int32 slot_number = 2;
+  optional string slot_type = 3;
+  optional string surface_type = 4;
+}
+
+message Template3DAssetsResponse {
+  string template_id = 1;
+  string model_3d_asset_key = 2;
+  string glb_url = 3;
+  string mapping_version = 4;
+  repeated AnchorNode anchors = 5;
+}
+
+// -----------------------------------------------------------------------------
+// Configuration Options (Aggregated for 3D Configurator)
+// -----------------------------------------------------------------------------
+
+message GetTemplateConfigurationOptionsRequest {
+  string template_id = 1;
+}
+
+message TemplateConfigurationOptionsResponse {
+  string template_id = 1;
+  repeated MaterialResponse available_materials = 2;
+  repeated TemplateVariantResponse available_variants = 3;
+  repeated GemstoneSlotResponse gemstone_slots = 4;
+  repeated string allowed_personalization_packages = 5;
+}
+
+// -----------------------------------------------------------------------------
+// Validation
+// -----------------------------------------------------------------------------
+
+message GemstoneSelection {
+  int32 slot_number = 1;
+  string gemstone_option_id = 2;
+}
+
+message ValidateConfigurationRequest {
+  string template_id = 1;
+  string material_id = 2;
+  double standard_size = 3;
+  double target_size = 4;
+  repeated GemstoneSelection gemstone_selections = 5;
+  string personalization_package = 6;
+}
+
+message ValidationError {
+  string code = 1;
+  string message = 2;
+  string field = 3;
+}
+
+message ValidateConfigurationResponse {
+  bool is_valid = 1;
+  repeated ValidationError validation_errors = 2;
+  string template_variant_id = 3;
+  double safe_engraving_depth_mm = 4;
+  double resize_delta = 5;
+  bool is_resize_allowed = 6;
+}
+
+// -----------------------------------------------------------------------------
+// Admin Catalog Messages
+// -----------------------------------------------------------------------------
+
+message CreateTemplateRequest {
+  string code = 1;
+  string name = 2;
+  optional string description = 3;
+  string glb_asset_key = 4;
+  optional string stone_layout = 5;
+  repeated string design_supported_personalization_packages = 6;
+  optional string gender = 7;
+  optional string created_by_user_id = 8;
+}
+
+message UpdateTemplateRequest {
+  string template_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional string glb_asset_key = 4;
+  optional string stone_layout = 5;
+  repeated string design_supported_personalization_packages = 6;
+  optional string gender = 7;
+}
+
+message PublishTemplateRequest {
+  string template_id = 1;
+}
+
+message ArchiveTemplateRequest {
+  string template_id = 1;
+}
+
+message CreateMaterialRequest {
+  string code = 1;
+  string name = 2;
+  optional string material_family = 3;
+  optional double purity_percent = 4;
+  optional string color = 5;
+}
+
+message UpdateMaterialRequest {
+  string material_id = 1;
+  optional string name = 2;
+  optional string material_family = 3;
+  optional double purity_percent = 4;
+  optional string color = 5;
+  optional string status = 6;
+}
+
+message CreateVariantRequest {
+  string ring_template_id = 1;
+  string material_id = 2;
+  double standard_size = 3;
+  optional double max_up_delta = 4;
+  optional double max_down_delta = 5;
+  optional string resize_method = 6;
+  optional bool added_metal_allowed = 7;
+  double local_wall_thickness_mm = 8;
+  double min_remaining_wall_thickness_mm = 9;
+  double max_safe_engraving_depth_mm = 10;
+  optional string created_by_user_id = 11;
+}
+
+message UpdateVariantRequest {
+  string variant_id = 1;
+  optional double standard_size = 2;
+  optional double max_up_delta = 3;
+  optional double max_down_delta = 4;
+  optional string resize_method = 5;
+  optional bool added_metal_allowed = 6;
+  optional double local_wall_thickness_mm = 7;
+  optional double min_remaining_wall_thickness_mm = 8;
+  optional double max_safe_engraving_depth_mm = 9;
+  optional string status = 10;
+}
+
+message CreateGemstoneOptionRequest {
+  string code = 1;
+  string name = 2;
+  string stone_type = 3;
+  string shape = 4;
+  double length_mm = 5;
+  double width_mm = 6;
+  optional string color_grade = 7;
+  optional string clarity_grade = 8;
+  optional bool certified_required = 9;
+}
+
+message UpdateCompatibilitiesRequest {
+  string template_variant_id = 1;
+  string gemstone_group_id = 2;
+  repeated string gemstone_option_ids = 3;
+}
+
+message UpdateCompatibilitiesResponse {
+  string template_variant_id = 1;
+  string gemstone_group_id = 2;
+  repeated string allowed_option_ids = 3;
+  int32 updated_count = 4;
+}
+
+message GetResizePoliciesRequest {
+  optional string template_variant_id = 1;
+  optional string template_id = 2;
+}
+
+message ResizePolicyItem {
+  string template_variant_id = 1;
+  string template_id = 2;
+  string template_name = 3;
+  string material_name = 4;
+  double standard_size = 5;
+  double min_size = 6;
+  double max_size = 7;
+  double max_up_delta = 8;
+  double max_down_delta = 9;
+  string resize_method = 10;
+  bool added_metal_allowed = 11;
+  double local_wall_thickness_mm = 12;
+  double min_remaining_wall_thickness_mm = 13;
+  double max_safe_engraving_depth_mm = 14;
+}
+
+message ResizePoliciesResponse {
+  repeated ResizePolicyItem data = 1;
+}
+
+message UpdateResizePoliciesRequest {
+  string template_variant_id = 1;
+  optional double max_up_delta = 2;
+  optional double max_down_delta = 3;
+  optional string resize_method = 4;
+  optional bool added_metal_allowed = 5;
+  optional double min_remaining_wall_thickness_mm = 6;
+  optional double max_safe_engraving_depth_mm = 7;
+}
+
+

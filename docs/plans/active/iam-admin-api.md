@@ -15,7 +15,7 @@
 - In scope: administrative reads and mutations over existing `iam` tables that an approved RBAC v1 permission already names. Gateway stays HTTP. IAM owns rules, persistence, and security-audit writes.
 - Out of scope: customer authentication, Google OAuth, refresh, CSRF, logging changes, `DATA_RIGHTS_PROCESS`, new roles, a new microservice, production migration, and any API not listed here. `IAM_SECURITY_AUDIT_READ` is the one permission code added for IAM-ADM-14.
 - Read:
-  - `docs/architecture/memora-backend-4-service.md` (ADR-001, MF01–MF06). IAM admin is not a lead flow in that table. These APIs are the IAM admin extension, Main Flow `N/A`.
+  - `docs/architecture/memora-backend-4-service.md` (ADR-001, MF01–MF04). IAM admin is not a lead flow in that table. These APIs are the IAM admin extension, Main Flow `N/A`.
   - `docs/architecture/iam-permission-matrix.md` (APPROVED 2026-10-15, plus `IAM_SECURITY_AUDIT_READ` on 2026-10-20: 6 roles, 46 permissions, 49 mappings, no ADMIN wildcard).
   - `docs/architecture/api-gateway-structure.md`.
   - `libs/contracts/src/iam/permissions.ts` (`RBAC_V1_APPROVAL_STATUS = APPROVED`).

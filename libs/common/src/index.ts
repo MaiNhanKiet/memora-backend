@@ -1,6 +1,7 @@
 export * from './constants/auth-metadata.constants';
 export * from './constants/internal-grpc.constants';
 export * from './interfaces/api-response.interface';
+export * from './decorators/allow-guest.decorator';
 export * from './decorators/public.decorator';
 export * from './decorators/skip-response-transform.decorator';
 export * from './exceptions/error-codes';
@@ -11,3 +12,4 @@ export * from './filters/http-exception.filter';
 export * from './filters/grpc-exception.filter';
 export * from './guards/internal-grpc-auth.guard';
 export * from './utils/pagination';
+export * from './utils/verified-actor';

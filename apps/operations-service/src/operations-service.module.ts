@@ -3,6 +3,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import {
   createServiceConfigModule,
   operationsConfig,
+  queueRedisConfig,
   validateOperationsEnv,
 } from '@app/config';
 import { LoggingInterceptor } from '@app/logger';
@@ -18,7 +19,7 @@ import { PrismaModule } from './persistence/prisma/prisma.module';
   imports: [
     createServiceConfigModule({
       validate: validateOperationsEnv,
-      load: [operationsConfig],
+      load: [operationsConfig, queueRedisConfig],
     }),
     ObservabilityModule,
     PrismaModule,

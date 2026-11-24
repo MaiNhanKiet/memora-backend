@@ -19,6 +19,7 @@ import { LinkGuestIdentityRequestDto } from '../dto/request/link-guest-identity.
 import { RequestGuestVerificationRequestDto } from '../dto/request/request-guest-verification.request.dto';
 import type {
   CustomerIdentityProjectionDto,
+  GuestSessionResponseDto,
   GuestVerificationChallengeResponseDto,
   GuestVerificationProofResponseDto,
   LinkedGuestIdentityResponseDto,
@@ -26,6 +27,7 @@ import type {
 } from '../dto/response/guest-verification.response.dto';
 import {
   ApiConfirmGuestVerificationDocs,
+  ApiCreateGuestSessionDocs,
   ApiGetMyCustomerIdentityDocs,
   ApiLinkGuestIdentityDocs,
   ApiRequestGuestVerificationDocs,
@@ -35,6 +37,15 @@ import {
 @Controller('identities')
 export class GuestIdentityController {
   constructor(private readonly iam: IamGrpcClient) {}
+
+  @Post('guest/sessions')
+  @Public()
+  @AuthRateLimit(20, 60)
+  @HttpCode(201)
+  @ApiCreateGuestSessionDocs()
+  createSession(@Req() request: Request): Promise<GuestSessionResponseDto> {
+    return this.iam.createGuestSession(request.ip ?? '');
+  }
 
   @Post('guest/verify/request')
   @Public()

@@ -135,7 +135,7 @@ D4–D10 đã được chốt **APPROVED** cho đúng phạm vi guest identity *
 
 - **Status:** `APPROVED`. Implementation: `PARTIAL`.
 - **Review:** `PASS_WITH_NOTES`
-- **Domain/owner/flow:** IAM / Gateway → IAM / MF02 foundation; chưa tích hợp Commerce.
+- **Domain/owner/flow:** IAM / Gateway → IAM / MF01 (legacy MF02) foundation; chưa tích hợp Commerce.
 - **Actor/auth:** public (`@Public()`), áp dụng D4–D7 đã được phê duyệt; có throttling, không có guest JWT giả.
 - **Request:** `{ "contactEmail": "guest@example.com" }`, normalize email trong IAM. Không nhận naked `customerIdentityId`, `userId`, role, hoặc tự tìm record hiện có theo email.
 - **Response:** 202 `data: { challengeId: string, expiresInSeconds: 300 }`; generic/anti-enumeration; error 400 invalid, 429 rate limit, 503 Redis/email unavailable.
@@ -151,7 +151,7 @@ D4–D10 đã được chốt **APPROVED** cho đúng phạm vi guest identity *
 
 - **Status:** `APPROVED`. Implementation: `PARTIAL`.
 - **Review:** `PASS_WITH_NOTES`
-- **Domain/owner/flow:** IAM / Gateway → IAM / MF02 foundation.
+- **Domain/owner/flow:** IAM / Gateway → IAM / MF01 (legacy MF02) foundation.
 - **Actor/auth:** public with verified challenge; no JWT login created.
 - **Request:** `{ "challengeId": "<opaque>", "otp": "123456" }`.
 - **Response:** 200 `data: { customerIdentityId: string, guestProof: string, expiresInSeconds: 900 }`; errors 400 invalid/expired/used challenge, 429 too many attempts, 503 IAM/Redis failure.
@@ -168,7 +168,7 @@ D4–D10 đã được chốt **APPROVED** cho đúng phạm vi guest identity *
 
 - **Status:** `APPROVED`. Implementation: `PARTIAL`.
 - **Review:** `PASS_WITH_NOTES`
-- **Domain/owner/flow:** IAM / Gateway → IAM / MF02/MF05 lookup.
+- **Domain/owner/flow:** IAM / Gateway → IAM / MF01/MF03 (legacy MF02/MF05) lookup.
 - **Actor/auth:** verified JWT; only linked primary CustomerIdentity belonging to this User.
 - **Request:** không params, body, query.
 - **Response:** 200 `data: { primary: { id, displayName?, contactEmail, emailVerifiedAt?, isPrimaryForUser, accountLinkedAt? } | null }`; error 401 invalid JWT. Không trả guestProof hoặc danh sách identity người khác.
@@ -183,7 +183,7 @@ D4–D10 đã được chốt **APPROVED** cho đúng phạm vi guest identity *
 
 - **Status:** `APPROVED`. Implementation: `PARTIAL`.
 - **Review:** `PASS_WITH_NOTES`
-- **Domain/owner/flow:** IAM / Gateway → IAM / MF02/MF05 lookup.
+- **Domain/owner/flow:** IAM / Gateway → IAM / MF01/MF03 (legacy MF02/MF05) lookup.
 - **Actor/auth:** verified JWT plus short-lived `guestProof` from IAM-012; actor `userId` only from JWT.
 - **Request:** `{ "guestProof": "<opaque>" }`; no request `userId`, role, contact email, or guessed identity ID as authorization.
 - **Response:** 200 `data: { customerIdentityId, userId, isPrimaryForUser: true, accountLinkedAt }`; errors 400 bad proof, 401 unauthenticated, 403 not verified, 404 missing identity (non-enumerating), 409 already linked/primary conflict.
