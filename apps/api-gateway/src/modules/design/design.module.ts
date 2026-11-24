@@ -16,6 +16,7 @@ import {
         urlConfigKey: 'apiGateway.commerceGrpcUrl',
         protoPackage: 'memora.commerce.v1',
         protoFile: 'commerce/v1/cart.proto',
+        optional: true,
       }),
     ]),
   ],
