@@ -1,4 +1,5 @@
-import { Expose } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
+import { IsString, Matches, MinLength, ValidateIf } from 'class-validator';
 import { registerAs } from '@nestjs/config';
 import {
   EnvHostname,
@@ -30,6 +31,26 @@ export const EXPERIENCE_FORBIDDEN_SCHEMAS = [
 ] as const;
 
 const POSTGRES_SUPERUSER_ROLES = new Set(['postgres']);
+const HTTP_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
+
+const requiredOutsideDevelopment = (env: { NODE_ENV?: unknown }): boolean =>
+  env.NODE_ENV !== 'development';
+
+function optionalText(value: unknown): unknown {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
+  }
+  return value;
+}
+
+const presentOrRequired =
+  (key: string) =>
+  (env: Record<string, unknown>): boolean =>
+    requiredOutsideDevelopment(env) || env[key] !== undefined;
 
 export class ExperienceEnvironment extends NodeEnvironment {
   @Expose()
@@ -55,6 +76,48 @@ export class ExperienceEnvironment extends NodeEnvironment {
   @Expose()
   @EnvSecret(32)
   EXPERIENCE_INTERNAL_GRPC_SECRET!: string;
+
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf(presentOrRequired('EXPERIENCE_OBJECT_STORAGE_ENDPOINT'))
+  @IsString()
+  @Matches(HTTP_URL_PATTERN, { message: 'must be an absolute http(s) URL' })
+  EXPERIENCE_OBJECT_STORAGE_ENDPOINT?: string;
+
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf((_, value) => value !== undefined)
+  @IsString()
+  @Matches(HTTP_URL_PATTERN, { message: 'must be an absolute http(s) URL' })
+  EXPERIENCE_OBJECT_STORAGE_PUBLIC_ENDPOINT?: string;
+
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf(presentOrRequired('EXPERIENCE_OBJECT_STORAGE_REGION'))
+  @IsString()
+  @MinLength(1)
+  EXPERIENCE_OBJECT_STORAGE_REGION?: string;
+
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf(presentOrRequired('EXPERIENCE_OBJECT_STORAGE_BUCKET'))
+  @IsString()
+  @MinLength(1)
+  EXPERIENCE_OBJECT_STORAGE_BUCKET?: string;
+
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf(presentOrRequired('EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID'))
+  @IsString()
+  @MinLength(1)
+  EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID?: string;
+
+  @Expose()
+  @Transform(({ value }: { value: unknown }) => optionalText(value))
+  @ValidateIf(presentOrRequired('EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY'))
+  @IsString()
+  @MinLength(1)
+  EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY?: string;
 }
 
 export interface ExperienceEnv {
@@ -65,6 +128,12 @@ export interface ExperienceEnv {
   EXPERIENCE_HEALTH_PORT: number;
   EXPERIENCE_DATABASE_URL: string;
   EXPERIENCE_INTERNAL_GRPC_SECRET: string;
+  EXPERIENCE_OBJECT_STORAGE_ENDPOINT?: string;
+  EXPERIENCE_OBJECT_STORAGE_PUBLIC_ENDPOINT?: string;
+  EXPERIENCE_OBJECT_STORAGE_REGION?: string;
+  EXPERIENCE_OBJECT_STORAGE_BUCKET?: string;
+  EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID?: string;
+  EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY?: string;
 }
 
 export function validateExperienceEnv(
@@ -79,6 +148,14 @@ export function validateExperienceEnv(
       '127.0.0.1',
     ),
     EXPERIENCE_HEALTH_PORT: defaultText(source.EXPERIENCE_HEALTH_PORT, '5054'),
+    EXPERIENCE_OBJECT_STORAGE_REGION: defaultText(
+      source.EXPERIENCE_OBJECT_STORAGE_REGION,
+      'garage',
+    ),
+    EXPERIENCE_OBJECT_STORAGE_BUCKET: defaultText(
+      source.EXPERIENCE_OBJECT_STORAGE_BUCKET,
+      'memora-memory',
+    ),
   });
   assertExperienceDatabaseUrl(
     validated.EXPERIENCE_DATABASE_URL,
@@ -92,6 +169,18 @@ export function validateExperienceEnv(
     EXPERIENCE_HEALTH_PORT: validated.EXPERIENCE_HEALTH_PORT,
     EXPERIENCE_DATABASE_URL: validated.EXPERIENCE_DATABASE_URL,
     EXPERIENCE_INTERNAL_GRPC_SECRET: validated.EXPERIENCE_INTERNAL_GRPC_SECRET,
+    EXPERIENCE_OBJECT_STORAGE_ENDPOINT:
+      validated.EXPERIENCE_OBJECT_STORAGE_ENDPOINT,
+    EXPERIENCE_OBJECT_STORAGE_PUBLIC_ENDPOINT:
+      validated.EXPERIENCE_OBJECT_STORAGE_PUBLIC_ENDPOINT,
+    EXPERIENCE_OBJECT_STORAGE_REGION:
+      validated.EXPERIENCE_OBJECT_STORAGE_REGION,
+    EXPERIENCE_OBJECT_STORAGE_BUCKET:
+      validated.EXPERIENCE_OBJECT_STORAGE_BUCKET,
+    EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID:
+      validated.EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID,
+    EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY:
+      validated.EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY,
   };
 }
 
@@ -110,6 +199,14 @@ export const experienceConfig = registerAs('experience', () => {
     healthPort: env.EXPERIENCE_HEALTH_PORT,
     databaseUrl: env.EXPERIENCE_DATABASE_URL,
     internalGrpcSecret: env.EXPERIENCE_INTERNAL_GRPC_SECRET,
+    storage: {
+      endpoint: env.EXPERIENCE_OBJECT_STORAGE_ENDPOINT,
+      publicEndpoint: env.EXPERIENCE_OBJECT_STORAGE_PUBLIC_ENDPOINT,
+      region: env.EXPERIENCE_OBJECT_STORAGE_REGION ?? 'garage',
+      bucket: env.EXPERIENCE_OBJECT_STORAGE_BUCKET ?? 'memora-memory',
+      accessKeyId: env.EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID,
+      secretAccessKey: env.EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY,
+    },
   };
 });
 
