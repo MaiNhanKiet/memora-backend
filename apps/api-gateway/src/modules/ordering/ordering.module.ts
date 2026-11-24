@@ -26,6 +26,7 @@ import { MemoryCardsModule } from '../memory/cards/memory-cards.module';
         urlConfigKey: 'apiGateway.commerceGrpcUrl',
         protoPackage: 'memora.commerce.v1',
         protoFile: 'commerce/v1/ordering.proto',
+        optional: true,
       }),
     ]),
   ],
