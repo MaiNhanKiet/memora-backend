@@ -8,9 +8,13 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type {
+  MemoryStoragePort,
+  PresignedUploadResult,
+} from '../application/memory-storage.port';
 
 @Injectable()
-export class MemoryStorageAdapter {
+export class MemoryStorageAdapter implements MemoryStoragePort {
   private readonly client: S3Client;
   private readonly signingClient: S3Client;
   private readonly bucket: string;
@@ -96,7 +100,7 @@ export class MemoryStorageAdapter {
     key: string,
     contentType: string,
     expiresInSeconds: number = 900,
-  ): Promise<{ uploadUrl: string; expiresAt: Date }> {
+  ): Promise<PresignedUploadResult> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,

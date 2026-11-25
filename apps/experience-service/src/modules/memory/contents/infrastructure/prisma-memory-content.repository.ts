@@ -1,16 +1,39 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../../persistence/prisma/prisma.service';
 import type {
   Prisma,
   memory_contents,
 } from '../../../../../generated/prisma/client';
+import { PrismaService } from '../../../../persistence/prisma/prisma.service';
+import type {
+  MemoryContentRecord,
+  MemoryContentRepository,
+  ReplaceMemoryContentItemInput,
+} from '../application/memory-content.repository';
+
+function toMemoryContentRecord(row: memory_contents): MemoryContentRecord {
+  return {
+    id: row.id,
+    memoryCardId: row.memory_card_id,
+    contentType: row.content_type,
+    title: row.title ?? undefined,
+    textContent: row.text_content ?? undefined,
+    assetKey: row.asset_key ?? undefined,
+    sortOrder: row.sort_order,
+    status: row.status,
+    layoutJson: row.layout_json ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 @Injectable()
-export class MemoryContentRepository {
+export class PrismaMemoryContentRepository implements MemoryContentRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listContentsByCardId(cardId: string): Promise<memory_contents[]> {
-    return this.prisma.memory_contents.findMany({
+  async listContentsByCardId(
+    cardId: string,
+  ): Promise<readonly MemoryContentRecord[]> {
+    const rows = await this.prisma.memory_contents.findMany({
       where: {
         memory_card_id: cardId,
         status: { in: ['ACTIVE', 'HIDDEN'] },
@@ -18,23 +41,15 @@ export class MemoryContentRepository {
       },
       orderBy: { sort_order: 'asc' },
     });
+    return rows.map(toMemoryContentRecord);
   }
 
   async replaceContents(
     cardId: string,
     customerIdentityId: string,
-    items: Array<{
-      id?: string;
-      contentType: string;
-      title?: string;
-      textContent?: string;
-      assetKey?: string;
-      sortOrder: number;
-      layoutJson?: string;
-    }>,
-  ): Promise<memory_contents[]> {
-    return this.prisma.$transaction(async (tx) => {
-      // Soft-delete existing contents for this card
+    items: readonly ReplaceMemoryContentItemInput[],
+  ): Promise<readonly MemoryContentRecord[]> {
+    const createdRows = await this.prisma.$transaction(async (tx) => {
       await tx.memory_contents.updateMany({
         where: {
           memory_card_id: cardId,
@@ -46,7 +61,6 @@ export class MemoryContentRepository {
         },
       });
 
-      // Insert new contents
       const createdItems: memory_contents[] = [];
       for (const item of items) {
         const created = await tx.memory_contents.create({
@@ -69,5 +83,7 @@ export class MemoryContentRepository {
 
       return createdItems;
     });
+
+    return createdRows.map(toMemoryContentRecord);
   }
 }

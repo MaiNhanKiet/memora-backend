@@ -14,45 +14,58 @@ import {
   type RevokeAccessGrantResponse,
 } from '@app/contracts';
 import { ExperienceInternalGrpcAuthGuard } from '../../../../grpc/experience-internal-grpc-auth.guard';
-import { MemoryGrantService } from '../application/memory-grant.service';
+import {
+  CreateAccessGrantUseCase,
+  GetMemoryBySessionUseCase,
+  ListAccessGrantsUseCase,
+  RedeemInvitationUseCase,
+  RevokeAccessGrantUseCase,
+} from '../application/memory-grant.use-cases';
 
+/** Thin gRPC adapter. Actor parsing and resource authorization live in the use cases. */
 @Controller()
 @UseGuards(ExperienceInternalGrpcAuthGuard)
 export class MemoryGrantGrpcController {
-  constructor(private readonly grantService: MemoryGrantService) {}
+  constructor(
+    private readonly createAccessGrantUseCase: CreateAccessGrantUseCase,
+    private readonly listAccessGrantsUseCase: ListAccessGrantsUseCase,
+    private readonly revokeAccessGrantUseCase: RevokeAccessGrantUseCase,
+    private readonly redeemInvitationUseCase: RedeemInvitationUseCase,
+    private readonly getMemoryBySessionUseCase: GetMemoryBySessionUseCase,
+  ) {}
 
   @GrpcMethod(MEMORY_SERVICE_NAME, 'CreateAccessGrant')
   createAccessGrant(
     request: CreateAccessGrantRequest,
   ): Promise<CreateAccessGrantResponse> {
-    return this.grantService.createAccessGrant(request);
+    return this.createAccessGrantUseCase.execute(request);
   }
 
   @GrpcMethod(MEMORY_SERVICE_NAME, 'ListAccessGrants')
   listAccessGrants(
     request: ListAccessGrantsRequest,
   ): Promise<ListAccessGrantsResponse> {
-    return this.grantService.listAccessGrants(request);
+    return this.listAccessGrantsUseCase.execute(request);
   }
 
   @GrpcMethod(MEMORY_SERVICE_NAME, 'RevokeAccessGrant')
   revokeAccessGrant(
     request: RevokeAccessGrantRequest,
   ): Promise<RevokeAccessGrantResponse> {
-    return this.grantService.revokeAccessGrant(request);
+    return this.revokeAccessGrantUseCase.execute(request);
   }
 
   @GrpcMethod(MEMORY_SERVICE_NAME, 'RedeemInvitation')
   redeemInvitation(
     request: RedeemInvitationRequest,
   ): Promise<RedeemInvitationResponse> {
-    return this.grantService.redeemInvitation(request);
+    return this.redeemInvitationUseCase.execute(request);
   }
 
   @GrpcMethod(MEMORY_SERVICE_NAME, 'GetMemoryBySession')
   getMemoryBySession(
     request: GetMemoryBySessionRequest,
   ): Promise<GetMemoryBySessionResponse> {
-    return this.grantService.getMemoryBySession(request);
+    return this.getMemoryBySessionUseCase.execute(request);
   }
 }

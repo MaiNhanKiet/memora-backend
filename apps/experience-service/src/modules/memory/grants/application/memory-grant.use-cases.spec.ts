@@ -1,14 +1,29 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
-import { MemoryGrantService } from './memory-grant.service';
-import { MemoryGrantRepository } from '../infrastructure/memory-grant.repository';
-import { MemoryCardRepository } from '../../cards/infrastructure/memory-card.repository';
-import { MemoryContentRepository } from '../../contents/infrastructure/memory-content.repository';
-import { MemoryStorageAdapter } from '../../contents/infrastructure/memory-storage.adapter';
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+  MEMORY_CARD_REPOSITORY,
+  type MemoryCardWithGrantsRecord,
+} from '../../cards/application/memory-card.repository';
 import { PinHasher } from '../../cards/application/pin-hasher';
+import {
+  MEMORY_CONTENT_REPOSITORY,
+  type MemoryContentRecord,
+} from '../../contents/application/memory-content.repository';
+import { MEMORY_STORAGE_PORT } from '../../contents/application/memory-storage.port';
+import {
+  MEMORY_GRANT_REPOSITORY,
+  type MemoryAccessGrantWithCardRecord,
+} from './memory-grant.repository';
+import {
+  CreateAccessGrantUseCase,
+  GetMemoryBySessionUseCase,
+  RedeemInvitationUseCase,
+} from './memory-grant.use-cases';
 
-describe('MemoryGrantService', () => {
-  let service: MemoryGrantService;
+describe('MemoryGrant UseCases', () => {
+  let createAccessGrantUseCase: CreateAccessGrantUseCase;
+  let redeemInvitationUseCase: RedeemInvitationUseCase;
+  let getMemoryBySessionUseCase: GetMemoryBySessionUseCase;
 
   const mockGrantRepository = {
     createGrant: jest.fn(),
@@ -29,7 +44,7 @@ describe('MemoryGrantService', () => {
     listContentsByCardId: jest.fn(),
   };
 
-  const mockStorageAdapter = {
+  const mockStoragePort = {
     presignGetUrl: jest
       .fn()
       .mockResolvedValue('https://storage.memora.vn/sample.jpg'),
@@ -44,27 +59,26 @@ describe('MemoryGrantService', () => {
     customerIdentityId: '22222222-2222-4222-8222-222222222222',
   };
 
-  const sampleCard = {
+  const sampleCard: MemoryCardWithGrantsRecord = {
     id: '33333333-3333-4333-8333-333333333333',
-    ring_item_id: '44444444-4444-4444-8444-444444444444',
-    owner_customer_identity_id: '22222222-2222-4222-8222-222222222222',
-    owner_email: 'owner@memora.vn',
+    ringItemId: '44444444-4444-4444-8444-444444444444',
+    ownerCustomerIdentityId: '22222222-2222-4222-8222-222222222222',
+    ownerEmail: 'owner@memora.vn',
     status: 'ACTIVE',
-    pin_hash: null,
-    pin_failed_attempts: 0,
-    pin_locked_until: null,
-    deleted_at: null,
+    pinFailedAttempts: 0,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    accessGrants: [],
   };
 
-  const sampleGrant = {
+  const sampleGrant: MemoryAccessGrantWithCardRecord = {
     id: '55555555-5555-4555-8555-555555555555',
-    memory_card_id: sampleCard.id,
-    grantee_email: 'friend@memora.vn',
+    memoryCardId: sampleCard.id,
+    granteeEmail: 'friend@memora.vn',
     status: 'PENDING',
-    invitation_token_hash: 'token_hash_sample',
-    invite_expires_at: new Date(Date.now() + 7 * 86400 * 1000),
-    created_at: new Date('2026-01-01T00:00:00Z'),
-    memory_cards: sampleCard,
+    inviteExpiresAt: new Date(Date.now() + 7 * 86400 * 1000),
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    card: sampleCard,
   };
 
   beforeEach(async () => {
@@ -72,24 +86,34 @@ describe('MemoryGrantService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        MemoryGrantService,
-        { provide: MemoryGrantRepository, useValue: mockGrantRepository },
-        { provide: MemoryCardRepository, useValue: mockCardRepository },
-        { provide: MemoryContentRepository, useValue: mockContentRepository },
-        { provide: MemoryStorageAdapter, useValue: mockStorageAdapter },
+        CreateAccessGrantUseCase,
+        RedeemInvitationUseCase,
+        GetMemoryBySessionUseCase,
+        { provide: MEMORY_GRANT_REPOSITORY, useValue: mockGrantRepository },
+        { provide: MEMORY_CARD_REPOSITORY, useValue: mockCardRepository },
+        { provide: MEMORY_CONTENT_REPOSITORY, useValue: mockContentRepository },
+        { provide: MEMORY_STORAGE_PORT, useValue: mockStoragePort },
         { provide: PinHasher, useValue: mockPinHasher },
       ],
     }).compile();
 
-    service = module.get<MemoryGrantService>(MemoryGrantService);
+    createAccessGrantUseCase = module.get<CreateAccessGrantUseCase>(
+      CreateAccessGrantUseCase,
+    );
+    redeemInvitationUseCase = module.get<RedeemInvitationUseCase>(
+      RedeemInvitationUseCase,
+    );
+    getMemoryBySessionUseCase = module.get<GetMemoryBySessionUseCase>(
+      GetMemoryBySessionUseCase,
+    );
   });
 
-  describe('createAccessGrant', () => {
+  describe('CreateAccessGrantUseCase', () => {
     it('should create an access grant and return secure invitation token', async () => {
       mockCardRepository.findById.mockResolvedValue(sampleCard);
       mockGrantRepository.createGrant.mockResolvedValue(sampleGrant);
 
-      const res = await service.createAccessGrant({
+      const res = await createAccessGrantUseCase.execute({
         actor: sampleActor,
         cardId: sampleCard.id,
         granteeEmail: 'friend@memora.vn',
@@ -105,11 +129,11 @@ describe('MemoryGrantService', () => {
     it('should throw ForbiddenException if actor is not the card owner', async () => {
       mockCardRepository.findById.mockResolvedValue({
         ...sampleCard,
-        owner_customer_identity_id: 'other-identity-id',
+        ownerCustomerIdentityId: 'other-identity-id',
       });
 
       await expect(
-        service.createAccessGrant({
+        createAccessGrantUseCase.execute({
           actor: sampleActor,
           cardId: sampleCard.id,
           granteeEmail: 'friend@memora.vn',
@@ -118,16 +142,16 @@ describe('MemoryGrantService', () => {
     });
   });
 
-  describe('redeemInvitation', () => {
+  describe('RedeemInvitationUseCase', () => {
     it('should activate grant and return accessSessionId', async () => {
       mockGrantRepository.findByTokenHash.mockResolvedValue(sampleGrant);
       mockGrantRepository.markAccepted.mockResolvedValue({
         ...sampleGrant,
         status: 'ACTIVE',
-        accepted_at: new Date(),
+        acceptedAt: new Date(),
       });
 
-      const res = await service.redeemInvitation({
+      const res = await redeemInvitationUseCase.execute({
         invitationToken: 'test-token',
         actor: sampleActor,
       });
@@ -141,28 +165,30 @@ describe('MemoryGrantService', () => {
     });
   });
 
-  describe('getMemoryBySession', () => {
+  describe('GetMemoryBySessionUseCase', () => {
     it('should return memory contents for active session', async () => {
       mockGrantRepository.findGrantById.mockResolvedValue({
         ...sampleGrant,
         status: 'ACTIVE',
       });
-      mockGrantRepository.updateLastAccessed.mockResolvedValue({});
+      mockGrantRepository.updateLastAccessed.mockResolvedValue(sampleGrant);
+
+      const contentRecord: MemoryContentRecord = {
+        id: '66666666-6666-4666-8666-666666666666',
+        memoryCardId: sampleCard.id,
+        contentType: 'IMAGE',
+        title: 'Our Trip',
+        assetKey: 'memories/sample.jpg',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-01-01T00:00:00Z'),
+      };
       mockContentRepository.listContentsByCardId.mockResolvedValue([
-        {
-          id: '66666666-6666-4666-8666-666666666666',
-          memory_card_id: sampleCard.id,
-          content_type: 'IMAGE',
-          title: 'Our Trip',
-          asset_key: 'memories/sample.jpg',
-          sort_order: 0,
-          status: 'ACTIVE',
-          created_at: new Date('2026-01-01T00:00:00Z'),
-          updated_at: new Date('2026-01-01T00:00:00Z'),
-        },
+        contentRecord,
       ]);
 
-      const res = await service.getMemoryBySession({
+      const res = await getMemoryBySessionUseCase.execute({
         accessSessionId: sampleGrant.id,
       });
 

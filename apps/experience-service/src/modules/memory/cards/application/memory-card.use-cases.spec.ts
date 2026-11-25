@@ -1,11 +1,29 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { MemoryCardService } from './memory-card.service';
-import { MemoryCardRepository } from '../infrastructure/memory-card.repository';
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+  ActivateCardUseCase,
+  ProvisionMemoryCardUseCase,
+} from './card-lifecycle.use-cases';
+import { ChangePinUseCase, SetupPinUseCase } from './card-pin.use-cases';
+import {
+  GetCardByRingItemIdUseCase,
+  GetCardDetailUseCase,
+  ListMyCardsUseCase,
+} from './card-query.use-cases';
+import {
+  MEMORY_CARD_REPOSITORY,
+  type MemoryCardWithGrantsRecord,
+} from './memory-card.repository';
 import { PinHasher } from './pin-hasher';
 
-describe('MemoryCardService', () => {
-  let service: MemoryCardService;
+describe('MemoryCard UseCases', () => {
+  let listMyCardsUseCase: ListMyCardsUseCase;
+  let getCardDetailUseCase: GetCardDetailUseCase;
+  let activateCardUseCase: ActivateCardUseCase;
+  let provisionMemoryCardUseCase: ProvisionMemoryCardUseCase;
+  let getCardByRingItemIdUseCase: GetCardByRingItemIdUseCase;
+  let setupPinUseCase: SetupPinUseCase;
+  let changePinUseCase: ChangePinUseCase;
 
   const mockCardRepository = {
     listCardsByOwner: jest.fn(),
@@ -34,22 +52,16 @@ describe('MemoryCardService', () => {
     customerIdentityId: '22222222-2222-4222-8222-222222222222',
   };
 
-  const sampleCard = {
+  const sampleCard: MemoryCardWithGrantsRecord = {
     id: '33333333-3333-4333-8333-333333333333',
-    ring_item_id: '44444444-4444-4444-8444-444444444444',
-    owner_customer_identity_id: '22222222-2222-4222-8222-222222222222',
-    owner_email: 'customer@memora.vn',
+    ringItemId: '44444444-4444-4444-8444-444444444444',
+    ownerCustomerIdentityId: '22222222-2222-4222-8222-222222222222',
+    ownerEmail: 'customer@memora.vn',
     status: 'PENDING',
-    activated_at: null,
-    pin_hash: null,
-    pin_failed_attempts: 0,
-    pin_locked_until: null,
-    pin_updated_at: null,
-    ar_target_asset_key: null,
-    created_at: new Date('2026-01-01T00:00:00Z'),
-    updated_at: new Date('2026-01-01T00:00:00Z'),
-    deleted_at: null,
-    access_grants: [],
+    pinFailedAttempts: 0,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    accessGrants: [],
   };
 
   beforeEach(async () => {
@@ -57,29 +69,40 @@ describe('MemoryCardService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        MemoryCardService,
-        {
-          provide: MemoryCardRepository,
-          useValue: mockCardRepository,
-        },
-        {
-          provide: PinHasher,
-          useValue: mockPinHasher,
-        },
+        ListMyCardsUseCase,
+        GetCardDetailUseCase,
+        ActivateCardUseCase,
+        ProvisionMemoryCardUseCase,
+        GetCardByRingItemIdUseCase,
+        SetupPinUseCase,
+        ChangePinUseCase,
+        { provide: MEMORY_CARD_REPOSITORY, useValue: mockCardRepository },
+        { provide: PinHasher, useValue: mockPinHasher },
       ],
     }).compile();
 
-    service = module.get<MemoryCardService>(MemoryCardService);
+    listMyCardsUseCase = module.get<ListMyCardsUseCase>(ListMyCardsUseCase);
+    getCardDetailUseCase =
+      module.get<GetCardDetailUseCase>(GetCardDetailUseCase);
+    activateCardUseCase = module.get<ActivateCardUseCase>(ActivateCardUseCase);
+    provisionMemoryCardUseCase = module.get<ProvisionMemoryCardUseCase>(
+      ProvisionMemoryCardUseCase,
+    );
+    getCardByRingItemIdUseCase = module.get<GetCardByRingItemIdUseCase>(
+      GetCardByRingItemIdUseCase,
+    );
+    setupPinUseCase = module.get<SetupPinUseCase>(SetupPinUseCase);
+    changePinUseCase = module.get<ChangePinUseCase>(ChangePinUseCase);
   });
 
-  describe('listMyCards', () => {
+  describe('ListMyCardsUseCase', () => {
     it('should return paginated cards for customer', async () => {
       mockCardRepository.listCardsByOwner.mockResolvedValue({
         items: [sampleCard],
         total: 1,
       });
 
-      const res = await service.listMyCards({
+      const res = await listMyCardsUseCase.execute({
         actor: sampleActor,
         page: 1,
         limit: 10,
@@ -96,11 +119,11 @@ describe('MemoryCardService', () => {
     });
   });
 
-  describe('getCardDetail', () => {
+  describe('GetCardDetailUseCase', () => {
     it('should return card detail when owner requests', async () => {
       mockCardRepository.findById.mockResolvedValue(sampleCard);
 
-      const res = await service.getCardDetail({
+      const res = await getCardDetailUseCase.execute({
         actor: sampleActor,
         cardId: sampleCard.id,
       });
@@ -110,10 +133,10 @@ describe('MemoryCardService', () => {
     });
 
     it('should throw NotFoundException if card does not exist', async () => {
-      mockCardRepository.findById.mockResolvedValue(null);
+      mockCardRepository.findById.mockResolvedValue(undefined);
 
       await expect(
-        service.getCardDetail({
+        getCardDetailUseCase.execute({
           actor: sampleActor,
           cardId: 'missing-id',
         }),
@@ -121,17 +144,17 @@ describe('MemoryCardService', () => {
     });
   });
 
-  describe('activateCard', () => {
+  describe('ActivateCardUseCase', () => {
     it('should activate card and hash initial pin when provided', async () => {
       mockCardRepository.findById.mockResolvedValue(sampleCard);
       mockCardRepository.activateCard.mockResolvedValue({
         ...sampleCard,
         status: 'ACTIVE',
-        activated_at: new Date(),
-        pin_hash: 'hash_1234',
+        activatedAt: new Date(),
+        pinHash: 'hash_1234',
       });
 
-      const res = await service.activateCard({
+      const res = await activateCardUseCase.execute({
         actor: sampleActor,
         cardId: sampleCard.id,
         initialPin: '1234',
@@ -147,7 +170,7 @@ describe('MemoryCardService', () => {
     });
   });
 
-  describe('setupPin', () => {
+  describe('SetupPinUseCase', () => {
     it('should set pin when card has no pin yet', async () => {
       mockCardRepository.findById.mockResolvedValue({
         ...sampleCard,
@@ -155,11 +178,11 @@ describe('MemoryCardService', () => {
       });
       mockCardRepository.updatePin.mockResolvedValue({
         ...sampleCard,
-        pin_hash: 'hash_9999',
-        pin_updated_at: new Date(),
+        pinHash: 'hash_9999',
+        pinUpdatedAt: new Date(),
       });
 
-      const res = await service.setupPin({
+      const res = await setupPinUseCase.execute({
         actor: sampleActor,
         cardId: sampleCard.id,
         pin: '9999',
@@ -175,11 +198,11 @@ describe('MemoryCardService', () => {
     it('should throw BadRequestException if pin is already configured', async () => {
       mockCardRepository.findById.mockResolvedValue({
         ...sampleCard,
-        pin_hash: 'existing_hash',
+        pinHash: 'existing_hash',
       });
 
       await expect(
-        service.setupPin({
+        setupPinUseCase.execute({
           actor: sampleActor,
           cardId: sampleCard.id,
           pin: '9999',
@@ -188,19 +211,19 @@ describe('MemoryCardService', () => {
     });
   });
 
-  describe('changePin', () => {
+  describe('ChangePinUseCase', () => {
     it('should update pin if current pin matches', async () => {
       mockCardRepository.findById.mockResolvedValue({
         ...sampleCard,
-        pin_hash: 'hash_1234',
+        pinHash: 'hash_1234',
       });
       mockCardRepository.updatePin.mockResolvedValue({
         ...sampleCard,
-        pin_hash: 'hash_5678',
-        pin_updated_at: new Date(),
+        pinHash: 'hash_5678',
+        pinUpdatedAt: new Date(),
       });
 
-      const res = await service.changePin({
+      const res = await changePinUseCase.execute({
         actor: sampleActor,
         cardId: sampleCard.id,
         currentPin: '1234',
@@ -217,12 +240,12 @@ describe('MemoryCardService', () => {
     it('should increment failed attempts when current pin is wrong', async () => {
       mockCardRepository.findById.mockResolvedValue({
         ...sampleCard,
-        pin_hash: 'hash_1234',
-        pin_failed_attempts: 0,
+        pinHash: 'hash_1234',
+        pinFailedAttempts: 0,
       });
 
       await expect(
-        service.changePin({
+        changePinUseCase.execute({
           actor: sampleActor,
           cardId: sampleCard.id,
           currentPin: '0000',
@@ -233,53 +256,53 @@ describe('MemoryCardService', () => {
       expect(mockCardRepository.recordFailedPinAttempt).toHaveBeenCalledWith(
         sampleCard.id,
         1,
-        null,
+        undefined,
       );
     });
   });
 
-  describe('provisionMemoryCard', () => {
+  describe('ProvisionMemoryCardUseCase', () => {
     it('should provision memory card idempotently', async () => {
       mockCardRepository.provisionCard.mockResolvedValue(sampleCard);
 
-      const res = await service.provisionMemoryCard({
+      const res = await provisionMemoryCardUseCase.execute({
         actor: sampleActor,
-        ringItemId: sampleCard.ring_item_id,
-        ownerCustomerIdentityId: sampleCard.owner_customer_identity_id,
-        ownerEmail: sampleCard.owner_email,
+        ringItemId: sampleCard.ringItemId,
+        ownerCustomerIdentityId: sampleCard.ownerCustomerIdentityId,
+        ownerEmail: sampleCard.ownerEmail,
       });
 
       expect(res.id).toBe(sampleCard.id);
-      expect(res.ringItemId).toBe(sampleCard.ring_item_id);
+      expect(res.ringItemId).toBe(sampleCard.ringItemId);
       expect(mockCardRepository.provisionCard).toHaveBeenCalledWith({
-        ringItemId: sampleCard.ring_item_id,
-        ownerCustomerIdentityId: sampleCard.owner_customer_identity_id,
-        ownerEmail: sampleCard.owner_email,
+        ringItemId: sampleCard.ringItemId,
+        ownerCustomerIdentityId: sampleCard.ownerCustomerIdentityId,
+        ownerEmail: sampleCard.ownerEmail,
       });
     });
   });
 
-  describe('getCardByRingItemId', () => {
+  describe('GetCardByRingItemIdUseCase', () => {
     it('should find card by ring item id', async () => {
       mockCardRepository.findByRingItemId.mockResolvedValue(sampleCard);
 
-      const res = await service.getCardByRingItemId({
+      const res = await getCardByRingItemIdUseCase.execute({
         actor: sampleActor,
-        ringItemId: sampleCard.ring_item_id,
+        ringItemId: sampleCard.ringItemId,
       });
 
       expect(res.id).toBe(sampleCard.id);
       expect(res.isOwner).toBe(true);
       expect(mockCardRepository.findByRingItemId).toHaveBeenCalledWith(
-        sampleCard.ring_item_id,
+        sampleCard.ringItemId,
       );
     });
 
     it('should throw NotFoundException when card does not exist', async () => {
-      mockCardRepository.findByRingItemId.mockResolvedValue(null);
+      mockCardRepository.findByRingItemId.mockResolvedValue(undefined);
 
       await expect(
-        service.getCardByRingItemId({
+        getCardByRingItemIdUseCase.execute({
           actor: sampleActor,
           ringItemId: 'non-existent-ring-item',
         }),

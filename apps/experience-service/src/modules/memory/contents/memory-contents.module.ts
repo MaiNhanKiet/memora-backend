@@ -1,9 +1,15 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../../persistence/prisma/prisma.module';
 import { MemoryCardsModule } from '../cards/memory-cards.module';
-import { MemoryContentService } from './application/memory-content.service';
-import { MemoryContentRepository } from './infrastructure/memory-content.repository';
+import { MEMORY_CONTENT_REPOSITORY } from './application/memory-content.repository';
+import {
+  InitiateMediaUploadUseCase,
+  ListCardContentsUseCase,
+  UpdateCardContentsUseCase,
+} from './application/memory-content.use-cases';
+import { MEMORY_STORAGE_PORT } from './application/memory-storage.port';
 import { MemoryStorageAdapter } from './infrastructure/memory-storage.adapter';
+import { PrismaMemoryContentRepository } from './infrastructure/prisma-memory-content.repository';
 import { MemoryContentGrpcController } from './presentation/memory-content.grpc.controller';
 
 @Module({
@@ -11,12 +17,18 @@ import { MemoryContentGrpcController } from './presentation/memory-content.grpc.
   controllers: [MemoryContentGrpcController],
   providers: [
     MemoryStorageAdapter,
-    MemoryContentRepository,
-    MemoryContentService,
+    { provide: MEMORY_STORAGE_PORT, useExisting: MemoryStorageAdapter },
+    {
+      provide: MEMORY_CONTENT_REPOSITORY,
+      useClass: PrismaMemoryContentRepository,
+    },
+    ListCardContentsUseCase,
+    UpdateCardContentsUseCase,
+    InitiateMediaUploadUseCase,
   ],
   exports: [
-    MemoryContentService,
-    MemoryContentRepository,
+    MEMORY_CONTENT_REPOSITORY,
+    MEMORY_STORAGE_PORT,
     MemoryStorageAdapter,
   ],
 })
