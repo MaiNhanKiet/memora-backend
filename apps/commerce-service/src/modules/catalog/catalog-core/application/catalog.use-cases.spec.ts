@@ -1,14 +1,14 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CATALOG_REPOSITORY } from './catalog.repository';
-import { ResizePolicyUseCases } from './resize-policy.use-cases';
+import { GetResizePoliciesUseCase } from './resize-policy.use-cases';
 import { ValidateConfigurationUseCase } from './validate-configuration.use-case';
-import { VariantUseCases } from './variant.use-cases';
+import { CreateVariantUseCase } from './variant.use-cases';
 
 describe('Catalog validation, variants & resize policies', () => {
   let validateUseCase: ValidateConfigurationUseCase;
-  let variantUseCases: VariantUseCases;
-  let resizePolicyUseCases: ResizePolicyUseCases;
+  let createVariantUseCase: CreateVariantUseCase;
+  let getResizePoliciesUseCase: GetResizePoliciesUseCase;
 
   const mockRepository = {
     findTemplateById: jest.fn(),
@@ -24,8 +24,8 @@ describe('Catalog validation, variants & resize policies', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ValidateConfigurationUseCase,
-        VariantUseCases,
-        ResizePolicyUseCases,
+        CreateVariantUseCase,
+        GetResizePoliciesUseCase,
         { provide: CATALOG_REPOSITORY, useValue: mockRepository },
       ],
     }).compile();
@@ -33,9 +33,11 @@ describe('Catalog validation, variants & resize policies', () => {
     validateUseCase = module.get<ValidateConfigurationUseCase>(
       ValidateConfigurationUseCase,
     );
-    variantUseCases = module.get<VariantUseCases>(VariantUseCases);
-    resizePolicyUseCases =
-      module.get<ResizePolicyUseCases>(ResizePolicyUseCases);
+    createVariantUseCase =
+      module.get<CreateVariantUseCase>(CreateVariantUseCase);
+    getResizePoliciesUseCase = module.get<GetResizePoliciesUseCase>(
+      GetResizePoliciesUseCase,
+    );
     jest.clearAllMocks();
   });
 
@@ -106,12 +108,12 @@ describe('Catalog validation, variants & resize policies', () => {
     });
   });
 
-  describe('VariantUseCases.createVariant', () => {
+  describe('CreateVariantUseCase', () => {
     it('should throw NotFoundException if template does not exist', async () => {
-      mockRepository.findTemplateById.mockResolvedValue(null);
+      mockRepository.findTemplateById.mockResolvedValue(undefined);
 
       await expect(
-        variantUseCases.createVariant({
+        createVariantUseCase.execute({
           ringTemplateId: 't-none',
           materialId: 'm-1',
           standardSize: 14.0,
@@ -137,7 +139,7 @@ describe('Catalog validation, variants & resize policies', () => {
         addedMetalAllowed: false,
       });
 
-      const res = await variantUseCases.createVariant({
+      const res = await createVariantUseCase.execute({
         ringTemplateId: 't-1',
         materialId: 'm-1',
         standardSize: 14.0,
@@ -151,7 +153,7 @@ describe('Catalog validation, variants & resize policies', () => {
     });
   });
 
-  describe('ResizePolicyUseCases.getResizePolicies', () => {
+  describe('GetResizePoliciesUseCase', () => {
     it('should calculate minSize and maxSize based on standard size and deltas', async () => {
       mockRepository.findResizePolicies.mockResolvedValue([
         {
@@ -172,7 +174,7 @@ describe('Catalog validation, variants & resize policies', () => {
         },
       ]);
 
-      const res = await resizePolicyUseCases.getResizePolicies({
+      const res = await getResizePoliciesUseCase.execute({
         templateId: 't-1',
       });
       expect(res.data).toHaveLength(1);

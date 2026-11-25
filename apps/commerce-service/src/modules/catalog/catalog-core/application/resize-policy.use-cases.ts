@@ -10,27 +10,41 @@ import {
   type CatalogRepository,
 } from './catalog.repository';
 
+async function loadResizePolicies(
+  repository: CatalogRepository,
+  filter: { templateVariantId?: string; templateId?: string },
+): Promise<ResizePoliciesResponse> {
+  const variants = await repository.findResizePolicies(filter);
+  return {
+    data: variants.map((v) => toResizePolicyItem(v)),
+  };
+}
+
 @Injectable()
-export class ResizePolicyUseCases {
+export class GetResizePoliciesUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
   ) {}
 
-  async getResizePolicies(
+  async execute(
     request: GetResizePoliciesRequest,
   ): Promise<ResizePoliciesResponse> {
-    const variants = await this.repository.findResizePolicies({
+    return loadResizePolicies(this.repository, {
       templateVariantId: request.templateVariantId,
       templateId: request.templateId,
     });
-
-    return {
-      data: variants.map((v) => toResizePolicyItem(v)),
-    };
   }
+}
 
-  async updateResizePolicies(
+@Injectable()
+export class UpdateResizePoliciesUseCase {
+  constructor(
+    @Inject(CATALOG_REPOSITORY)
+    private readonly repository: CatalogRepository,
+  ) {}
+
+  async execute(
     request: UpdateResizePoliciesRequest,
   ): Promise<ResizePoliciesResponse> {
     const existing = await this.repository.findTemplateVariantById(
@@ -65,7 +79,7 @@ export class ResizePolicyUseCases {
         : {}),
     });
 
-    return this.getResizePolicies({
+    return loadResizePolicies(this.repository, {
       templateVariantId: request.templateVariantId,
     });
   }

@@ -10,6 +10,7 @@ import {
   type ListMyCardsRequest,
   type ListMyCardsResponse,
   type MemoryCardDetailResponse,
+  type MemoryServiceHandler,
   type ProvisionMemoryCardRequest,
   type ResetPinRequest,
   type ResetPinResponse,
@@ -35,7 +36,17 @@ import {
 /** Thin gRPC adapter. Actor parsing and resource authorization live in the use cases. */
 @Controller()
 @UseGuards(ExperienceInternalGrpcAuthGuard)
-export class MemoryCardGrpcController {
+export class MemoryCardGrpcController implements Pick<
+  MemoryServiceHandler,
+  | 'listMyCards'
+  | 'getCardDetail'
+  | 'activateCard'
+  | 'provisionMemoryCard'
+  | 'getCardByRingItemId'
+  | 'setupPin'
+  | 'changePin'
+  | 'resetPin'
+> {
   constructor(
     private readonly listMyCardsUseCase: ListMyCardsUseCase,
     private readonly getCardDetailUseCase: GetCardDetailUseCase,

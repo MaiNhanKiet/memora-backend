@@ -8,6 +8,7 @@ import {
   type GetMemoryBySessionResponse,
   type ListAccessGrantsRequest,
   type ListAccessGrantsResponse,
+  type MemoryServiceHandler,
   type RedeemInvitationRequest,
   type RedeemInvitationResponse,
   type RevokeAccessGrantRequest,
@@ -25,7 +26,14 @@ import {
 /** Thin gRPC adapter. Actor parsing and resource authorization live in the use cases. */
 @Controller()
 @UseGuards(ExperienceInternalGrpcAuthGuard)
-export class MemoryGrantGrpcController {
+export class MemoryGrantGrpcController implements Pick<
+  MemoryServiceHandler,
+  | 'createAccessGrant'
+  | 'listAccessGrants'
+  | 'revokeAccessGrant'
+  | 'redeemInvitation'
+  | 'getMemoryBySession'
+> {
   constructor(
     private readonly createAccessGrantUseCase: CreateAccessGrantUseCase,
     private readonly listAccessGrantsUseCase: ListAccessGrantsUseCase,

@@ -21,14 +21,13 @@ import {
 import { assertDraftOwnership, validateCartActor } from './cart.validation';
 
 @Injectable()
-export class DesignDraftUseCases {
+export class GetDesignDraftUseCase {
   constructor(
     @Inject(CART_REPOSITORY)
     private readonly repository: CartRepository,
-    private readonly estimatePriceUseCase: EstimatePriceUseCase,
   ) {}
 
-  async getDesignDraft(
+  async execute(
     request: GetDesignDraftRequest,
   ): Promise<GetDesignDraftResponse> {
     const actor = validateCartActor(request.actor);
@@ -44,8 +43,17 @@ export class DesignDraftUseCases {
       draft: mapDraftItem(draft),
     };
   }
+}
 
-  async duplicateDesignDraft(
+@Injectable()
+export class DuplicateDesignDraftUseCase {
+  constructor(
+    @Inject(CART_REPOSITORY)
+    private readonly repository: CartRepository,
+    private readonly estimatePriceUseCase: EstimatePriceUseCase,
+  ) {}
+
+  async execute(
     request: DuplicateDesignDraftRequest,
   ): Promise<DuplicateDesignDraftResponse> {
     const actor = validateCartActor(request.actor);

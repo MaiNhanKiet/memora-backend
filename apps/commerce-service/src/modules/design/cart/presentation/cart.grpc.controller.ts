@@ -23,16 +23,23 @@ import type {
   ValidateCheckoutRequest,
   ValidateCheckoutResponse,
 } from '@app/contracts';
+import { CommerceInternalGrpcAuthGuard } from '../../../../grpc/commerce-internal-grpc-auth.guard';
 import { AbandonCartUseCase } from '../application/abandon-cart.use-case';
 import { AddCartItemUseCase } from '../application/add-cart-item.use-case';
-import { DesignDraftUseCases } from '../application/design-draft.use-cases';
-import { DesignShareCodeUseCases } from '../application/design-share-code.use-cases';
+import {
+  DuplicateDesignDraftUseCase,
+  GetDesignDraftUseCase,
+} from '../application/design-draft.use-cases';
+import {
+  CreateDesignShareLinkUseCase,
+  RevokeDesignShareLinkUseCase,
+} from '../application/design-share-code.use-cases';
 import { GetCartUseCase } from '../application/get-cart.use-case';
 import { RemoveCartItemUseCase } from '../application/remove-cart-item.use-case';
 import { UpdateCartItemUseCase } from '../application/update-cart-item.use-case';
 import { ValidateCheckoutUseCase } from '../application/validate-checkout.use-case';
-import { CommerceInternalGrpcAuthGuard } from '../../../../grpc/commerce-internal-grpc-auth.guard';
 
+/** Thin gRPC adapter. Actor parsing and draft ownership live in the use cases. */
 @Controller()
 @UseGuards(CommerceInternalGrpcAuthGuard)
 export class CartGrpcController implements CartServiceHandler {
@@ -43,8 +50,10 @@ export class CartGrpcController implements CartServiceHandler {
     private readonly removeCartItemUseCase: RemoveCartItemUseCase,
     private readonly validateCheckoutUseCase: ValidateCheckoutUseCase,
     private readonly abandonCartUseCase: AbandonCartUseCase,
-    private readonly designDraftUseCases: DesignDraftUseCases,
-    private readonly designShareCodeUseCases: DesignShareCodeUseCases,
+    private readonly getDesignDraftUseCase: GetDesignDraftUseCase,
+    private readonly duplicateDesignDraftUseCase: DuplicateDesignDraftUseCase,
+    private readonly createDesignShareLinkUseCase: CreateDesignShareLinkUseCase,
+    private readonly revokeDesignShareLinkUseCase: RevokeDesignShareLinkUseCase,
   ) {}
 
   @GrpcMethod('CartService', 'GetCart')
@@ -87,27 +96,27 @@ export class CartGrpcController implements CartServiceHandler {
   getDesignDraft(
     request: GetDesignDraftRequest,
   ): Promise<GetDesignDraftResponse> {
-    return this.designDraftUseCases.getDesignDraft(request);
+    return this.getDesignDraftUseCase.execute(request);
   }
 
   @GrpcMethod('CartService', 'DuplicateDesignDraft')
   duplicateDesignDraft(
     request: DuplicateDesignDraftRequest,
   ): Promise<DuplicateDesignDraftResponse> {
-    return this.designDraftUseCases.duplicateDesignDraft(request);
+    return this.duplicateDesignDraftUseCase.execute(request);
   }
 
   @GrpcMethod('CartService', 'CreateDesignShareLink')
   createDesignShareLink(
     request: CreateDesignShareLinkRequest,
   ): Promise<CreateDesignShareLinkResponse> {
-    return this.designShareCodeUseCases.createDesignShareLink(request);
+    return this.createDesignShareLinkUseCase.execute(request);
   }
 
   @GrpcMethod('CartService', 'RevokeDesignShareLink')
   revokeDesignShareLink(
     request: RevokeDesignShareLinkRequest,
   ): Promise<RevokeDesignShareLinkResponse> {
-    return this.designShareCodeUseCases.revokeDesignShareLink(request);
+    return this.revokeDesignShareLinkUseCase.execute(request);
   }
 }

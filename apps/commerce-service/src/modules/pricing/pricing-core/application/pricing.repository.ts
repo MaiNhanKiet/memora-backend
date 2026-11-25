@@ -103,23 +103,23 @@ export interface CreatePricingRuleInput {
 }
 
 export interface PricingRepository {
-  findVariantById(id: string): Promise<PricingVariantRecord | null>;
+  findVariantById(id: string): Promise<PricingVariantRecord | undefined>;
   findActivePriceVersionByVariantId(
     variantId: string,
-  ): Promise<PriceVersionRecord | null>;
+  ): Promise<PriceVersionRecord | undefined>;
   findActivePriceVersionsByGemstoneOptionIds(
     gemstoneOptionIds: readonly string[],
   ): Promise<PriceVersionRecord[]>;
   findActivePriceVersionByPersonalizationPackage(
     pkg: string,
-  ): Promise<PriceVersionRecord | null>;
+  ): Promise<PriceVersionRecord | undefined>;
   findActivePriceVersionByMaintenancePlan(
     planCode: string,
-  ): Promise<PriceVersionRecord | null>;
+  ): Promise<PriceVersionRecord | undefined>;
   findActiveResizeRule(
     variantId: string,
     direction: 'UP' | 'DOWN',
-  ): Promise<PricingRuleRecord | null>;
+  ): Promise<PricingRuleRecord | undefined>;
 
   findPriceItems(filter: {
     priceType?: string;
@@ -127,8 +127,8 @@ export interface PricingRepository {
     limit: number;
     offset: number;
   }): Promise<{ items: PriceItemRecord[]; total: number }>;
-  findPriceItemById(id: string): Promise<PriceItemRecord | null>;
-  findPriceItemByCode(code: string): Promise<PriceItemRecord | null>;
+  findPriceItemById(id: string): Promise<PriceItemRecord | undefined>;
+  findPriceItemByCode(code: string): Promise<PriceItemRecord | undefined>;
   createPriceItem(data: CreatePriceItemInput): Promise<PriceItemRecord>;
 
   findPriceVersions(filter: {

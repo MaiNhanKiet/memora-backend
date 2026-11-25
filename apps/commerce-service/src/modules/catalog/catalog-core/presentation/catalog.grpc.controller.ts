@@ -38,74 +38,117 @@ import type {
   ValidateConfigurationRequest,
   ValidateConfigurationResponse,
 } from '@app/contracts';
-import { GemstoneUseCases } from '../application/gemstone.use-cases';
-import { MaterialUseCases } from '../application/material.use-cases';
-import { ResizePolicyUseCases } from '../application/resize-policy.use-cases';
-import { TemplateUseCases } from '../application/template.use-cases';
-import { ValidateConfigurationUseCase } from '../application/validate-configuration.use-case';
-import { VariantUseCases } from '../application/variant.use-cases';
 import { CommerceInternalGrpcAuthGuard } from '../../../../grpc/commerce-internal-grpc-auth.guard';
+import {
+  CreateGemstoneOptionUseCase,
+  ListGemstoneOptionsUseCase,
+  ListGemstoneSlotsUseCase,
+  UpdateCompatibilitiesUseCase,
+} from '../application/gemstone.use-cases';
+import {
+  CreateMaterialUseCase,
+  ListMaterialsUseCase,
+  UpdateMaterialUseCase,
+} from '../application/material.use-cases';
+import {
+  GetResizePoliciesUseCase,
+  UpdateResizePoliciesUseCase,
+} from '../application/resize-policy.use-cases';
+import {
+  GetTemplate3DAssetsUseCase,
+  GetTemplateByIdUseCase,
+  GetTemplateConfigurationOptionsUseCase,
+  ListTemplatesUseCase,
+} from '../application/template-query.use-cases';
+import {
+  ArchiveTemplateUseCase,
+  CreateTemplateUseCase,
+  PublishTemplateUseCase,
+  UpdateTemplateUseCase,
+} from '../application/template.use-cases';
+import { ValidateConfigurationUseCase } from '../application/validate-configuration.use-case';
+import {
+  CreateVariantUseCase,
+  ListTemplateVariantsUseCase,
+  UpdateVariantUseCase,
+} from '../application/variant.use-cases';
 
+/** Thin gRPC adapter. Business rules and validation live in the use cases. */
 @Controller()
 @UseGuards(CommerceInternalGrpcAuthGuard)
 export class CatalogGrpcController implements CatalogServiceHandler {
   constructor(
-    private readonly templateUseCases: TemplateUseCases,
-    private readonly materialUseCases: MaterialUseCases,
-    private readonly variantUseCases: VariantUseCases,
-    private readonly gemstoneUseCases: GemstoneUseCases,
-    private readonly resizePolicyUseCases: ResizePolicyUseCases,
+    private readonly listTemplatesUseCase: ListTemplatesUseCase,
+    private readonly getTemplateByIdUseCase: GetTemplateByIdUseCase,
+    private readonly getTemplateConfigurationOptionsUseCase: GetTemplateConfigurationOptionsUseCase,
+    private readonly getTemplate3DAssetsUseCase: GetTemplate3DAssetsUseCase,
+    private readonly createTemplateUseCase: CreateTemplateUseCase,
+    private readonly updateTemplateUseCase: UpdateTemplateUseCase,
+    private readonly publishTemplateUseCase: PublishTemplateUseCase,
+    private readonly archiveTemplateUseCase: ArchiveTemplateUseCase,
+    private readonly listMaterialsUseCase: ListMaterialsUseCase,
+    private readonly createMaterialUseCase: CreateMaterialUseCase,
+    private readonly updateMaterialUseCase: UpdateMaterialUseCase,
+    private readonly listTemplateVariantsUseCase: ListTemplateVariantsUseCase,
+    private readonly createVariantUseCase: CreateVariantUseCase,
+    private readonly updateVariantUseCase: UpdateVariantUseCase,
+    private readonly listGemstoneOptionsUseCase: ListGemstoneOptionsUseCase,
+    private readonly listGemstoneSlotsUseCase: ListGemstoneSlotsUseCase,
+    private readonly createGemstoneOptionUseCase: CreateGemstoneOptionUseCase,
+    private readonly updateCompatibilitiesUseCase: UpdateCompatibilitiesUseCase,
+    private readonly getResizePoliciesUseCase: GetResizePoliciesUseCase,
+    private readonly updateResizePoliciesUseCase: UpdateResizePoliciesUseCase,
     private readonly validateConfigurationUseCase: ValidateConfigurationUseCase,
   ) {}
 
   @GrpcMethod('CatalogService', 'ListTemplates')
   listTemplates(request: ListTemplatesRequest): Promise<ListTemplatesResponse> {
-    return this.templateUseCases.listTemplates(request);
+    return this.listTemplatesUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'GetTemplateById')
   getTemplateById(request: GetTemplateByIdRequest): Promise<TemplateResponse> {
-    return this.templateUseCases.getTemplateById(request);
+    return this.getTemplateByIdUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'GetTemplateConfigurationOptions')
   getTemplateConfigurationOptions(
     request: GetTemplateConfigurationOptionsRequest,
   ): Promise<TemplateConfigurationOptionsResponse> {
-    return this.templateUseCases.getTemplateConfigurationOptions(request);
+    return this.getTemplateConfigurationOptionsUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'GetTemplate3DAssets')
   getTemplate3DAssets(
     request: GetTemplate3DAssetsRequest,
   ): Promise<Template3DAssetsResponse> {
-    return this.templateUseCases.getTemplate3DAssets(request);
+    return this.getTemplate3DAssetsUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'ListMaterials')
   listMaterials(request: ListMaterialsRequest): Promise<ListMaterialsResponse> {
-    return this.materialUseCases.listMaterials(request);
+    return this.listMaterialsUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'ListTemplateVariants')
   listTemplateVariants(
     request: ListTemplateVariantsRequest,
   ): Promise<ListTemplateVariantsResponse> {
-    return this.variantUseCases.listTemplateVariants(request);
+    return this.listTemplateVariantsUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'ListGemstoneOptions')
   listGemstoneOptions(
     request: ListGemstoneOptionsRequest,
   ): Promise<ListGemstoneOptionsResponse> {
-    return this.gemstoneUseCases.listGemstoneOptions(request);
+    return this.listGemstoneOptionsUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'ListGemstoneSlots')
   listGemstoneSlots(
     request: ListGemstoneSlotsRequest,
   ): Promise<ListGemstoneSlotsResponse> {
-    return this.gemstoneUseCases.listGemstoneSlots(request);
+    return this.listGemstoneSlotsUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'ValidateConfiguration')
@@ -115,79 +158,75 @@ export class CatalogGrpcController implements CatalogServiceHandler {
     return this.validateConfigurationUseCase.execute(request);
   }
 
-  // ---------------------------------------------------------------------------
-  // Admin APIs
-  // ---------------------------------------------------------------------------
-
   @GrpcMethod('CatalogService', 'CreateTemplate')
   createTemplate(request: CreateTemplateRequest): Promise<TemplateResponse> {
-    return this.templateUseCases.createTemplate(request);
+    return this.createTemplateUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'UpdateTemplate')
   updateTemplate(request: UpdateTemplateRequest): Promise<TemplateResponse> {
-    return this.templateUseCases.updateTemplate(request);
+    return this.updateTemplateUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'PublishTemplate')
   publishTemplate(request: PublishTemplateRequest): Promise<TemplateResponse> {
-    return this.templateUseCases.publishTemplate(request);
+    return this.publishTemplateUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'ArchiveTemplate')
   archiveTemplate(request: ArchiveTemplateRequest): Promise<TemplateResponse> {
-    return this.templateUseCases.archiveTemplate(request);
+    return this.archiveTemplateUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'CreateMaterial')
   createMaterial(request: CreateMaterialRequest): Promise<MaterialResponse> {
-    return this.materialUseCases.createMaterial(request);
+    return this.createMaterialUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'UpdateMaterial')
   updateMaterial(request: UpdateMaterialRequest): Promise<MaterialResponse> {
-    return this.materialUseCases.updateMaterial(request);
+    return this.updateMaterialUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'CreateVariant')
   createVariant(
     request: CreateVariantRequest,
   ): Promise<TemplateVariantResponse> {
-    return this.variantUseCases.createVariant(request);
+    return this.createVariantUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'UpdateVariant')
   updateVariant(
     request: UpdateVariantRequest,
   ): Promise<TemplateVariantResponse> {
-    return this.variantUseCases.updateVariant(request);
+    return this.updateVariantUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'CreateGemstoneOption')
   createGemstoneOption(
     request: CreateGemstoneOptionRequest,
   ): Promise<GemstoneOptionResponse> {
-    return this.gemstoneUseCases.createGemstoneOption(request);
+    return this.createGemstoneOptionUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'UpdateCompatibilities')
   updateCompatibilities(
     request: UpdateCompatibilitiesRequest,
   ): Promise<UpdateCompatibilitiesResponse> {
-    return this.gemstoneUseCases.updateCompatibilities(request);
+    return this.updateCompatibilitiesUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'GetResizePolicies')
   getResizePolicies(
     request: GetResizePoliciesRequest,
   ): Promise<ResizePoliciesResponse> {
-    return this.resizePolicyUseCases.getResizePolicies(request);
+    return this.getResizePoliciesUseCase.execute(request);
   }
 
   @GrpcMethod('CatalogService', 'UpdateResizePolicies')
   updateResizePolicies(
     request: UpdateResizePoliciesRequest,
   ): Promise<ResizePoliciesResponse> {
-    return this.resizePolicyUseCases.updateResizePolicies(request);
+    return this.updateResizePoliciesUseCase.execute(request);
   }
 }

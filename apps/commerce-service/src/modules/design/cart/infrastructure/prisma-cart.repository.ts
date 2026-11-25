@@ -82,14 +82,16 @@ function toCartRecord(row: CartRow): CartRecord {
 export class PrismaCartRepository implements CartRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findActiveCartByActor(actor: CartActor): Promise<CartRecord | null> {
+  async findActiveCartByActor(
+    actor: CartActor,
+  ): Promise<CartRecord | undefined> {
     const where: Prisma.cartsWhereInput = { status: 'ACTIVE' };
     if (actor.userId) {
       where.user_id = actor.userId;
     } else if (actor.guestSessionId) {
       where.guest_session_id = actor.guestSessionId;
     } else {
-      return null;
+      return undefined;
     }
 
     const row = await this.prisma.carts.findFirst({
@@ -105,7 +107,7 @@ export class PrismaCartRepository implements CartRepository {
       },
     });
 
-    return row ? toCartRecord(row) : null;
+    return row ? toCartRecord(row) : undefined;
   }
 
   async createActiveCart(data: {
@@ -132,7 +134,7 @@ export class PrismaCartRepository implements CartRepository {
     return toCartRecord(row);
   }
 
-  async findDraftById(draftId: string): Promise<CartDraftRecord | null> {
+  async findDraftById(draftId: string): Promise<CartDraftRecord | undefined> {
     const row = await this.prisma.ring_design_drafts.findUnique({
       where: { id: draftId },
       include: {
@@ -141,7 +143,7 @@ export class PrismaCartRepository implements CartRepository {
       },
     });
 
-    return row ? toDraftRecord(row) : null;
+    return row ? toDraftRecord(row) : undefined;
   }
 
   async createDraft(data: CreateCartDraftInput): Promise<CartDraftRecord> {
@@ -240,7 +242,7 @@ export class PrismaCartRepository implements CartRepository {
   async findDesignCodeById(
     linkId: string,
     draftId: string,
-  ): Promise<DesignShareCodeRecord | null> {
+  ): Promise<DesignShareCodeRecord | undefined> {
     const row = await this.prisma.design_codes.findFirst({
       where: {
         id: linkId,
@@ -255,7 +257,7 @@ export class PrismaCartRepository implements CartRepository {
           status: row.status,
           expiresAt: row.expires_at,
         }
-      : null;
+      : undefined;
   }
 
   async revokeDesignShareCode(linkId: string): Promise<void> {

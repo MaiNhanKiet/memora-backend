@@ -325,7 +325,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
     orderId: string,
     actorId: string,
     guestEmail?: string,
-  ): Promise<OrderingDetailRecord | null> {
+  ): Promise<OrderingDetailRecord | undefined> {
     const row = await this.prisma.orders.findFirst({
       where: {
         id: orderId,
@@ -337,7 +337,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
       include: ORDER_WITH_RELATIONS_INCLUDE,
     });
 
-    return row ? toOrderDetailRecord(row) : null;
+    return row ? toOrderDetailRecord(row) : undefined;
   }
 
   async findRingItemWithDetails(
@@ -345,7 +345,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
     ringItemId: string,
     actorId: string,
     guestEmail?: string,
-  ): Promise<OrderingRingItemDetailRecord | null> {
+  ): Promise<OrderingRingItemDetailRecord | undefined> {
     const order = await this.prisma.orders.findFirst({
       where: {
         id: orderId,
@@ -356,7 +356,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
       },
     });
     if (!order) {
-      return null;
+      return undefined;
     }
 
     const item = await this.prisma.ring_items.findFirst({
@@ -382,7 +382,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
     });
 
     if (!item) {
-      return null;
+      return undefined;
     }
 
     const ver =
@@ -477,12 +477,12 @@ export class PrismaOrderingRepository implements OrderingRepository {
 
   async findAdminOrderById(
     orderId: string,
-  ): Promise<OrderingDetailRecord | null> {
+  ): Promise<OrderingDetailRecord | undefined> {
     const row = await this.prisma.orders.findUnique({
       where: { id: orderId },
       include: ORDER_WITH_RELATIONS_INCLUDE,
     });
-    return row ? toOrderDetailRecord(row) : null;
+    return row ? toOrderDetailRecord(row) : undefined;
   }
 
   async updateOrderStatus(params: {
@@ -522,7 +522,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
     ringItemId: string,
     actorId: string,
     guestEmail?: string,
-  ): Promise<OrderingRingItemVersionRecord[] | null> {
+  ): Promise<OrderingRingItemVersionRecord[] | undefined> {
     const order = await this.prisma.orders.findFirst({
       where: {
         id: orderId,
@@ -533,14 +533,14 @@ export class PrismaOrderingRepository implements OrderingRepository {
       },
     });
     if (!order) {
-      return null;
+      return undefined;
     }
 
     const ringItem = await this.prisma.ring_items.findFirst({
       where: { id: ringItemId, order_id: orderId },
     });
     if (!ringItem) {
-      return null;
+      return undefined;
     }
 
     const versions = await this.prisma.ring_item_versions.findMany({
@@ -584,7 +584,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
     ringItemId: string,
     actorId: string,
     guestEmail?: string,
-  ): Promise<{ id: string; status: string } | null> {
+  ): Promise<{ id: string; status: string } | undefined> {
     const order = await this.prisma.orders.findFirst({
       where: {
         id: orderId,
@@ -595,7 +595,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
       },
     });
     if (!order) {
-      return null;
+      return undefined;
     }
 
     const ringItem = await this.prisma.ring_items.findFirst({
@@ -608,10 +608,13 @@ export class PrismaOrderingRepository implements OrderingRepository {
     });
 
     if (!ringItem || !ringItem.current_version_id) {
-      return null;
+      return undefined;
     }
 
-    return ringItem.ring_item_versions_ring_items_current_version_idToring_item_versions;
+    return (
+      ringItem.ring_item_versions_ring_items_current_version_idToring_item_versions ??
+      undefined
+    );
   }
 
   async updateCurrentRingItemVersion(
@@ -660,7 +663,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
     orderId: string,
     actorId: string,
     guestEmail?: string,
-  ): Promise<OrderingQuoteRecord[] | null> {
+  ): Promise<OrderingQuoteRecord[] | undefined> {
     const order = await this.prisma.orders.findFirst({
       where: {
         id: orderId,
@@ -671,7 +674,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
       },
     });
     if (!order) {
-      return null;
+      return undefined;
     }
 
     const quotes = await this.prisma.quotes.findMany({
@@ -685,7 +688,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
 
   async findOrderPersonalizationContext(
     orderId: string,
-  ): Promise<OrderingPersonalizationContextRecord | null> {
+  ): Promise<OrderingPersonalizationContextRecord | undefined> {
     const order = await this.prisma.orders.findUnique({
       where: { id: orderId },
       select: {
@@ -720,7 +723,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
     });
 
     if (!order) {
-      return null;
+      return undefined;
     }
 
     return {
@@ -805,14 +808,14 @@ export class PrismaOrderingRepository implements OrderingRepository {
       lineAmount: number;
       priceSourceType?: string;
     }[];
-  }): Promise<OrderingQuoteRecord | null> {
+  }): Promise<OrderingQuoteRecord | undefined> {
     const created = await this.prisma.$transaction(async (tx) => {
       const order = await tx.orders.findUnique({
         where: { id: params.orderId },
         select: { id: true, order_no: true },
       });
       if (!order) {
-        return null;
+        return undefined;
       }
 
       const lastQuote = await tx.quotes.findFirst({
@@ -854,18 +857,18 @@ export class PrismaOrderingRepository implements OrderingRepository {
       });
     });
 
-    return created ? toQuoteRecord(created) : null;
+    return created ? toQuoteRecord(created) : undefined;
   }
 
   async findQuoteById(
     orderId: string,
     quoteId: string,
-  ): Promise<OrderingQuoteRecord | null> {
+  ): Promise<OrderingQuoteRecord | undefined> {
     const row = await this.prisma.quotes.findFirst({
       where: { id: quoteId, order_id: orderId },
       include: { quote_items: { orderBy: { created_at: 'asc' } } },
     });
-    return row ? toQuoteRecord(row) : null;
+    return row ? toQuoteRecord(row) : undefined;
   }
 
   async updateFinalQuote(params: {
@@ -1121,27 +1124,27 @@ export class PrismaOrderingRepository implements OrderingRepository {
   async findOrderPaymentById(
     orderId: string,
     transactionId: string,
-  ): Promise<OrderingPaymentTransactionRecord | null> {
+  ): Promise<OrderingPaymentTransactionRecord | undefined> {
     const row = await this.prisma.payment_transactions.findFirst({
       where: { id: transactionId, order_id: orderId },
     });
-    return row ? toPaymentTransactionRecord(row) : null;
+    return row ? toPaymentTransactionRecord(row) : undefined;
   }
 
   async findPaymentTransactionById(
     transactionId: string,
-  ): Promise<OrderingPaymentTransactionRecord | null> {
+  ): Promise<OrderingPaymentTransactionRecord | undefined> {
     const row = await this.prisma.payment_transactions.findUnique({
       where: { id: transactionId },
       include: { orders: true, quotes: true },
     });
-    return row ? toPaymentTransactionRecord(row) : null;
+    return row ? toPaymentTransactionRecord(row) : undefined;
   }
 
   async findPaymentReceipt(
     orderId: string,
     transactionId: string,
-  ): Promise<OrderingPaymentTransactionRecord | null> {
+  ): Promise<OrderingPaymentTransactionRecord | undefined> {
     const tx = await this.prisma.payment_transactions.findFirst({
       where: { id: transactionId, order_id: orderId },
       include: {
@@ -1151,7 +1154,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
       },
     });
     if (!tx) {
-      return null;
+      return undefined;
     }
 
     if (!tx.receipt_no && tx.status === 'SUCCEEDED') {
@@ -1183,7 +1186,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
 
   async findOrderInvoice(
     orderId: string,
-  ): Promise<OrderingInvoiceRecord | null> {
+  ): Promise<OrderingInvoiceRecord | undefined> {
     const order = await this.prisma.orders.findUnique({
       where: { id: orderId },
       include: {
@@ -1197,7 +1200,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
       },
     });
     if (!order) {
-      return null;
+      return undefined;
     }
 
     if (!order.invoice_no) {
@@ -1222,13 +1225,13 @@ export class PrismaOrderingRepository implements OrderingRepository {
     reason: string;
     notes?: string;
     staffUserId?: string;
-  }): Promise<OrderingPaymentTransactionRecord | null> {
+  }): Promise<OrderingPaymentTransactionRecord | undefined> {
     const refund = await this.prisma.$transaction(async (tx) => {
       const original = await tx.payment_transactions.findUnique({
         where: { id: params.transactionId },
       });
       if (!original) {
-        return null;
+        return undefined;
       }
 
       return tx.payment_transactions.create({
@@ -1253,7 +1256,7 @@ export class PrismaOrderingRepository implements OrderingRepository {
       });
     });
 
-    return refund ? toPaymentTransactionRecord(refund) : null;
+    return refund ? toPaymentTransactionRecord(refund) : undefined;
   }
 
   async findClaimQuotes(claimId: string): Promise<OrderingQuoteRecord[]> {
@@ -1268,12 +1271,12 @@ export class PrismaOrderingRepository implements OrderingRepository {
   async findClaimQuoteById(
     claimId: string,
     quoteId: string,
-  ): Promise<OrderingQuoteRecord | null> {
+  ): Promise<OrderingQuoteRecord | undefined> {
     const row = await this.prisma.quotes.findFirst({
       where: { id: quoteId, claim_id: claimId },
       include: { quote_items: { orderBy: { created_at: 'asc' } } },
     });
-    return row ? toQuoteRecord(row) : null;
+    return row ? toQuoteRecord(row) : undefined;
   }
 
   async acceptClaimQuote(params: {
@@ -1325,12 +1328,12 @@ export class PrismaOrderingRepository implements OrderingRepository {
 
   async findTransactionByOrderCode(
     orderCode: bigint,
-  ): Promise<OrderingPaymentTransactionRecord | null> {
+  ): Promise<OrderingPaymentTransactionRecord | undefined> {
     const row = await this.prisma.payment_transactions.findFirst({
       where: { provider_order_code: orderCode },
       include: { orders: true, quotes: true },
     });
-    return row ? toPaymentTransactionRecord(row) : null;
+    return row ? toPaymentTransactionRecord(row) : undefined;
   }
 
   async markPaymentTransactionSucceeded(params: {

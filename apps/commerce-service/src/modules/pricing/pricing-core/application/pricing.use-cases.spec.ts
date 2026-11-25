@@ -5,16 +5,30 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EstimatePriceUseCase } from './estimate-price.use-case';
-import { PriceItemUseCases } from './price-item.use-cases';
-import { PriceVersionUseCases } from './price-version.use-cases';
+import {
+  CreatePriceItemUseCase,
+  ListPriceItemsUseCase,
+} from './price-item.use-cases';
+import {
+  ApprovePriceVersionUseCase,
+  CreatePriceVersionUseCase,
+  RejectPriceVersionUseCase,
+} from './price-version.use-cases';
+import {
+  ActivatePricingRuleUseCase,
+  CreatePricingRuleUseCase,
+} from './pricing-rule.use-cases';
 import { PRICING_REPOSITORY } from './pricing.repository';
-import { PricingRuleUseCases } from './pricing-rule.use-cases';
 
 describe('Pricing Use Cases', () => {
   let estimateUseCase: EstimatePriceUseCase;
-  let itemUseCases: PriceItemUseCases;
-  let versionUseCases: PriceVersionUseCases;
-  let ruleUseCases: PricingRuleUseCases;
+  let listPriceItemsUseCase: ListPriceItemsUseCase;
+  let createPriceItemUseCase: CreatePriceItemUseCase;
+  let createPriceVersionUseCase: CreatePriceVersionUseCase;
+  let approvePriceVersionUseCase: ApprovePriceVersionUseCase;
+  let rejectPriceVersionUseCase: RejectPriceVersionUseCase;
+  let createPricingRuleUseCase: CreatePricingRuleUseCase;
+  let activatePricingRuleUseCase: ActivatePricingRuleUseCase;
 
   const mockRepository = {
     findVariantById: jest.fn(),
@@ -42,23 +56,45 @@ describe('Pricing Use Cases', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EstimatePriceUseCase,
-        PriceItemUseCases,
-        PriceVersionUseCases,
-        PricingRuleUseCases,
+        ListPriceItemsUseCase,
+        CreatePriceItemUseCase,
+        CreatePriceVersionUseCase,
+        ApprovePriceVersionUseCase,
+        RejectPriceVersionUseCase,
+        CreatePricingRuleUseCase,
+        ActivatePricingRuleUseCase,
         { provide: PRICING_REPOSITORY, useValue: mockRepository },
       ],
     }).compile();
 
     estimateUseCase = module.get<EstimatePriceUseCase>(EstimatePriceUseCase);
-    itemUseCases = module.get<PriceItemUseCases>(PriceItemUseCases);
-    versionUseCases = module.get<PriceVersionUseCases>(PriceVersionUseCases);
-    ruleUseCases = module.get<PricingRuleUseCases>(PricingRuleUseCases);
+    listPriceItemsUseCase = module.get<ListPriceItemsUseCase>(
+      ListPriceItemsUseCase,
+    );
+    createPriceItemUseCase = module.get<CreatePriceItemUseCase>(
+      CreatePriceItemUseCase,
+    );
+    createPriceVersionUseCase = module.get<CreatePriceVersionUseCase>(
+      CreatePriceVersionUseCase,
+    );
+    approvePriceVersionUseCase = module.get<ApprovePriceVersionUseCase>(
+      ApprovePriceVersionUseCase,
+    );
+    rejectPriceVersionUseCase = module.get<RejectPriceVersionUseCase>(
+      RejectPriceVersionUseCase,
+    );
+    createPricingRuleUseCase = module.get<CreatePricingRuleUseCase>(
+      CreatePricingRuleUseCase,
+    );
+    activatePricingRuleUseCase = module.get<ActivatePricingRuleUseCase>(
+      ActivatePricingRuleUseCase,
+    );
     jest.clearAllMocks();
   });
 
   describe('EstimatePriceUseCase', () => {
     it('should throw NotFoundException if variant does not exist', async () => {
-      mockRepository.findVariantById.mockResolvedValue(null);
+      mockRepository.findVariantById.mockResolvedValue(undefined);
 
       await expect(
         estimateUseCase.execute({
@@ -124,7 +160,7 @@ describe('Pricing Use Cases', () => {
     });
   });
 
-  describe('PriceItemUseCases', () => {
+  describe('PriceItem UseCases', () => {
     it('should return paginated price items', async () => {
       mockRepository.findPriceItems.mockResolvedValue({
         items: [
@@ -140,7 +176,7 @@ describe('Pricing Use Cases', () => {
         total: 1,
       });
 
-      const res = await itemUseCases.listPriceItems({});
+      const res = await listPriceItemsUseCase.execute({});
       expect(res.items).toHaveLength(1);
       expect(res.total).toBe(1);
     });
@@ -149,7 +185,7 @@ describe('Pricing Use Cases', () => {
       mockRepository.findPriceItemByCode.mockResolvedValue({ id: 'pi-1' });
 
       await expect(
-        itemUseCases.createPriceItem({
+        createPriceItemUseCase.execute({
           priceType: 'RING_BLANK',
           code: 'RB-01',
           templateVariantId: 'v-1',
@@ -158,10 +194,10 @@ describe('Pricing Use Cases', () => {
     });
 
     it('should throw UnprocessableEntityException if missing required target reference', async () => {
-      mockRepository.findPriceItemByCode.mockResolvedValue(null);
+      mockRepository.findPriceItemByCode.mockResolvedValue(undefined);
 
       await expect(
-        itemUseCases.createPriceItem({
+        createPriceItemUseCase.execute({
           priceType: 'RING_BLANK',
           code: 'RB-02',
         }),
@@ -169,7 +205,7 @@ describe('Pricing Use Cases', () => {
     });
   });
 
-  describe('PriceVersionUseCases', () => {
+  describe('PriceVersion UseCases', () => {
     it('should create price version in DRAFT state with next versionNo', async () => {
       mockRepository.findPriceItemById.mockResolvedValue({ id: 'pi-1' });
       mockRepository.getLatestVersionNoForPriceItem.mockResolvedValue(2);
@@ -184,7 +220,7 @@ describe('Pricing Use Cases', () => {
         createdAt: new Date(),
       });
 
-      const res = await versionUseCases.createPriceVersion({
+      const res = await createPriceVersionUseCase.execute({
         priceItemId: 'pi-1',
         amount: 9000000,
       });
@@ -205,7 +241,7 @@ describe('Pricing Use Cases', () => {
         createdAt: new Date(),
       });
 
-      const approved = await versionUseCases.approvePriceVersion({
+      const approved = await approvePriceVersionUseCase.execute({
         versionId: 'pv-1',
       });
       expect(approved.status).toBe('ACTIVE');
@@ -214,7 +250,7 @@ describe('Pricing Use Cases', () => {
         new Error('PRICE_VERSION_NOT_DRAFT'),
       );
       await expect(
-        versionUseCases.rejectPriceVersion({
+        rejectPriceVersionUseCase.execute({
           versionId: 'pv-1',
           reviewNote: 'Invalid amount',
         }),
@@ -222,7 +258,7 @@ describe('Pricing Use Cases', () => {
     });
   });
 
-  describe('PricingRuleUseCases', () => {
+  describe('PricingRule UseCases', () => {
     it('should create and activate pricing rule', async () => {
       mockRepository.getLatestVersionNoForPricingRule.mockResolvedValue(0);
       mockRepository.createPricingRule.mockResolvedValue({
@@ -235,7 +271,7 @@ describe('Pricing Use Cases', () => {
         createdAt: new Date(),
       });
 
-      const created = await ruleUseCases.createPricingRule({
+      const created = await createPricingRuleUseCase.execute({
         ruleType: 'RESIZE_FEE',
         code: 'RESIZE_UP',
         name: 'Resize Up',
@@ -247,7 +283,7 @@ describe('Pricing Use Cases', () => {
         new Error('PRICING_RULE_NOT_FOUND'),
       );
       await expect(
-        ruleUseCases.activatePricingRule({ ruleId: 'missing' }),
+        activatePricingRuleUseCase.execute({ ruleId: 'missing' }),
       ).rejects.toThrow(NotFoundException);
     });
   });

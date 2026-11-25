@@ -5,10 +5,20 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CATALOG_REPOSITORY } from './catalog.repository';
-import { TemplateUseCases } from './template.use-cases';
+import {
+  GetTemplateByIdUseCase,
+  ListTemplatesUseCase,
+} from './template-query.use-cases';
+import {
+  CreateTemplateUseCase,
+  PublishTemplateUseCase,
+} from './template.use-cases';
 
-describe('TemplateUseCases', () => {
-  let useCases: TemplateUseCases;
+describe('Template UseCases', () => {
+  let listTemplatesUseCase: ListTemplatesUseCase;
+  let getTemplateByIdUseCase: GetTemplateByIdUseCase;
+  let createTemplateUseCase: CreateTemplateUseCase;
+  let publishTemplateUseCase: PublishTemplateUseCase;
 
   const mockRepository = {
     findManyTemplates: jest.fn(),
@@ -22,16 +32,29 @@ describe('TemplateUseCases', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        TemplateUseCases,
+        ListTemplatesUseCase,
+        GetTemplateByIdUseCase,
+        CreateTemplateUseCase,
+        PublishTemplateUseCase,
         { provide: CATALOG_REPOSITORY, useValue: mockRepository },
       ],
     }).compile();
 
-    useCases = module.get<TemplateUseCases>(TemplateUseCases);
+    listTemplatesUseCase =
+      module.get<ListTemplatesUseCase>(ListTemplatesUseCase);
+    getTemplateByIdUseCase = module.get<GetTemplateByIdUseCase>(
+      GetTemplateByIdUseCase,
+    );
+    createTemplateUseCase = module.get<CreateTemplateUseCase>(
+      CreateTemplateUseCase,
+    );
+    publishTemplateUseCase = module.get<PublishTemplateUseCase>(
+      PublishTemplateUseCase,
+    );
     jest.clearAllMocks();
   });
 
-  describe('listTemplates', () => {
+  describe('ListTemplatesUseCase', () => {
     it('should return paginated templates', async () => {
       mockRepository.findManyTemplates.mockResolvedValue({
         rows: [
@@ -51,7 +74,7 @@ describe('TemplateUseCases', () => {
         total: 1,
       });
 
-      const result = await useCases.listTemplates({
+      const result = await listTemplatesUseCase.execute({
         pagination: { page: 1, limit: 10 },
       });
 
@@ -61,12 +84,12 @@ describe('TemplateUseCases', () => {
     });
   });
 
-  describe('getTemplateById', () => {
+  describe('GetTemplateByIdUseCase', () => {
     it('should throw NotFoundException if template does not exist or is inactive', async () => {
-      mockRepository.findTemplateById.mockResolvedValue(null);
+      mockRepository.findTemplateById.mockResolvedValue(undefined);
 
       await expect(
-        useCases.getTemplateById({ templateId: 'non-existent' }),
+        getTemplateByIdUseCase.execute({ templateId: 'non-existent' }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -84,18 +107,20 @@ describe('TemplateUseCases', () => {
         updatedAt: new Date('2026-01-01'),
       });
 
-      const result = await useCases.getTemplateById({ templateId: 'uuid-1' });
+      const result = await getTemplateByIdUseCase.execute({
+        templateId: 'uuid-1',
+      });
       expect(result.id).toBe('uuid-1');
       expect(result.name).toBe('Classic Solitaire');
     });
   });
 
-  describe('createTemplate', () => {
+  describe('CreateTemplateUseCase', () => {
     it('should throw ConflictException if template code already exists', async () => {
       mockRepository.findTemplateByCode.mockResolvedValue({ id: 't-1' });
 
       await expect(
-        useCases.createTemplate({
+        createTemplateUseCase.execute({
           code: 'T-01',
           name: 'Classic Solitaire',
           glbAssetKey: 'models/t-01.glb',
@@ -104,7 +129,7 @@ describe('TemplateUseCases', () => {
     });
 
     it('should create template in DRAFT status', async () => {
-      mockRepository.findTemplateByCode.mockResolvedValue(null);
+      mockRepository.findTemplateByCode.mockResolvedValue(undefined);
       mockRepository.createTemplate.mockResolvedValue({
         id: 'uuid-created',
         code: 'T-NEW',
@@ -118,7 +143,7 @@ describe('TemplateUseCases', () => {
         updatedAt: new Date('2026-01-01'),
       });
 
-      const res = await useCases.createTemplate({
+      const res = await createTemplateUseCase.execute({
         code: 'T-NEW',
         name: 'New Ring',
         glbAssetKey: 'models/new.glb',
@@ -129,7 +154,7 @@ describe('TemplateUseCases', () => {
     });
   });
 
-  describe('publishTemplate', () => {
+  describe('PublishTemplateUseCase', () => {
     it('should throw BadRequestException if template has no variants', async () => {
       mockRepository.findTemplateById.mockResolvedValue({
         id: 't-1',
@@ -138,7 +163,7 @@ describe('TemplateUseCases', () => {
       mockRepository.countVariantsForTemplate.mockResolvedValue(0);
 
       await expect(
-        useCases.publishTemplate({ templateId: 't-1' }),
+        publishTemplateUseCase.execute({ templateId: 't-1' }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -161,7 +186,7 @@ describe('TemplateUseCases', () => {
         updatedAt: new Date('2026-01-01'),
       });
 
-      const res = await useCases.publishTemplate({ templateId: 't-1' });
+      const res = await publishTemplateUseCase.execute({ templateId: 't-1' });
       expect(res.status).toBe('ACTIVE');
     });
   });

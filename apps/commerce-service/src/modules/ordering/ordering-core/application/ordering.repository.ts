@@ -276,13 +276,13 @@ export interface OrderingRepository {
     orderId: string,
     actorId: string,
     guestSessionId?: string,
-  ): Promise<OrderingDetailRecord | null>;
+  ): Promise<OrderingDetailRecord | undefined>;
   findRingItemWithDetails(
     orderId: string,
     ringItemId: string,
     actorId: string,
     guestSessionId?: string,
-  ): Promise<OrderingRingItemDetailRecord | null>;
+  ): Promise<OrderingRingItemDetailRecord | undefined>;
   listAdminOrders(params: {
     page?: number;
     limit?: number;
@@ -296,7 +296,9 @@ export interface OrderingRepository {
     page: number;
     limit: number;
   }>;
-  findAdminOrderById(orderId: string): Promise<OrderingDetailRecord | null>;
+  findAdminOrderById(
+    orderId: string,
+  ): Promise<OrderingDetailRecord | undefined>;
   updateOrderStatus(params: {
     orderId: string;
     targetStatus: string;
@@ -307,16 +309,19 @@ export interface OrderingRepository {
     ringItemId: string,
     actorId: string,
     guestSessionId?: string,
-  ): Promise<OrderingRingItemVersionRecord[] | null>;
+  ): Promise<OrderingRingItemVersionRecord[] | undefined>;
   findCurrentRingItemVersion(
     orderId: string,
     ringItemId: string,
     actorId: string,
     guestSessionId?: string,
-  ): Promise<{
-    id: string;
-    status: string;
-  } | null>;
+  ): Promise<
+    | {
+        id: string;
+        status: string;
+      }
+    | undefined
+  >;
   updateCurrentRingItemVersion(
     versionId: string,
     data: {
@@ -336,10 +341,10 @@ export interface OrderingRepository {
     orderId: string,
     actorId: string,
     guestSessionId?: string,
-  ): Promise<OrderingQuoteRecord[] | null>;
+  ): Promise<OrderingQuoteRecord[] | undefined>;
   findOrderPersonalizationContext(
     orderId: string,
-  ): Promise<OrderingPersonalizationContextRecord | null>;
+  ): Promise<OrderingPersonalizationContextRecord | undefined>;
   cancelOrder(
     orderId: string,
     reason?: string,
@@ -367,11 +372,11 @@ export interface OrderingRepository {
       lineAmount: number;
       priceSourceType?: string;
     }[];
-  }): Promise<OrderingQuoteRecord | null>;
+  }): Promise<OrderingQuoteRecord | undefined>;
   findQuoteById(
     orderId: string,
     quoteId: string,
-  ): Promise<OrderingQuoteRecord | null>;
+  ): Promise<OrderingQuoteRecord | undefined>;
   updateFinalQuote(params: {
     orderId: string;
     quoteId: string;
@@ -416,27 +421,27 @@ export interface OrderingRepository {
   findOrderPaymentById(
     orderId: string,
     transactionId: string,
-  ): Promise<OrderingPaymentTransactionRecord | null>;
+  ): Promise<OrderingPaymentTransactionRecord | undefined>;
   findPaymentTransactionById(
     transactionId: string,
-  ): Promise<OrderingPaymentTransactionRecord | null>;
+  ): Promise<OrderingPaymentTransactionRecord | undefined>;
   findPaymentReceipt(
     orderId: string,
     transactionId: string,
-  ): Promise<OrderingPaymentTransactionRecord | null>;
-  findOrderInvoice(orderId: string): Promise<OrderingInvoiceRecord | null>;
+  ): Promise<OrderingPaymentTransactionRecord | undefined>;
+  findOrderInvoice(orderId: string): Promise<OrderingInvoiceRecord | undefined>;
   createRefundRequest(params: {
     transactionId: string;
     refundAmount: number;
     reason: string;
     notes?: string;
     staffUserId?: string;
-  }): Promise<OrderingPaymentTransactionRecord | null>;
+  }): Promise<OrderingPaymentTransactionRecord | undefined>;
   findClaimQuotes(claimId: string): Promise<OrderingQuoteRecord[]>;
   findClaimQuoteById(
     claimId: string,
     quoteId: string,
-  ): Promise<OrderingQuoteRecord | null>;
+  ): Promise<OrderingQuoteRecord | undefined>;
   acceptClaimQuote(params: {
     quoteId: string;
     customerIdentityId: string;
@@ -454,7 +459,7 @@ export interface OrderingRepository {
   }): Promise<OrderingPaymentTransactionRecord>;
   findTransactionByOrderCode(
     orderCode: bigint,
-  ): Promise<OrderingPaymentTransactionRecord | null>;
+  ): Promise<OrderingPaymentTransactionRecord | undefined>;
   markPaymentTransactionSucceeded(params: {
     transactionId: string;
     providerTransactionId?: string;

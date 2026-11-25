@@ -1,9 +1,21 @@
 import { Module } from '@nestjs/common';
 import { EstimatePriceUseCase } from './application/estimate-price.use-case';
-import { PriceItemUseCases } from './application/price-item.use-cases';
-import { PriceVersionUseCases } from './application/price-version.use-cases';
+import {
+  CreatePriceItemUseCase,
+  ListPriceItemsUseCase,
+} from './application/price-item.use-cases';
+import {
+  ApprovePriceVersionUseCase,
+  CreatePriceVersionUseCase,
+  ListPriceVersionsUseCase,
+  RejectPriceVersionUseCase,
+} from './application/price-version.use-cases';
+import {
+  ActivatePricingRuleUseCase,
+  CreatePricingRuleUseCase,
+  ListPricingRulesUseCase,
+} from './application/pricing-rule.use-cases';
 import { PRICING_REPOSITORY } from './application/pricing.repository';
-import { PricingRuleUseCases } from './application/pricing-rule.use-cases';
 import { PrismaPricingRepository } from './infrastructure/prisma-pricing.repository';
 import { PricingGrpcController } from './presentation/pricing.grpc.controller';
 
@@ -11,9 +23,15 @@ import { PricingGrpcController } from './presentation/pricing.grpc.controller';
   controllers: [PricingGrpcController],
   providers: [
     EstimatePriceUseCase,
-    PriceItemUseCases,
-    PriceVersionUseCases,
-    PricingRuleUseCases,
+    ListPriceItemsUseCase,
+    CreatePriceItemUseCase,
+    ListPriceVersionsUseCase,
+    CreatePriceVersionUseCase,
+    ApprovePriceVersionUseCase,
+    RejectPriceVersionUseCase,
+    ListPricingRulesUseCase,
+    CreatePricingRuleUseCase,
+    ActivatePricingRuleUseCase,
     { provide: PRICING_REPOSITORY, useClass: PrismaPricingRepository },
   ],
   exports: [EstimatePriceUseCase, PRICING_REPOSITORY],

@@ -272,7 +272,7 @@ describe('Quote & Payment UseCases', () => {
     });
 
     it('should throw NotFoundException if refund target transaction missing', async () => {
-      mockRepository.createRefundRequest.mockResolvedValue(null);
+      mockRepository.createRefundRequest.mockResolvedValue(undefined);
 
       await expect(
         createRefundRequestUseCase.execute({

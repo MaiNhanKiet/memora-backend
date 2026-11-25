@@ -20,16 +20,29 @@ import {
   type InventoryRepository,
 } from './inventory.repository';
 
+function mapAllocationTransitionError(
+  error: unknown,
+  invalidStatusMessage: string,
+): never {
+  if (error instanceof Error) {
+    if (error.message === 'ALLOCATION_NOT_FOUND') {
+      throw new NotFoundException(error.message);
+    }
+    if (error.message === 'INVALID_ALLOCATION_STATUS') {
+      throw new BadRequestException(invalidStatusMessage);
+    }
+  }
+  throw error;
+}
+
 @Injectable()
-export class AllocationUseCases {
+export class HoldInventoryUseCase {
   constructor(
     @Inject(INVENTORY_REPOSITORY)
     private readonly repository: InventoryRepository,
   ) {}
 
-  async holdInventory(
-    request: HoldInventoryRequest,
-  ): Promise<AllocationResponse> {
+  async execute(request: HoldInventoryRequest): Promise<AllocationResponse> {
     const actor = requireUserActor(parseVerifiedActor(request.actor));
     if (!request.stockLotId && !request.certifiedGemstoneId) {
       throw new BadRequestException(
@@ -72,10 +85,16 @@ export class AllocationUseCases {
       throw error;
     }
   }
+}
 
-  async reserveInventory(
-    request: ReserveInventoryRequest,
-  ): Promise<AllocationResponse> {
+@Injectable()
+export class ReserveInventoryUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(request: ReserveInventoryRequest): Promise<AllocationResponse> {
     const actor = requireUserActor(parseVerifiedActor(request.actor));
 
     try {
@@ -86,21 +105,22 @@ export class AllocationUseCases {
 
       return toAllocationResponse(updated);
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'ALLOCATION_NOT_FOUND') {
-          throw new NotFoundException(error.message);
-        }
-        if (error.message === 'INVALID_ALLOCATION_STATUS') {
-          throw new BadRequestException(
-            'Allocation can only be reserved from HOLD status',
-          );
-        }
-      }
-      throw error;
+      mapAllocationTransitionError(
+        error,
+        'Allocation can only be reserved from HOLD status',
+      );
     }
   }
+}
 
-  async allocateInventory(
+@Injectable()
+export class AllocateInventoryUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(
     request: AllocateInventoryRequest,
   ): Promise<AllocationResponse> {
     const actor = requireUserActor(parseVerifiedActor(request.actor));
@@ -117,23 +137,22 @@ export class AllocationUseCases {
 
       return toAllocationResponse(updated);
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'ALLOCATION_NOT_FOUND') {
-          throw new NotFoundException(error.message);
-        }
-        if (error.message === 'INVALID_ALLOCATION_STATUS') {
-          throw new BadRequestException(
-            'Allocation must be in HOLD or RESERVED status to allocate',
-          );
-        }
-      }
-      throw error;
+      mapAllocationTransitionError(
+        error,
+        'Allocation must be in HOLD or RESERVED status to allocate',
+      );
     }
   }
+}
 
-  async consumeInventory(
-    request: ConsumeInventoryRequest,
-  ): Promise<AllocationResponse> {
+@Injectable()
+export class ConsumeInventoryUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(request: ConsumeInventoryRequest): Promise<AllocationResponse> {
     const actor = requireUserActor(parseVerifiedActor(request.actor));
 
     try {
@@ -144,23 +163,22 @@ export class AllocationUseCases {
 
       return toAllocationResponse(updated);
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'ALLOCATION_NOT_FOUND') {
-          throw new NotFoundException(error.message);
-        }
-        if (error.message === 'INVALID_ALLOCATION_STATUS') {
-          throw new BadRequestException(
-            'Allocation must be in ALLOCATED status to consume',
-          );
-        }
-      }
-      throw error;
+      mapAllocationTransitionError(
+        error,
+        'Allocation must be in ALLOCATED status to consume',
+      );
     }
   }
+}
 
-  async releaseInventory(
-    request: ReleaseInventoryRequest,
-  ): Promise<AllocationResponse> {
+@Injectable()
+export class ReleaseInventoryUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(request: ReleaseInventoryRequest): Promise<AllocationResponse> {
     const actor = requireUserActor(parseVerifiedActor(request.actor));
 
     try {
@@ -172,17 +190,10 @@ export class AllocationUseCases {
 
       return toAllocationResponse(updated);
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'ALLOCATION_NOT_FOUND') {
-          throw new NotFoundException(error.message);
-        }
-        if (error.message === 'INVALID_ALLOCATION_STATUS') {
-          throw new BadRequestException(
-            'Cannot release already consumed or released allocation',
-          );
-        }
-      }
-      throw error;
+      mapAllocationTransitionError(
+        error,
+        'Cannot release already consumed or released allocation',
+      );
     }
   }
 }

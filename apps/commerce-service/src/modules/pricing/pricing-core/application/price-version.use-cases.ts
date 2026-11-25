@@ -21,14 +21,32 @@ import {
   type PricingRepository,
 } from './pricing.repository';
 
+function mapPriceVersionMutationError(
+  error: unknown,
+  versionId: string,
+  action: 'approved' | 'rejected',
+): never {
+  if (error instanceof Error) {
+    if (error.message === 'PRICE_VERSION_NOT_FOUND') {
+      throw new NotFoundException(`Price version ${versionId} not found`);
+    }
+    if (error.message === 'PRICE_VERSION_NOT_DRAFT') {
+      throw new UnprocessableEntityException(
+        `Only DRAFT price versions can be ${action}`,
+      );
+    }
+  }
+  throw error;
+}
+
 @Injectable()
-export class PriceVersionUseCases {
+export class ListPriceVersionsUseCase {
   constructor(
     @Inject(PRICING_REPOSITORY)
     private readonly repository: PricingRepository,
   ) {}
 
-  async listPriceVersions(
+  async execute(
     request: ListPriceVersionsRequest,
   ): Promise<ListPriceVersionsResponse> {
     const limit = request.limit && request.limit > 0 ? request.limit : 20;
@@ -46,8 +64,16 @@ export class PriceVersionUseCases {
       total,
     };
   }
+}
 
-  async createPriceVersion(
+@Injectable()
+export class CreatePriceVersionUseCase {
+  constructor(
+    @Inject(PRICING_REPOSITORY)
+    private readonly repository: PricingRepository,
+  ) {}
+
+  async execute(
     request: CreatePriceVersionRequest,
   ): Promise<PriceVersionResponse> {
     const priceItem = await this.repository.findPriceItemById(
@@ -86,8 +112,16 @@ export class PriceVersionUseCases {
 
     return toPriceVersionResponse(created);
   }
+}
 
-  async approvePriceVersion(
+@Injectable()
+export class ApprovePriceVersionUseCase {
+  constructor(
+    @Inject(PRICING_REPOSITORY)
+    private readonly repository: PricingRepository,
+  ) {}
+
+  async execute(
     request: ApprovePriceVersionRequest,
   ): Promise<PriceVersionResponse> {
     try {
@@ -98,23 +132,19 @@ export class PriceVersionUseCases {
       );
       return toPriceVersionResponse(approved);
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'PRICE_VERSION_NOT_FOUND') {
-          throw new NotFoundException(
-            `Price version ${request.versionId} not found`,
-          );
-        }
-        if (error.message === 'PRICE_VERSION_NOT_DRAFT') {
-          throw new UnprocessableEntityException(
-            'Only DRAFT price versions can be approved',
-          );
-        }
-      }
-      throw error;
+      mapPriceVersionMutationError(error, request.versionId, 'approved');
     }
   }
+}
 
-  async rejectPriceVersion(
+@Injectable()
+export class RejectPriceVersionUseCase {
+  constructor(
+    @Inject(PRICING_REPOSITORY)
+    private readonly repository: PricingRepository,
+  ) {}
+
+  async execute(
     request: RejectPriceVersionRequest,
   ): Promise<PriceVersionResponse> {
     try {
@@ -125,19 +155,7 @@ export class PriceVersionUseCases {
       );
       return toPriceVersionResponse(rejected);
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'PRICE_VERSION_NOT_FOUND') {
-          throw new NotFoundException(
-            `Price version ${request.versionId} not found`,
-          );
-        }
-        if (error.message === 'PRICE_VERSION_NOT_DRAFT') {
-          throw new UnprocessableEntityException(
-            'Only DRAFT price versions can be rejected',
-          );
-        }
-      }
-      throw error;
+      mapPriceVersionMutationError(error, request.versionId, 'rejected');
     }
   }
 }

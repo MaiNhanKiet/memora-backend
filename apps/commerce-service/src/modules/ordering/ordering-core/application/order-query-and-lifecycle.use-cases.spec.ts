@@ -136,7 +136,7 @@ describe('Order Query, Ring Item & Lifecycle UseCases', () => {
     });
 
     it('should throw NotFoundException if admin order does not exist', async () => {
-      mockRepository.findAdminOrderById.mockResolvedValue(null);
+      mockRepository.findAdminOrderById.mockResolvedValue(undefined);
 
       await expect(
         getAdminOrderDetailsUseCase.execute({ orderId: 'missing' }),

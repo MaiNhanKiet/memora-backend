@@ -1,6 +1,9 @@
+import { Logger } from '@nestjs/common';
 import type { MemoryContentItem, MemoryContentType } from '@app/contracts';
 import type { MemoryContentRecord } from './memory-content.repository';
 import type { MemoryStoragePort } from './memory-storage.port';
+
+const logger = new Logger('MemoryContentMapper');
 
 export function toMemoryContentItem(
   content: MemoryContentRecord,
@@ -34,7 +37,11 @@ export async function mapContentsWithPresignedUrls(
       if (content.assetKey) {
         try {
           assetUrl = await storagePort.presignGetUrl(content.assetKey, 3600);
-        } catch {
+        } catch (err: unknown) {
+          logger.warn(
+            `Failed to presign memory content assetKey=${content.assetKey}`,
+            err,
+          );
           assetUrl = undefined;
         }
       }

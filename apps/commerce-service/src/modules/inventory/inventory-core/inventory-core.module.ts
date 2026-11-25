@@ -1,17 +1,43 @@
 import { Module } from '@nestjs/common';
-import { AllocationUseCases } from './application/allocation.use-cases';
-import { CertifiedGemstoneUseCases } from './application/certified-gemstone.use-cases';
+import {
+  AllocateInventoryUseCase,
+  ConsumeInventoryUseCase,
+  HoldInventoryUseCase,
+  ReleaseInventoryUseCase,
+  ReserveInventoryUseCase,
+} from './application/allocation.use-cases';
+import {
+  CreateCertifiedGemstoneUseCase,
+  ListCertifiedGemstoneAvailabilityUseCase,
+} from './application/certified-gemstone.use-cases';
 import { INVENTORY_REPOSITORY } from './application/inventory.repository';
-import { StockLotUseCases } from './application/stock-lot.use-cases';
+import {
+  AdjustInventoryUseCase,
+  ListGemstoneBatchesUseCase,
+  ListInventoryMovementsUseCase,
+  ListRingBlankStocksUseCase,
+  ReceiveGemstoneBatchUseCase,
+  ReceiveRingBlankStockUseCase,
+} from './application/stock-lot.use-cases';
 import { PrismaInventoryRepository } from './infrastructure/prisma-inventory.repository';
 import { InventoryGrpcController } from './presentation/inventory.grpc.controller';
 
 @Module({
   controllers: [InventoryGrpcController],
   providers: [
-    StockLotUseCases,
-    CertifiedGemstoneUseCases,
-    AllocationUseCases,
+    ListRingBlankStocksUseCase,
+    ReceiveRingBlankStockUseCase,
+    ListGemstoneBatchesUseCase,
+    ReceiveGemstoneBatchUseCase,
+    ListCertifiedGemstoneAvailabilityUseCase,
+    CreateCertifiedGemstoneUseCase,
+    ListInventoryMovementsUseCase,
+    AdjustInventoryUseCase,
+    HoldInventoryUseCase,
+    ReserveInventoryUseCase,
+    AllocateInventoryUseCase,
+    ConsumeInventoryUseCase,
+    ReleaseInventoryUseCase,
     { provide: INVENTORY_REPOSITORY, useClass: PrismaInventoryRepository },
   ],
   exports: [INVENTORY_REPOSITORY],

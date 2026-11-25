@@ -20,20 +20,39 @@ import type {
   PricingServiceHandler,
   RejectPriceVersionRequest,
 } from '@app/contracts';
-import { EstimatePriceUseCase } from '../application/estimate-price.use-case';
-import { PriceItemUseCases } from '../application/price-item.use-cases';
-import { PriceVersionUseCases } from '../application/price-version.use-cases';
-import { PricingRuleUseCases } from '../application/pricing-rule.use-cases';
 import { CommerceInternalGrpcAuthGuard } from '../../../../grpc/commerce-internal-grpc-auth.guard';
+import { EstimatePriceUseCase } from '../application/estimate-price.use-case';
+import {
+  CreatePriceItemUseCase,
+  ListPriceItemsUseCase,
+} from '../application/price-item.use-cases';
+import {
+  ApprovePriceVersionUseCase,
+  CreatePriceVersionUseCase,
+  ListPriceVersionsUseCase,
+  RejectPriceVersionUseCase,
+} from '../application/price-version.use-cases';
+import {
+  ActivatePricingRuleUseCase,
+  CreatePricingRuleUseCase,
+  ListPricingRulesUseCase,
+} from '../application/pricing-rule.use-cases';
 
+/** Thin gRPC adapter. Pricing calculations and validation live in the use cases. */
 @Controller()
 @UseGuards(CommerceInternalGrpcAuthGuard)
 export class PricingGrpcController implements PricingServiceHandler {
   constructor(
     private readonly estimatePriceUseCase: EstimatePriceUseCase,
-    private readonly priceItemUseCases: PriceItemUseCases,
-    private readonly priceVersionUseCases: PriceVersionUseCases,
-    private readonly pricingRuleUseCases: PricingRuleUseCases,
+    private readonly listPriceItemsUseCase: ListPriceItemsUseCase,
+    private readonly createPriceItemUseCase: CreatePriceItemUseCase,
+    private readonly listPriceVersionsUseCase: ListPriceVersionsUseCase,
+    private readonly createPriceVersionUseCase: CreatePriceVersionUseCase,
+    private readonly approvePriceVersionUseCase: ApprovePriceVersionUseCase,
+    private readonly rejectPriceVersionUseCase: RejectPriceVersionUseCase,
+    private readonly listPricingRulesUseCase: ListPricingRulesUseCase,
+    private readonly createPricingRuleUseCase: CreatePricingRuleUseCase,
+    private readonly activatePricingRuleUseCase: ActivatePricingRuleUseCase,
   ) {}
 
   @GrpcMethod('PricingService', 'EstimatePrice')
@@ -45,60 +64,60 @@ export class PricingGrpcController implements PricingServiceHandler {
   listPriceItems(
     request: ListPriceItemsRequest,
   ): Promise<ListPriceItemsResponse> {
-    return this.priceItemUseCases.listPriceItems(request);
+    return this.listPriceItemsUseCase.execute(request);
   }
 
   @GrpcMethod('PricingService', 'CreatePriceItem')
   createPriceItem(request: CreatePriceItemRequest): Promise<PriceItemResponse> {
-    return this.priceItemUseCases.createPriceItem(request);
+    return this.createPriceItemUseCase.execute(request);
   }
 
   @GrpcMethod('PricingService', 'ListPriceVersions')
   listPriceVersions(
     request: ListPriceVersionsRequest,
   ): Promise<ListPriceVersionsResponse> {
-    return this.priceVersionUseCases.listPriceVersions(request);
+    return this.listPriceVersionsUseCase.execute(request);
   }
 
   @GrpcMethod('PricingService', 'CreatePriceVersion')
   createPriceVersion(
     request: CreatePriceVersionRequest,
   ): Promise<PriceVersionResponse> {
-    return this.priceVersionUseCases.createPriceVersion(request);
+    return this.createPriceVersionUseCase.execute(request);
   }
 
   @GrpcMethod('PricingService', 'ApprovePriceVersion')
   approvePriceVersion(
     request: ApprovePriceVersionRequest,
   ): Promise<PriceVersionResponse> {
-    return this.priceVersionUseCases.approvePriceVersion(request);
+    return this.approvePriceVersionUseCase.execute(request);
   }
 
   @GrpcMethod('PricingService', 'RejectPriceVersion')
   rejectPriceVersion(
     request: RejectPriceVersionRequest,
   ): Promise<PriceVersionResponse> {
-    return this.priceVersionUseCases.rejectPriceVersion(request);
+    return this.rejectPriceVersionUseCase.execute(request);
   }
 
   @GrpcMethod('PricingService', 'ListPricingRules')
   listPricingRules(
     request: ListPricingRulesRequest,
   ): Promise<ListPricingRulesResponse> {
-    return this.pricingRuleUseCases.listPricingRules(request);
+    return this.listPricingRulesUseCase.execute(request);
   }
 
   @GrpcMethod('PricingService', 'CreatePricingRule')
   createPricingRule(
     request: CreatePricingRuleRequest,
   ): Promise<PricingRuleResponse> {
-    return this.pricingRuleUseCases.createPricingRule(request);
+    return this.createPricingRuleUseCase.execute(request);
   }
 
   @GrpcMethod('PricingService', 'ActivatePricingRule')
   activatePricingRule(
     request: ActivatePricingRuleRequest,
   ): Promise<PricingRuleResponse> {
-    return this.pricingRuleUseCases.activatePricingRule(request);
+    return this.activatePricingRuleUseCase.execute(request);
   }
 }

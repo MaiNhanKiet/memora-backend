@@ -18,25 +18,29 @@ import {
 } from './catalog.repository';
 
 @Injectable()
-export class MaterialUseCases {
+export class ListMaterialsUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
   ) {}
 
-  async listMaterials(
-    request: ListMaterialsRequest,
-  ): Promise<ListMaterialsResponse> {
+  async execute(request: ListMaterialsRequest): Promise<ListMaterialsResponse> {
     const status = request.status ?? 'ACTIVE';
     const rows = await this.repository.findManyMaterials(status);
     return {
       data: rows.map((m) => toMaterialResponse(m)),
     };
   }
+}
 
-  async createMaterial(
-    request: CreateMaterialRequest,
-  ): Promise<MaterialResponse> {
+@Injectable()
+export class CreateMaterialUseCase {
+  constructor(
+    @Inject(CATALOG_REPOSITORY)
+    private readonly repository: CatalogRepository,
+  ) {}
+
+  async execute(request: CreateMaterialRequest): Promise<MaterialResponse> {
     const existing = await this.repository.findMaterialByCode(request.code);
     if (existing) {
       throw new ConflictException(
@@ -55,10 +59,16 @@ export class MaterialUseCases {
 
     return toMaterialResponse(created);
   }
+}
 
-  async updateMaterial(
-    request: UpdateMaterialRequest,
-  ): Promise<MaterialResponse> {
+@Injectable()
+export class UpdateMaterialUseCase {
+  constructor(
+    @Inject(CATALOG_REPOSITORY)
+    private readonly repository: CatalogRepository,
+  ) {}
+
+  async execute(request: UpdateMaterialRequest): Promise<MaterialResponse> {
     const existing = await this.repository.findMaterialById(request.materialId);
     if (!existing) {
       throw new NotFoundException(

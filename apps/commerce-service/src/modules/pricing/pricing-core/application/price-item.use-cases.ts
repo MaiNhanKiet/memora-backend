@@ -17,13 +17,13 @@ import {
 } from './pricing.repository';
 
 @Injectable()
-export class PriceItemUseCases {
+export class ListPriceItemsUseCase {
   constructor(
     @Inject(PRICING_REPOSITORY)
     private readonly repository: PricingRepository,
   ) {}
 
-  async listPriceItems(
+  async execute(
     request: ListPriceItemsRequest,
   ): Promise<ListPriceItemsResponse> {
     const limit = request.limit && request.limit > 0 ? request.limit : 20;
@@ -41,10 +41,16 @@ export class PriceItemUseCases {
       total,
     };
   }
+}
 
-  async createPriceItem(
-    request: CreatePriceItemRequest,
-  ): Promise<PriceItemResponse> {
+@Injectable()
+export class CreatePriceItemUseCase {
+  constructor(
+    @Inject(PRICING_REPOSITORY)
+    private readonly repository: PricingRepository,
+  ) {}
+
+  async execute(request: CreatePriceItemRequest): Promise<PriceItemResponse> {
     const existing = await this.repository.findPriceItemByCode(request.code);
     if (existing) {
       throw new ConflictException(

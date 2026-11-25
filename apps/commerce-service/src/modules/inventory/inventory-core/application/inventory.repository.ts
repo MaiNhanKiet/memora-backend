@@ -108,7 +108,7 @@ export interface InventoryRepository {
 
   findCertifiedGemstoneByCode(
     internalCode: string,
-  ): Promise<CertifiedGemstoneRecord | null>;
+  ): Promise<CertifiedGemstoneRecord | undefined>;
 
   createCertifiedGemstone(params: {
     internalCode: string;

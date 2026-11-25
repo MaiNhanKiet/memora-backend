@@ -71,13 +71,13 @@ export interface UpdateCartDraftInput {
 }
 
 export interface CartRepository {
-  findActiveCartByActor(actor: CartActor): Promise<CartRecord | null>;
+  findActiveCartByActor(actor: CartActor): Promise<CartRecord | undefined>;
   createActiveCart(data: {
     userId?: string;
     guestSessionId?: string;
     expiresAt?: Date;
   }): Promise<CartRecord>;
-  findDraftById(draftId: string): Promise<CartDraftRecord | null>;
+  findDraftById(draftId: string): Promise<CartDraftRecord | undefined>;
   createDraft(data: CreateCartDraftInput): Promise<CartDraftRecord>;
   updateDraft(
     draftId: string,
@@ -93,7 +93,7 @@ export interface CartRepository {
   findDesignCodeById(
     linkId: string,
     draftId: string,
-  ): Promise<DesignShareCodeRecord | null>;
+  ): Promise<DesignShareCodeRecord | undefined>;
   revokeDesignShareCode(linkId: string): Promise<void>;
 }
 

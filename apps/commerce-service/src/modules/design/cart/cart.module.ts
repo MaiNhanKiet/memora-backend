@@ -3,8 +3,14 @@ import { PricingModule } from '../../pricing/pricing.module';
 import { AbandonCartUseCase } from './application/abandon-cart.use-case';
 import { AddCartItemUseCase } from './application/add-cart-item.use-case';
 import { CART_REPOSITORY } from './application/cart.repository';
-import { DesignDraftUseCases } from './application/design-draft.use-cases';
-import { DesignShareCodeUseCases } from './application/design-share-code.use-cases';
+import {
+  DuplicateDesignDraftUseCase,
+  GetDesignDraftUseCase,
+} from './application/design-draft.use-cases';
+import {
+  CreateDesignShareLinkUseCase,
+  RevokeDesignShareLinkUseCase,
+} from './application/design-share-code.use-cases';
 import { GetCartUseCase } from './application/get-cart.use-case';
 import { RemoveCartItemUseCase } from './application/remove-cart-item.use-case';
 import { UpdateCartItemUseCase } from './application/update-cart-item.use-case';
@@ -22,8 +28,10 @@ import { CartGrpcController } from './presentation/cart.grpc.controller';
     RemoveCartItemUseCase,
     ValidateCheckoutUseCase,
     AbandonCartUseCase,
-    DesignDraftUseCases,
-    DesignShareCodeUseCases,
+    GetDesignDraftUseCase,
+    DuplicateDesignDraftUseCase,
+    CreateDesignShareLinkUseCase,
+    RevokeDesignShareLinkUseCase,
     { provide: CART_REPOSITORY, useClass: PrismaCartRepository },
   ],
   exports: [CART_REPOSITORY],

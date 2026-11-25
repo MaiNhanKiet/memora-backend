@@ -174,8 +174,8 @@ export interface CatalogRepository {
   findManyTemplates(
     filter: FindTemplatesFilter,
   ): Promise<PaginatedResult<RingTemplateRecord>>;
-  findTemplateById(id: string): Promise<RingTemplateRecord | null>;
-  findTemplateByCode(code: string): Promise<RingTemplateRecord | null>;
+  findTemplateById(id: string): Promise<RingTemplateRecord | undefined>;
+  findTemplateByCode(code: string): Promise<RingTemplateRecord | undefined>;
   createTemplate(data: CreateTemplateInput): Promise<RingTemplateRecord>;
   updateTemplate(
     id: string,
@@ -184,8 +184,8 @@ export interface CatalogRepository {
   countVariantsForTemplate(templateId: string): Promise<number>;
 
   findManyMaterials(status?: string): Promise<MaterialRecord[]>;
-  findMaterialById(id: string): Promise<MaterialRecord | null>;
-  findMaterialByCode(code: string): Promise<MaterialRecord | null>;
+  findMaterialById(id: string): Promise<MaterialRecord | undefined>;
+  findMaterialByCode(code: string): Promise<MaterialRecord | undefined>;
   createMaterial(data: CreateMaterialInput): Promise<MaterialRecord>;
   updateMaterial(
     id: string,
@@ -201,8 +201,10 @@ export interface CatalogRepository {
     templateId: string,
     materialId: string,
     standardSize: number,
-  ): Promise<TemplateVariantRecord | null>;
-  findTemplateVariantById(id: string): Promise<TemplateVariantRecord | null>;
+  ): Promise<TemplateVariantRecord | undefined>;
+  findTemplateVariantById(
+    id: string,
+  ): Promise<TemplateVariantRecord | undefined>;
   createVariant(data: CreateVariantInput): Promise<TemplateVariantRecord>;
   updateVariant(
     id: string,
@@ -212,7 +214,9 @@ export interface CatalogRepository {
   findManyGemstoneOptions(
     filter: FindGemstonesFilter,
   ): Promise<PaginatedResult<GemstoneOptionRecord>>;
-  findGemstoneOptionByCode(code: string): Promise<GemstoneOptionRecord | null>;
+  findGemstoneOptionByCode(
+    code: string,
+  ): Promise<GemstoneOptionRecord | undefined>;
   createGemstoneOption(
     data: CreateGemstoneOptionInput,
   ): Promise<GemstoneOptionRecord>;

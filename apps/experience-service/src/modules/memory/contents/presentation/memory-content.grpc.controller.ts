@@ -6,6 +6,7 @@ import {
   type InitiateMediaUploadResponse,
   type ListCardContentsRequest,
   type ListCardContentsResponse,
+  type MemoryServiceHandler,
   type UpdateCardContentsRequest,
   type UpdateCardContentsResponse,
 } from '@app/contracts';
@@ -19,7 +20,10 @@ import {
 /** Thin gRPC adapter. Actor parsing and resource authorization live in the use cases. */
 @Controller()
 @UseGuards(ExperienceInternalGrpcAuthGuard)
-export class MemoryContentGrpcController {
+export class MemoryContentGrpcController implements Pick<
+  MemoryServiceHandler,
+  'listCardContents' | 'updateCardContents' | 'initiateMediaUpload'
+> {
   constructor(
     private readonly listCardContentsUseCase: ListCardContentsUseCase,
     private readonly updateCardContentsUseCase: UpdateCardContentsUseCase,

@@ -27,13 +27,13 @@ import {
 } from './inventory.repository';
 
 @Injectable()
-export class StockLotUseCases {
+export class ListRingBlankStocksUseCase {
   constructor(
     @Inject(INVENTORY_REPOSITORY)
     private readonly repository: InventoryRepository,
   ) {}
 
-  async listRingBlankStocks(
+  async execute(
     request: ListRingBlankStocksRequest,
   ): Promise<ListRingBlankStocksResponse> {
     const limit = request.limit && request.limit > 0 ? request.limit : 20;
@@ -51,8 +51,16 @@ export class StockLotUseCases {
       total,
     };
   }
+}
 
-  async receiveRingBlankStock(
+@Injectable()
+export class ReceiveRingBlankStockUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(
     request: ReceiveRingBlankStockRequest,
   ): Promise<StockLotResponse> {
     if (request.quantity <= 0) {
@@ -72,8 +80,16 @@ export class StockLotUseCases {
 
     return toStockLotResponse(created);
   }
+}
 
-  async listGemstoneBatches(
+@Injectable()
+export class ListGemstoneBatchesUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(
     request: ListGemstoneBatchesRequest,
   ): Promise<ListGemstoneBatchesResponse> {
     const limit = request.limit && request.limit > 0 ? request.limit : 20;
@@ -91,8 +107,16 @@ export class StockLotUseCases {
       total,
     };
   }
+}
 
-  async receiveGemstoneBatch(
+@Injectable()
+export class ReceiveGemstoneBatchUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(
     request: ReceiveGemstoneBatchRequest,
   ): Promise<StockLotResponse> {
     if (request.quantity <= 0) {
@@ -112,8 +136,16 @@ export class StockLotUseCases {
 
     return toStockLotResponse(created);
   }
+}
 
-  async listInventoryMovements(
+@Injectable()
+export class ListInventoryMovementsUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(
     request: ListInventoryMovementsRequest,
   ): Promise<ListInventoryMovementsResponse> {
     const limit = request.limit && request.limit > 0 ? request.limit : 20;
@@ -132,10 +164,16 @@ export class StockLotUseCases {
       total,
     };
   }
+}
 
-  async adjustInventory(
-    request: AdjustInventoryRequest,
-  ): Promise<StockLotResponse> {
+@Injectable()
+export class AdjustInventoryUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(request: AdjustInventoryRequest): Promise<StockLotResponse> {
     if (request.adjustedQuantity === 0) {
       throw new UnprocessableEntityException('Adjusted quantity cannot be 0');
     }

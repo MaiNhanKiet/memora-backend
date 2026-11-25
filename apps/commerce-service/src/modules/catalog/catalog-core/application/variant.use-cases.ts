@@ -13,13 +13,13 @@ import {
 } from './catalog.repository';
 
 @Injectable()
-export class VariantUseCases {
+export class ListTemplateVariantsUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
   ) {}
 
-  async listTemplateVariants(
+  async execute(
     request: ListTemplateVariantsRequest,
   ): Promise<ListTemplateVariantsResponse> {
     const rows = await this.repository.findVariantsByTemplateId(
@@ -31,8 +31,16 @@ export class VariantUseCases {
       data: rows.map((v) => toVariantResponse(v)),
     };
   }
+}
 
-  async createVariant(
+@Injectable()
+export class CreateVariantUseCase {
+  constructor(
+    @Inject(CATALOG_REPOSITORY)
+    private readonly repository: CatalogRepository,
+  ) {}
+
+  async execute(
     request: CreateVariantRequest,
   ): Promise<TemplateVariantResponse> {
     const template = await this.repository.findTemplateById(
@@ -67,8 +75,16 @@ export class VariantUseCases {
 
     return toVariantResponse(created);
   }
+}
 
-  async updateVariant(
+@Injectable()
+export class UpdateVariantUseCase {
+  constructor(
+    @Inject(CATALOG_REPOSITORY)
+    private readonly repository: CatalogRepository,
+  ) {}
+
+  async execute(
     request: UpdateVariantRequest,
   ): Promise<TemplateVariantResponse> {
     const existing = await this.repository.findTemplateVariantById(

@@ -98,16 +98,16 @@ function toPricingRuleRecord(rule: pricing_rules): PricingRuleRecord {
 export class PrismaPricingRepository implements PricingRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findVariantById(id: string): Promise<PricingVariantRecord | null> {
+  async findVariantById(id: string): Promise<PricingVariantRecord | undefined> {
     const row = await this.prisma.template_variants.findUnique({
       where: { id },
     });
-    return row ? toVariantRecord(row) : null;
+    return row ? toVariantRecord(row) : undefined;
   }
 
   async findActivePriceVersionByVariantId(
     variantId: string,
-  ): Promise<PriceVersionRecord | null> {
+  ): Promise<PriceVersionRecord | undefined> {
     const row = await this.prisma.price_versions.findFirst({
       where: {
         status: 'ACTIVE',
@@ -119,7 +119,7 @@ export class PrismaPricingRepository implements PricingRepository {
       },
       include: { price_items: true },
     });
-    return row ? toPriceVersionRecord(row) : null;
+    return row ? toPriceVersionRecord(row) : undefined;
   }
 
   async findActivePriceVersionsByGemstoneOptionIds(
@@ -144,7 +144,7 @@ export class PrismaPricingRepository implements PricingRepository {
 
   async findActivePriceVersionByPersonalizationPackage(
     pkg: string,
-  ): Promise<PriceVersionRecord | null> {
+  ): Promise<PriceVersionRecord | undefined> {
     const row = await this.prisma.price_versions.findFirst({
       where: {
         status: 'ACTIVE',
@@ -156,12 +156,12 @@ export class PrismaPricingRepository implements PricingRepository {
       },
       include: { price_items: true },
     });
-    return row ? toPriceVersionRecord(row) : null;
+    return row ? toPriceVersionRecord(row) : undefined;
   }
 
   async findActivePriceVersionByMaintenancePlan(
     planCode: string,
-  ): Promise<PriceVersionRecord | null> {
+  ): Promise<PriceVersionRecord | undefined> {
     const row = await this.prisma.price_versions.findFirst({
       where: {
         status: 'ACTIVE',
@@ -173,13 +173,13 @@ export class PrismaPricingRepository implements PricingRepository {
       },
       include: { price_items: true },
     });
-    return row ? toPriceVersionRecord(row) : null;
+    return row ? toPriceVersionRecord(row) : undefined;
   }
 
   async findActiveResizeRule(
     variantId: string,
     direction: 'UP' | 'DOWN',
-  ): Promise<PricingRuleRecord | null> {
+  ): Promise<PricingRuleRecord | undefined> {
     const row = await this.prisma.pricing_rules.findFirst({
       where: {
         rule_type: 'RESIZE_FEE',
@@ -188,7 +188,7 @@ export class PrismaPricingRepository implements PricingRepository {
         status: 'ACTIVE',
       },
     });
-    return row ? toPricingRuleRecord(row) : null;
+    return row ? toPricingRuleRecord(row) : undefined;
   }
 
   async findPriceItems(filter: {
@@ -216,17 +216,19 @@ export class PrismaPricingRepository implements PricingRepository {
     return { items: items.map((i) => toPriceItemRecord(i)), total };
   }
 
-  async findPriceItemById(id: string): Promise<PriceItemRecord | null> {
+  async findPriceItemById(id: string): Promise<PriceItemRecord | undefined> {
     const row = await this.prisma.price_items.findUnique({
       where: { id },
       include: { price_versions: true },
     });
-    return row ? toPriceItemRecord(row) : null;
+    return row ? toPriceItemRecord(row) : undefined;
   }
 
-  async findPriceItemByCode(code: string): Promise<PriceItemRecord | null> {
+  async findPriceItemByCode(
+    code: string,
+  ): Promise<PriceItemRecord | undefined> {
     const row = await this.prisma.price_items.findUnique({ where: { code } });
-    return row ? toPriceItemRecord(row) : null;
+    return row ? toPriceItemRecord(row) : undefined;
   }
 
   async createPriceItem(data: CreatePriceItemInput): Promise<PriceItemRecord> {

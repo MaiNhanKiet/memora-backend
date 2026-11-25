@@ -18,13 +18,13 @@ import {
 } from './pricing.repository';
 
 @Injectable()
-export class PricingRuleUseCases {
+export class ListPricingRulesUseCase {
   constructor(
     @Inject(PRICING_REPOSITORY)
     private readonly repository: PricingRepository,
   ) {}
 
-  async listPricingRules(
+  async execute(
     request: ListPricingRulesRequest,
   ): Promise<ListPricingRulesResponse> {
     const limit = request.limit && request.limit > 0 ? request.limit : 20;
@@ -42,8 +42,16 @@ export class PricingRuleUseCases {
       total,
     };
   }
+}
 
-  async createPricingRule(
+@Injectable()
+export class CreatePricingRuleUseCase {
+  constructor(
+    @Inject(PRICING_REPOSITORY)
+    private readonly repository: PricingRepository,
+  ) {}
+
+  async execute(
     request: CreatePricingRuleRequest,
   ): Promise<PricingRuleResponse> {
     const latestVersion =
@@ -75,8 +83,16 @@ export class PricingRuleUseCases {
 
     return toPricingRuleResponse(created);
   }
+}
 
-  async activatePricingRule(
+@Injectable()
+export class ActivatePricingRuleUseCase {
+  constructor(
+    @Inject(PRICING_REPOSITORY)
+    private readonly repository: PricingRepository,
+  ) {}
+
+  async execute(
     request: ActivatePricingRuleRequest,
   ): Promise<PricingRuleResponse> {
     try {

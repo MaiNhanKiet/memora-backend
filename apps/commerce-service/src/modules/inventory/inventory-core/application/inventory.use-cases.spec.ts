@@ -4,15 +4,33 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AllocationUseCases } from './allocation.use-cases';
-import { CertifiedGemstoneUseCases } from './certified-gemstone.use-cases';
+import {
+  AllocateInventoryUseCase,
+  ConsumeInventoryUseCase,
+  HoldInventoryUseCase,
+  ReleaseInventoryUseCase,
+  ReserveInventoryUseCase,
+} from './allocation.use-cases';
+import { CreateCertifiedGemstoneUseCase } from './certified-gemstone.use-cases';
 import { INVENTORY_REPOSITORY } from './inventory.repository';
-import { StockLotUseCases } from './stock-lot.use-cases';
+import {
+  AdjustInventoryUseCase,
+  ListRingBlankStocksUseCase,
+  ReceiveGemstoneBatchUseCase,
+  ReceiveRingBlankStockUseCase,
+} from './stock-lot.use-cases';
 
 describe('Inventory Use Cases', () => {
-  let stockLotUseCases: StockLotUseCases;
-  let certifiedUseCases: CertifiedGemstoneUseCases;
-  let allocationUseCases: AllocationUseCases;
+  let listRingBlankStocksUseCase: ListRingBlankStocksUseCase;
+  let receiveRingBlankStockUseCase: ReceiveRingBlankStockUseCase;
+  let receiveGemstoneBatchUseCase: ReceiveGemstoneBatchUseCase;
+  let adjustInventoryUseCase: AdjustInventoryUseCase;
+  let createCertifiedGemstoneUseCase: CreateCertifiedGemstoneUseCase;
+  let holdInventoryUseCase: HoldInventoryUseCase;
+  let reserveInventoryUseCase: ReserveInventoryUseCase;
+  let allocateInventoryUseCase: AllocateInventoryUseCase;
+  let consumeInventoryUseCase: ConsumeInventoryUseCase;
+  let releaseInventoryUseCase: ReleaseInventoryUseCase;
 
   const mockRepository = {
     findRingBlankStocks: jest.fn(),
@@ -36,22 +54,53 @@ describe('Inventory Use Cases', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        StockLotUseCases,
-        CertifiedGemstoneUseCases,
-        AllocationUseCases,
+        ListRingBlankStocksUseCase,
+        ReceiveRingBlankStockUseCase,
+        ReceiveGemstoneBatchUseCase,
+        AdjustInventoryUseCase,
+        CreateCertifiedGemstoneUseCase,
+        HoldInventoryUseCase,
+        ReserveInventoryUseCase,
+        AllocateInventoryUseCase,
+        ConsumeInventoryUseCase,
+        ReleaseInventoryUseCase,
         { provide: INVENTORY_REPOSITORY, useValue: mockRepository },
       ],
     }).compile();
 
-    stockLotUseCases = module.get<StockLotUseCases>(StockLotUseCases);
-    certifiedUseCases = module.get<CertifiedGemstoneUseCases>(
-      CertifiedGemstoneUseCases,
+    listRingBlankStocksUseCase = module.get<ListRingBlankStocksUseCase>(
+      ListRingBlankStocksUseCase,
     );
-    allocationUseCases = module.get<AllocationUseCases>(AllocationUseCases);
+    receiveRingBlankStockUseCase = module.get<ReceiveRingBlankStockUseCase>(
+      ReceiveRingBlankStockUseCase,
+    );
+    receiveGemstoneBatchUseCase = module.get<ReceiveGemstoneBatchUseCase>(
+      ReceiveGemstoneBatchUseCase,
+    );
+    adjustInventoryUseCase = module.get<AdjustInventoryUseCase>(
+      AdjustInventoryUseCase,
+    );
+    createCertifiedGemstoneUseCase = module.get<CreateCertifiedGemstoneUseCase>(
+      CreateCertifiedGemstoneUseCase,
+    );
+    holdInventoryUseCase =
+      module.get<HoldInventoryUseCase>(HoldInventoryUseCase);
+    reserveInventoryUseCase = module.get<ReserveInventoryUseCase>(
+      ReserveInventoryUseCase,
+    );
+    allocateInventoryUseCase = module.get<AllocateInventoryUseCase>(
+      AllocateInventoryUseCase,
+    );
+    consumeInventoryUseCase = module.get<ConsumeInventoryUseCase>(
+      ConsumeInventoryUseCase,
+    );
+    releaseInventoryUseCase = module.get<ReleaseInventoryUseCase>(
+      ReleaseInventoryUseCase,
+    );
     jest.clearAllMocks();
   });
 
-  describe('StockLotUseCases', () => {
+  describe('StockLot UseCases', () => {
     it('should return paginated ring blank stock lots', async () => {
       mockRepository.findRingBlankStocks.mockResolvedValue({
         items: [
@@ -68,21 +117,21 @@ describe('Inventory Use Cases', () => {
         total: 1,
       });
 
-      const res = await stockLotUseCases.listRingBlankStocks({});
+      const res = await listRingBlankStocksUseCase.execute({});
       expect(res.items).toHaveLength(1);
       expect(res.total).toBe(1);
     });
 
     it('should validate quantity > 0 when receiving ring blank or gemstone batch', async () => {
       await expect(
-        stockLotUseCases.receiveRingBlankStock({
+        receiveRingBlankStockUseCase.execute({
           templateVariantId: 'v-1',
           quantity: 0,
         }),
       ).rejects.toThrow(UnprocessableEntityException);
 
       await expect(
-        stockLotUseCases.receiveGemstoneBatch({
+        receiveGemstoneBatchUseCase.execute({
           gemstoneOptionId: 'g-1',
           quantity: -1,
         }),
@@ -91,7 +140,7 @@ describe('Inventory Use Cases', () => {
 
     it('should adjust inventory and map repository errors', async () => {
       await expect(
-        stockLotUseCases.adjustInventory({
+        adjustInventoryUseCase.execute({
           stockLotId: 'lot-1',
           adjustedQuantity: 0,
           reason: 'audit',
@@ -102,7 +151,7 @@ describe('Inventory Use Cases', () => {
         new Error('STOCK_LOT_NOT_FOUND'),
       );
       await expect(
-        stockLotUseCases.adjustInventory({
+        adjustInventoryUseCase.execute({
           stockLotId: 'lot-1',
           adjustedQuantity: 5,
           reason: 'audit',
@@ -113,7 +162,7 @@ describe('Inventory Use Cases', () => {
         new Error('STOCK_INSUFFICIENT'),
       );
       await expect(
-        stockLotUseCases.adjustInventory({
+        adjustInventoryUseCase.execute({
           stockLotId: 'lot-1',
           adjustedQuantity: -100,
           reason: 'audit',
@@ -122,14 +171,14 @@ describe('Inventory Use Cases', () => {
     });
   });
 
-  describe('CertifiedGemstoneUseCases', () => {
+  describe('CertifiedGemstone UseCases', () => {
     it('should throw ConflictException if internal code exists', async () => {
       mockRepository.findCertifiedGemstoneByCode.mockResolvedValue({
         id: 'cg-1',
       });
 
       await expect(
-        certifiedUseCases.createCertifiedGemstone({
+        createCertifiedGemstoneUseCase.execute({
           internalCode: 'GIA-001',
           gemstoneOptionId: 'g-1',
         }),
@@ -137,7 +186,7 @@ describe('Inventory Use Cases', () => {
     });
 
     it('should create certified gemstone successfully', async () => {
-      mockRepository.findCertifiedGemstoneByCode.mockResolvedValue(null);
+      mockRepository.findCertifiedGemstoneByCode.mockResolvedValue(undefined);
       mockRepository.createCertifiedGemstone.mockResolvedValue({
         id: 'cg-1',
         internalCode: 'GIA-001',
@@ -146,7 +195,7 @@ describe('Inventory Use Cases', () => {
         updatedAt: new Date(),
       });
 
-      const res = await certifiedUseCases.createCertifiedGemstone({
+      const res = await createCertifiedGemstoneUseCase.execute({
         internalCode: 'GIA-001',
         gemstoneOptionId: 'g-1',
       });
@@ -156,7 +205,7 @@ describe('Inventory Use Cases', () => {
     });
   });
 
-  describe('AllocationUseCases', () => {
+  describe('Allocation UseCases', () => {
     it('should hold, reserve, allocate, consume, and release inventory', async () => {
       const baseAlloc = {
         id: 'alloc-1',
@@ -169,7 +218,7 @@ describe('Inventory Use Cases', () => {
       };
 
       mockRepository.holdInventory.mockResolvedValue(baseAlloc);
-      const held = await allocationUseCases.holdInventory({
+      const held = await holdInventoryUseCase.execute({
         actor: { userId: validUserId },
         ringItemId: 'ri-1',
         stockLotId: 'lot-1',
@@ -181,7 +230,7 @@ describe('Inventory Use Cases', () => {
         ...baseAlloc,
         status: 'RESERVED',
       });
-      const reserved = await allocationUseCases.reserveInventory({
+      const reserved = await reserveInventoryUseCase.execute({
         actor: { userId: validUserId },
         allocationId: 'alloc-1',
       });
@@ -191,7 +240,7 @@ describe('Inventory Use Cases', () => {
         ...baseAlloc,
         status: 'ALLOCATED',
       });
-      const allocated = await allocationUseCases.allocateInventory({
+      const allocated = await allocateInventoryUseCase.execute({
         actor: { userId: validUserId },
         allocationId: 'alloc-1',
         productionAttemptId: 'pa-1',
@@ -202,7 +251,7 @@ describe('Inventory Use Cases', () => {
         ...baseAlloc,
         status: 'CONSUMED',
       });
-      const consumed = await allocationUseCases.consumeInventory({
+      const consumed = await consumeInventoryUseCase.execute({
         actor: { userId: validUserId },
         allocationId: 'alloc-1',
       });
@@ -212,7 +261,7 @@ describe('Inventory Use Cases', () => {
         ...baseAlloc,
         status: 'RELEASED',
       });
-      const released = await allocationUseCases.releaseInventory({
+      const released = await releaseInventoryUseCase.execute({
         actor: { userId: validUserId },
         allocationId: 'alloc-1',
         reason: 'cancelled',

@@ -13,13 +13,13 @@ import {
 } from './cart.validation';
 
 @Injectable()
-export class DesignShareCodeUseCases {
+export class CreateDesignShareLinkUseCase {
   constructor(
     @Inject(CART_REPOSITORY)
     private readonly repository: CartRepository,
   ) {}
 
-  async createDesignShareLink(
+  async execute(
     request: CreateDesignShareLinkRequest,
   ): Promise<CreateDesignShareLinkResponse> {
     const actor = validateCartActor(request.actor);
@@ -53,8 +53,16 @@ export class DesignShareCodeUseCases {
       expiresAt: created.expiresAt.toISOString(),
     };
   }
+}
 
-  async revokeDesignShareLink(
+@Injectable()
+export class RevokeDesignShareLinkUseCase {
+  constructor(
+    @Inject(CART_REPOSITORY)
+    private readonly repository: CartRepository,
+  ) {}
+
+  async execute(
     request: RevokeDesignShareLinkRequest,
   ): Promise<RevokeDesignShareLinkResponse> {
     const actor = validateCartActor(request.actor);

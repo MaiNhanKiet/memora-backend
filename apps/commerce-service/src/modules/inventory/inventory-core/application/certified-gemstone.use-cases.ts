@@ -15,13 +15,13 @@ import {
 } from './inventory.repository';
 
 @Injectable()
-export class CertifiedGemstoneUseCases {
+export class ListCertifiedGemstoneAvailabilityUseCase {
   constructor(
     @Inject(INVENTORY_REPOSITORY)
     private readonly repository: InventoryRepository,
   ) {}
 
-  async listCertifiedGemstoneAvailability(
+  async execute(
     request: ListCertifiedGemstoneAvailabilityRequest,
   ): Promise<ListCertifiedGemstoneAvailabilityResponse> {
     const limit = request.limit && request.limit > 0 ? request.limit : 20;
@@ -40,8 +40,16 @@ export class CertifiedGemstoneUseCases {
       total,
     };
   }
+}
 
-  async createCertifiedGemstone(
+@Injectable()
+export class CreateCertifiedGemstoneUseCase {
+  constructor(
+    @Inject(INVENTORY_REPOSITORY)
+    private readonly repository: InventoryRepository,
+  ) {}
+
+  async execute(
     request: CreateCertifiedGemstoneRequest,
   ): Promise<CertifiedGemstoneResponse> {
     const existing = await this.repository.findCertifiedGemstoneByCode(

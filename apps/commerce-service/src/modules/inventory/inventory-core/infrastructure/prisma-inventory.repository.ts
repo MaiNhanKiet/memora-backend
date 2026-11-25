@@ -280,11 +280,11 @@ export class PrismaInventoryRepository implements InventoryRepository {
 
   async findCertifiedGemstoneByCode(
     internalCode: string,
-  ): Promise<CertifiedGemstoneRecord | null> {
+  ): Promise<CertifiedGemstoneRecord | undefined> {
     const row = await this.prisma.certified_gemstones.findUnique({
       where: { internal_code: internalCode },
     });
-    return row ? toCertifiedGemstoneRecord(row) : null;
+    return row ? toCertifiedGemstoneRecord(row) : undefined;
   }
 
   async createCertifiedGemstone(params: {

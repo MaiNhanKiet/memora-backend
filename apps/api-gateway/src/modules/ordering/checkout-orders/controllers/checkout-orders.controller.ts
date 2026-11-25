@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -47,6 +48,8 @@ import {
 @ApiTags('commerce-orders')
 @Controller('orders')
 export class CheckoutOrdersController {
+  private readonly logger = new Logger(CheckoutOrdersController.name);
+
   constructor(
     private readonly orderingClient: OrderingGrpcClient,
     private readonly memoryClient: MemoryGrpcClient,
@@ -90,8 +93,12 @@ export class CheckoutOrdersController {
                 setTimeout(() => reject(new Error('Provision timeout')), 3000),
               ),
             ]);
-          } catch {
+          } catch (err: unknown) {
             // Fault-tolerant: non-blocking, fallback will run on getRingItemDetails
+            this.logger.warn(
+              `Non-blocking memory card provisioning failed for ringItemId=${item.id}`,
+              err,
+            );
           }
         }
       }
@@ -182,7 +189,11 @@ export class CheckoutOrdersController {
           ringItemId,
         });
         memoryCard = { id: card.id, status: card.status };
-      } catch {
+      } catch (lookupErr: unknown) {
+        this.logger.warn(
+          `Lazy memory card lookup missed for ringItemId=${ringItemId}`,
+          lookupErr,
+        );
         // Fallback: if not found, lazy-provision card when customer identity and recipientEmail are available
         if (actor.customerIdentityId) {
           try {
@@ -199,8 +210,12 @@ export class CheckoutOrdersController {
               });
               memoryCard = { id: card.id, status: card.status };
             }
-          } catch {
+          } catch (provisionErr: unknown) {
             // If experience service is unreachable, keep memoryCard undefined
+            this.logger.warn(
+              `Lazy memory card provisioning failed for ringItemId=${ringItemId}`,
+              provisionErr,
+            );
           }
         }
       }

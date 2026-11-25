@@ -144,16 +144,18 @@ export class PrismaCatalogRepository implements CatalogRepository {
     return { rows: rows.map((r) => toTemplateRecord(r)), total };
   }
 
-  async findTemplateById(id: string): Promise<RingTemplateRecord | null> {
+  async findTemplateById(id: string): Promise<RingTemplateRecord | undefined> {
     const row = await this.prisma.ring_templates.findUnique({ where: { id } });
-    return row ? toTemplateRecord(row) : null;
+    return row ? toTemplateRecord(row) : undefined;
   }
 
-  async findTemplateByCode(code: string): Promise<RingTemplateRecord | null> {
+  async findTemplateByCode(
+    code: string,
+  ): Promise<RingTemplateRecord | undefined> {
     const row = await this.prisma.ring_templates.findUnique({
       where: { code },
     });
-    return row ? toTemplateRecord(row) : null;
+    return row ? toTemplateRecord(row) : undefined;
   }
 
   async createTemplate(data: CreateTemplateInput): Promise<RingTemplateRecord> {
@@ -218,14 +220,14 @@ export class PrismaCatalogRepository implements CatalogRepository {
     return rows.map((r) => toMaterialRecord(r));
   }
 
-  async findMaterialById(id: string): Promise<MaterialRecord | null> {
+  async findMaterialById(id: string): Promise<MaterialRecord | undefined> {
     const row = await this.prisma.materials.findUnique({ where: { id } });
-    return row ? toMaterialRecord(row) : null;
+    return row ? toMaterialRecord(row) : undefined;
   }
 
-  async findMaterialByCode(code: string): Promise<MaterialRecord | null> {
+  async findMaterialByCode(code: string): Promise<MaterialRecord | undefined> {
     const row = await this.prisma.materials.findUnique({ where: { code } });
-    return row ? toMaterialRecord(row) : null;
+    return row ? toMaterialRecord(row) : undefined;
   }
 
   async createMaterial(data: CreateMaterialInput): Promise<MaterialRecord> {
@@ -288,7 +290,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
     templateId: string,
     materialId: string,
     standardSize: number,
-  ): Promise<TemplateVariantRecord | null> {
+  ): Promise<TemplateVariantRecord | undefined> {
     const row = await this.prisma.template_variants.findFirst({
       where: {
         ring_template_id: templateId,
@@ -297,16 +299,16 @@ export class PrismaCatalogRepository implements CatalogRepository {
         status: 'ACTIVE',
       },
     });
-    return row ? toVariantRecord(row) : null;
+    return row ? toVariantRecord(row) : undefined;
   }
 
   async findTemplateVariantById(
     id: string,
-  ): Promise<TemplateVariantRecord | null> {
+  ): Promise<TemplateVariantRecord | undefined> {
     const row = await this.prisma.template_variants.findUnique({
       where: { id },
     });
-    return row ? toVariantRecord(row) : null;
+    return row ? toVariantRecord(row) : undefined;
   }
 
   async createVariant(
@@ -419,11 +421,11 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async findGemstoneOptionByCode(
     code: string,
-  ): Promise<GemstoneOptionRecord | null> {
+  ): Promise<GemstoneOptionRecord | undefined> {
     const row = await this.prisma.gemstone_options.findUnique({
       where: { code },
     });
-    return row ? toGemstoneOptionRecord(row) : null;
+    return row ? toGemstoneOptionRecord(row) : undefined;
   }
 
   async createGemstoneOption(

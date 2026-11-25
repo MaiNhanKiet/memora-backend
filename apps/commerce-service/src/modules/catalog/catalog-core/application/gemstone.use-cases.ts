@@ -24,13 +24,13 @@ import {
 } from './catalog.repository';
 
 @Injectable()
-export class GemstoneUseCases {
+export class ListGemstoneOptionsUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
   ) {}
 
-  async listGemstoneOptions(
+  async execute(
     request: ListGemstoneOptionsRequest,
   ): Promise<ListGemstoneOptionsResponse> {
     const page = Math.max(1, request.pagination?.page ?? 1);
@@ -58,8 +58,16 @@ export class GemstoneUseCases {
       },
     };
   }
+}
 
-  async listGemstoneSlots(
+@Injectable()
+export class ListGemstoneSlotsUseCase {
+  constructor(
+    @Inject(CATALOG_REPOSITORY)
+    private readonly repository: CatalogRepository,
+  ) {}
+
+  async execute(
     request: ListGemstoneSlotsRequest,
   ): Promise<ListGemstoneSlotsResponse> {
     const rawSlots = await this.repository.findGemstoneSlotsByTemplateId(
@@ -69,8 +77,16 @@ export class GemstoneUseCases {
       data: rawSlots.map((s) => toGemstoneSlotResponse(s, request.templateId)),
     };
   }
+}
 
-  async createGemstoneOption(
+@Injectable()
+export class CreateGemstoneOptionUseCase {
+  constructor(
+    @Inject(CATALOG_REPOSITORY)
+    private readonly repository: CatalogRepository,
+  ) {}
+
+  async execute(
     request: CreateGemstoneOptionRequest,
   ): Promise<GemstoneOptionResponse> {
     const existing = await this.repository.findGemstoneOptionByCode(
@@ -97,8 +113,16 @@ export class GemstoneUseCases {
 
     return toGemstoneOptionResponse(created);
   }
+}
 
-  async updateCompatibilities(
+@Injectable()
+export class UpdateCompatibilitiesUseCase {
+  constructor(
+    @Inject(CATALOG_REPOSITORY)
+    private readonly repository: CatalogRepository,
+  ) {}
+
+  async execute(
     request: UpdateCompatibilitiesRequest,
   ): Promise<UpdateCompatibilitiesResponse> {
     const variant = await this.repository.findTemplateVariantById(
