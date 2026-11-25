@@ -37,7 +37,9 @@ export class DesignGrpcClient extends DomainGrpcClient implements OnModuleInit {
     private readonly grpcClient: ClientGrpc,
     configService: ConfigService,
   ) {
-    super(configService, 'apiGateway.commerceInternalGrpcSecret');
+    super(configService, 'apiGateway.commerceInternalGrpcSecret', {
+      optional: true,
+    });
   }
 
   onModuleInit(): void {

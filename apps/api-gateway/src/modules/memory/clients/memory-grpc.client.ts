@@ -61,7 +61,9 @@ export class MemoryGrpcClient extends DomainGrpcClient implements OnModuleInit {
     private readonly grpcClient: ClientGrpc,
     configService: ConfigService,
   ) {
-    super(configService, 'apiGateway.experienceInternalGrpcSecret');
+    super(configService, 'apiGateway.experienceInternalGrpcSecret', {
+      optional: true,
+    });
   }
 
   onModuleInit(): void {

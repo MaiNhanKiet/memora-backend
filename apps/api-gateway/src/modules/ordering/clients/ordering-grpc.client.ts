@@ -75,7 +75,9 @@ export class OrderingGrpcClient
     private readonly grpcClient: ClientGrpc,
     configService: ConfigService,
   ) {
-    super(configService, 'apiGateway.commerceInternalGrpcSecret');
+    super(configService, 'apiGateway.commerceInternalGrpcSecret', {
+      optional: true,
+    });
   }
 
   onModuleInit(): void {
