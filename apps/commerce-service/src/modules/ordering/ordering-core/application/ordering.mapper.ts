@@ -1,113 +1,316 @@
-import type { FullQuoteDetail, PaymentTransactionDetail } from '@app/contracts';
+import type {
+  AdminOrderSummaryItem,
+  FullQuoteDetail,
+  GetAdminOrderDetailsResponse,
+  GetOrderByIdResponse,
+  GetRingItemDetailsResponse,
+  OrderInvoiceDetail,
+  OrderSummaryItem,
+  PaymentReceiptDetail,
+  PaymentTransactionDetail,
+  RingItemSummary,
+  RingItemVersionSummary,
+} from '@app/contracts';
+import type {
+  OrderingDetailRecord,
+  OrderingInvoiceRecord,
+  OrderingListItemRecord,
+  OrderingPaymentTransactionRecord,
+  OrderingQuoteRecord,
+  OrderingRingItemDetailRecord,
+  OrderingRingItemRecord,
+  OrderingRingItemVersionRecord,
+} from './ordering.repository';
 
-export type DecimalLike = number | string | { toString(): string };
-
-export interface QuoteDetailInput {
-  id: string;
-  quote_no: string;
-  quote_type: string;
-  version_no: number;
-  status: string;
-  subtotal_amount: DecimalLike;
-  delivery_amount: DecimalLike;
-  adjustment_amount: DecimalLike;
-  total_amount: DecimalLike;
-  currency: string;
-  created_at: Date;
-  valid_until: Date | null;
-  issued_at: Date | null;
-  accepted_at: Date | null;
-  quote_items: Array<{
-    id: string;
-    ring_item_id: string | null;
-    component_type: string;
-    description: string | null;
-    quantity: DecimalLike;
-    unit_amount: DecimalLike;
-    line_amount: DecimalLike;
-    price_source_type: string;
-  }>;
+function mapRingItemSummary(item: OrderingRingItemRecord): RingItemSummary {
+  return {
+    id: item.id,
+    itemNo: item.itemNo,
+    sourceRingDesignDraftId: item.sourceRingDesignDraftId,
+    currentVersionId: item.currentVersionId || '',
+    versionNo: item.versionNo,
+    templateVariantId: item.templateVariantId,
+    templateCode: item.templateCode,
+    templateName: item.templateName,
+    materialName: item.materialName,
+    targetSize: item.targetSize,
+    personalizationPackage: item.personalizationPackage,
+    memoryEnabled: item.memoryEnabled,
+  };
 }
 
-export interface PaymentTransactionDetailInput {
-  id: string;
-  order_id: string | null;
-  payment_stage: string;
-  transaction_type: string;
-  amount: DecimalLike;
-  currency: string;
-  status: string;
-  provider: string | null;
-  payment_method: string | null;
-  provider_order_code: bigint | number | string | null;
-  provider_transaction_id: string | null;
-  provider_reference: string | null;
-  related_transaction_id: string | null;
-  requested_at: Date;
-  completed_at: Date | null;
-  failed_at: Date | null;
-  failure_reason: string | null;
-  receipt_no: string | null;
-  receipt_issued_at: Date | null;
-  metadata_json: unknown;
+export function mapOrderSummary(o: OrderingListItemRecord): OrderSummaryItem {
+  return {
+    id: o.id,
+    orderNo: o.orderNo,
+    status: o.status,
+    sourcePlanMode: o.sourcePlanMode,
+    itemsCount: o.ringItemsCount,
+    totalAmount: o.currentQuote?.totalAmount ?? 0,
+    currency: o.currentQuote?.currency || 'VND',
+    recipientName: o.recipientName,
+    createdAt: o.createdAt.toISOString(),
+    updatedAt: o.updatedAt.toISOString(),
+  };
 }
 
-export function mapQuoteToDetail(quote: QuoteDetailInput): FullQuoteDetail {
+export function mapAdminOrderSummary(
+  o: OrderingListItemRecord,
+): AdminOrderSummaryItem {
+  return {
+    id: o.id,
+    orderNo: o.orderNo,
+    status: o.status,
+    sourcePlanMode: o.sourcePlanMode,
+    ownerCustomerIdentityId: o.ownerCustomerIdentityId,
+    recipientName: o.recipientName,
+    recipientPhone: o.recipientPhone,
+    recipientEmail: o.recipientEmail,
+    itemsCount: o.ringItemsCount,
+    totalAmount: o.currentQuote?.totalAmount ?? 0,
+    currency: o.currentQuote?.currency || 'VND',
+    createdAt: o.createdAt.toISOString(),
+    updatedAt: o.updatedAt.toISOString(),
+  };
+}
+
+export function mapOrderDetail(
+  order: OrderingDetailRecord,
+): GetOrderByIdResponse {
+  return {
+    id: order.id,
+    orderNo: order.orderNo,
+    status: order.status,
+    sourcePlanMode: order.sourcePlanMode,
+    fulfillmentMode: order.fulfillmentMode || 'DELIVERY',
+    recipientName: order.recipientName || '',
+    recipientPhone: order.recipientPhone || '',
+    recipientEmail: order.recipientEmail || '',
+    deliveryAddressJson: order.deliveryAddressJson
+      ? JSON.stringify(order.deliveryAddressJson)
+      : '{}',
+    currentQuote: order.currentQuote
+      ? {
+          quoteId: order.currentQuote.id,
+          quoteNo: order.currentQuote.quoteNo,
+          quoteType: order.currentQuote.quoteType,
+          subtotalAmount: order.currentQuote.subtotalAmount,
+          deliveryAmount: order.currentQuote.deliveryAmount,
+          adjustmentAmount: order.currentQuote.adjustmentAmount,
+          totalAmount: order.currentQuote.totalAmount,
+          currency: order.currentQuote.currency,
+          status: order.currentQuote.status,
+        }
+      : undefined,
+    items: order.ringItems.map((i) => mapRingItemSummary(i)),
+    createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
+  };
+}
+
+export function mapAdminOrderDetail(
+  order: OrderingDetailRecord,
+): GetAdminOrderDetailsResponse {
+  return {
+    id: order.id,
+    orderNo: order.orderNo,
+    status: order.status,
+    sourcePlanMode: order.sourcePlanMode,
+    fulfillmentMode: order.fulfillmentMode,
+    customer: {
+      customerIdentityId: order.ownerCustomerIdentityId,
+      guestEmail: order.guestEmail,
+      guestPhone: order.guestPhone,
+      guestEmailVerifiedAt: order.guestEmailVerifiedAt?.toISOString(),
+    },
+    recipientName: order.recipientName,
+    recipientPhone: order.recipientPhone,
+    recipientEmail: order.recipientEmail,
+    deliveryAddressJson: order.deliveryAddressJson
+      ? JSON.stringify(order.deliveryAddressJson)
+      : undefined,
+    preP1EvidenceJson: order.preP1EvidenceJson
+      ? JSON.stringify(order.preP1EvidenceJson)
+      : undefined,
+    currentQuote: order.currentQuote
+      ? {
+          quoteId: order.currentQuote.id,
+          quoteNo: order.currentQuote.quoteNo,
+          quoteType: order.currentQuote.quoteType,
+          subtotalAmount: order.currentQuote.subtotalAmount,
+          deliveryAmount: order.currentQuote.deliveryAmount,
+          adjustmentAmount: order.currentQuote.adjustmentAmount,
+          totalAmount: order.currentQuote.totalAmount,
+          currency: order.currentQuote.currency,
+          status: order.currentQuote.status,
+        }
+      : undefined,
+    items: order.ringItems.map((i) => mapRingItemSummary(i)),
+    cancelledAt: order.cancelledAt?.toISOString(),
+    cancellationReason: order.cancellationReason,
+    createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
+  };
+}
+
+export function mapRingItemDetail(
+  item: OrderingRingItemDetailRecord,
+): GetRingItemDetailsResponse {
+  return {
+    id: item.id,
+    orderId: item.orderId,
+    itemNo: item.itemNo,
+    sourceRingDesignDraftId: item.sourceRingDesignDraftId,
+    currentVersionId: item.currentVersionId || '',
+    versionNo: item.versionNo,
+    templateVariantId: item.templateVariantId,
+    templateCode: item.templateCode,
+    templateName: item.templateName,
+    materialName: item.materialName,
+    targetSize: item.targetSize,
+    personalizationPackage: item.personalizationPackage,
+    memoryEnabled: item.memoryEnabled,
+    maintenancePlan: item.maintenancePlan,
+    gemstones: [...item.gemstones],
+    createdAt: item.createdAt.toISOString(),
+  };
+}
+
+export function mapRingItemVersion(
+  ver: OrderingRingItemVersionRecord,
+): RingItemVersionSummary {
+  return {
+    id: ver.id,
+    versionNo: ver.versionNo,
+    status: ver.status,
+    targetSize: ver.targetSize,
+    personalizationPackage: ver.personalizationPackage,
+    memoryEnabled: ver.memoryEnabled,
+    changeReason: ver.changeReason,
+    templateVariantId: ver.templateVariantId,
+    templateCode: ver.templateCode,
+    templateName: ver.templateName,
+    materialName: ver.materialName,
+    gemstones: [...ver.gemstones],
+    createdAt: ver.createdAt.toISOString(),
+  };
+}
+
+export function mapQuoteToDetail(quote: OrderingQuoteRecord): FullQuoteDetail {
   return {
     id: quote.id,
-    quoteNo: quote.quote_no,
-    quoteType: quote.quote_type,
-    versionNo: quote.version_no,
+    quoteNo: quote.quoteNo,
+    quoteType: quote.quoteType,
+    versionNo: quote.versionNo,
     status: quote.status,
-    subtotalAmount: Number(quote.subtotal_amount),
-    deliveryAmount: Number(quote.delivery_amount),
-    adjustmentAmount: Number(quote.adjustment_amount),
-    totalAmount: Number(quote.total_amount),
+    subtotalAmount: quote.subtotalAmount,
+    deliveryAmount: quote.deliveryAmount,
+    adjustmentAmount: quote.adjustmentAmount,
+    totalAmount: quote.totalAmount,
     currency: quote.currency,
-    createdAt: quote.created_at.toISOString(),
-    validUntil: quote.valid_until ? quote.valid_until.toISOString() : undefined,
-    issuedAt: quote.issued_at ? quote.issued_at.toISOString() : undefined,
-    acceptedAt: quote.accepted_at ? quote.accepted_at.toISOString() : undefined,
-    items: quote.quote_items.map((i) => ({
+    createdAt: quote.createdAt.toISOString(),
+    validUntil: quote.validUntil?.toISOString(),
+    issuedAt: quote.issuedAt?.toISOString(),
+    acceptedAt: quote.acceptedAt?.toISOString(),
+    items: quote.items.map((i) => ({
       id: i.id,
-      ringItemId: i.ring_item_id ?? undefined,
-      componentType: i.component_type,
-      description: i.description ?? undefined,
-      quantity: Number(i.quantity),
-      unitAmount: Number(i.unit_amount),
-      lineAmount: Number(i.line_amount),
-      priceSourceType: i.price_source_type,
+      ringItemId: i.ringItemId,
+      componentType: i.componentType,
+      description: i.description,
+      quantity: i.quantity,
+      unitAmount: i.unitAmount,
+      lineAmount: i.lineAmount,
+      priceSourceType: i.priceSourceType,
     })),
   };
 }
 
 export function mapPaymentTransactionDetail(
-  p: PaymentTransactionDetailInput,
+  p: OrderingPaymentTransactionRecord,
+  fallbackOrderId = '',
 ): PaymentTransactionDetail {
   return {
     id: p.id,
-    orderId: p.order_id || '',
-    paymentStage: p.payment_stage,
-    transactionType: p.transaction_type,
-    amount: Number(p.amount),
+    orderId: p.orderId || fallbackOrderId,
+    paymentStage: p.paymentStage,
+    transactionType: p.transactionType,
+    amount: p.amount,
     currency: p.currency,
     status: p.status,
-    provider: p.provider ?? undefined,
-    paymentMethod: p.payment_method ?? undefined,
-    providerOrderCode: p.provider_order_code
-      ? p.provider_order_code.toString()
+    provider: p.provider,
+    paymentMethod: p.paymentMethod,
+    providerOrderCode: p.providerOrderCode
+      ? p.providerOrderCode.toString()
       : undefined,
-    providerTransactionId: p.provider_transaction_id ?? undefined,
-    providerReference: p.provider_reference ?? undefined,
-    relatedTransactionId: p.related_transaction_id ?? undefined,
-    requestedAt: p.requested_at.toISOString(),
-    completedAt: p.completed_at ? p.completed_at.toISOString() : undefined,
-    failedAt: p.failed_at ? p.failed_at.toISOString() : undefined,
-    failureReason: p.failure_reason ?? undefined,
-    receiptNo: p.receipt_no ?? undefined,
-    receiptIssuedAt: p.receipt_issued_at
-      ? p.receipt_issued_at.toISOString()
+    providerTransactionId: p.providerTransactionId,
+    providerReference: p.providerReference,
+    relatedTransactionId: p.relatedTransactionId,
+    requestedAt: p.requestedAt.toISOString(),
+    completedAt: p.completedAt?.toISOString(),
+    failedAt: p.failedAt?.toISOString(),
+    failureReason: p.failureReason,
+    receiptNo: p.receiptNo,
+    receiptIssuedAt: p.receiptIssuedAt?.toISOString(),
+    metadataJson: p.metadataJson ? JSON.stringify(p.metadataJson) : undefined,
+  };
+}
+
+export function mapPaymentReceipt(
+  tx: OrderingPaymentTransactionRecord,
+  fallbackOrderId: string,
+): PaymentReceiptDetail {
+  return {
+    receiptNo: tx.receiptNo || `REC-${tx.orderNo || 'ORD'}-${tx.paymentStage}`,
+    transactionId: tx.id,
+    orderId: tx.orderId || fallbackOrderId,
+    orderNo: tx.orderNo || '',
+    paymentStage: tx.paymentStage,
+    amount: tx.amount,
+    currency: tx.currency,
+    paymentMethod: tx.paymentMethod ?? '',
+    completedAt: (tx.completedAt ?? tx.requestedAt).toISOString(),
+    recipientName: tx.recipientName || '',
+    issuedAt: (tx.receiptIssuedAt ?? new Date()).toISOString(),
+  };
+}
+
+export function mapOrderInvoice(
+  orderDetails: OrderingInvoiceRecord,
+): OrderInvoiceDetail {
+  const totalAmount = orderDetails.quoteTotalAmount;
+  const totalPaidAmount = orderDetails.paymentTransactions.reduce(
+    (sum, p) => sum + p.amount,
+    0,
+  );
+  const remainingAmount = Math.max(0, totalAmount - totalPaidAmount);
+
+  return {
+    invoiceNo: orderDetails.invoiceNo || `INV-${orderDetails.orderNo}`,
+    orderId: orderDetails.id,
+    orderNo: orderDetails.orderNo,
+    status: orderDetails.status,
+    issuedAt: (orderDetails.invoiceIssuedAt ?? new Date()).toISOString(),
+    totalAmount,
+    totalPaidAmount,
+    remainingAmount,
+    currency: orderDetails.quoteCurrency || 'VND',
+    recipientName: orderDetails.recipientName || '',
+    recipientPhone: orderDetails.recipientPhone,
+    deliveryAddressJson: orderDetails.deliveryAddressJson
+      ? JSON.stringify(orderDetails.deliveryAddressJson)
       : undefined,
-    metadataJson: p.metadata_json ? JSON.stringify(p.metadata_json) : undefined,
+    items: orderDetails.quoteItems.map((item) => ({
+      componentType: item.componentType,
+      description: item.description || '',
+      quantity: item.quantity,
+      unitAmount: item.unitAmount,
+      lineAmount: item.lineAmount,
+    })),
+    paymentTransactions: orderDetails.paymentTransactions.map((pt) => ({
+      paymentStage: pt.paymentStage,
+      amount: pt.amount,
+      completedAt: (pt.completedAt ?? pt.requestedAt).toISOString(),
+      receiptNo: pt.receiptNo,
+    })),
   };
 }

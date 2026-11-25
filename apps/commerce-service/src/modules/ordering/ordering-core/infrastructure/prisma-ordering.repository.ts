@@ -1,72 +1,42 @@
 import { Injectable } from '@nestjs/common';
 import type { RingItemSummary } from '@app/contracts';
 import { Prisma } from '../../../../../generated/prisma/client';
-import type {
-  orders,
-  ring_items,
-  quotes,
-} from '../../../../../generated/prisma/client';
 import { PrismaService } from '../../../../persistence/prisma/prisma.service';
-
-export interface CreateOrderParams {
-  ownerCustomerIdentityId: string;
-  guestEmail?: string;
-  guestPhone?: string;
-  createdFromCartId?: string;
-  status: string;
-  sourcePlanMode: string;
-  preP1NoticeVersion?: string;
-  privacyNoticeAcknowledgedAt?: Date;
-  p1NonrefundAcknowledgedAt?: Date;
-  preP1EvidenceJson?: Record<string, unknown>;
-  fulfillmentMode: string;
-  recipientName: string;
-  recipientPhone: string;
-  recipientEmail: string;
-  deliveryAddressJson: Record<string, unknown>;
-  selectedDrafts: Array<{
-    id: string;
-    cart_id: string | null;
-    template_variant_id: string;
-    target_size: Prisma.Decimal;
-    personalization_package: string;
-    memory_enabled: boolean;
-    gemstone_config_json: Prisma.JsonValue;
-    estimated_price: Prisma.Decimal | null;
-    template_variants: {
-      ring_template_id: string;
-      materials: { name: string };
-      ring_templates: { code: string; name: string };
-    };
-  }>;
-}
-
-export type OrderWithRelations = orders & {
-  quotes_orders_current_quote_idToquotes: quotes | null;
-  ring_items: (ring_items & {
-    ring_item_versions_ring_items_current_version_idToring_item_versions: {
-      id: string;
-      version_no: number;
-      target_size: Prisma.Decimal;
-      personalization_package: string;
-      memory_enabled: boolean;
-      template_variants: {
-        id: string;
-        materials: { name: string };
-        ring_templates: { code: string; name: string };
-      };
-    } | null;
-  })[];
-};
+import type {
+  CreateOrderTransactionInput,
+  CreateOrderTransactionResult,
+  OrderingDetailRecord,
+  OrderingDraftRecord,
+  OrderingFinalConfirmationRecord,
+  OrderingInvoiceRecord,
+  OrderingListItemRecord,
+  OrderingPaymentTransactionRecord,
+  OrderingPersonalizationContextRecord,
+  OrderingQuoteRecord,
+  OrderingRepository,
+  OrderingRingItemDetailRecord,
+  OrderingRingItemVersionRecord,
+} from '../application/ordering.repository';
+import {
+  ORDER_WITH_RELATIONS_INCLUDE,
+  toGemstoneDetailRecords,
+  toOrderDetailRecord,
+  toOrderInvoiceRecord,
+  toOrderListItemRecord,
+  toPaymentTransactionRecord,
+  toQuoteRecord,
+} from './prisma-ordering.mappers';
 
 @Injectable()
-export class OrderingRepository {
+export class PrismaOrderingRepository implements OrderingRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findDraftsByIds(draftIds: string[]) {
-    return this.prisma.ring_design_drafts.findMany({
+  async findDraftsByIds(
+    draftIds: readonly string[],
+  ): Promise<OrderingDraftRecord[]> {
+    const rows = await this.prisma.ring_design_drafts.findMany({
       where: {
-        id: { in: draftIds },
+        id: { in: [...draftIds] },
         status: 'IN_CART',
       },
       include: {
@@ -78,20 +48,26 @@ export class OrderingRepository {
         },
       },
     });
+
+    return rows.map((d) => ({
+      id: d.id,
+      cartId: d.cart_id ?? undefined,
+      templateVariantId: d.template_variant_id,
+      templateCode: d.template_variants.ring_templates.code,
+      templateName: d.template_variants.ring_templates.name,
+      materialName: d.template_variants.materials.name,
+      targetSize: Number(d.target_size),
+      personalizationPackage: d.personalization_package,
+      memoryEnabled: d.memory_enabled,
+      gemstoneConfigJson: d.gemstone_config_json,
+      estimatedPrice: d.estimated_price ? Number(d.estimated_price) : 0,
+      ringTemplateId: d.template_variants.ring_template_id,
+    }));
   }
 
-  async findGemstoneSlotsByTemplateId(ringTemplateId: string) {
-    return this.prisma.gemstone_slots.findMany({
-      where: {
-        gemstone_groups: {
-          ring_template_id: ringTemplateId,
-        },
-      },
-      orderBy: { slot_index: 'asc' },
-    });
-  }
-
-  async createOrderTransaction(params: CreateOrderParams) {
+  async createOrderTransaction(
+    params: CreateOrderTransactionInput,
+  ): Promise<CreateOrderTransactionResult> {
     const timestamp = Date.now();
     const randomSuffix = Math.random()
       .toString(36)
@@ -101,16 +77,12 @@ export class OrderingRepository {
     const quoteNo = `QUO-${timestamp}-${randomSuffix}`;
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Calculate subtotal and total
       let subtotal = new Prisma.Decimal(0);
       for (const draft of params.selectedDrafts) {
-        if (draft.estimated_price) {
-          subtotal = subtotal.add(draft.estimated_price);
-        }
+        subtotal = subtotal.add(new Prisma.Decimal(draft.estimatedPrice));
       }
       const totalAmount = subtotal;
 
-      // 2. Create Order
       const order = await tx.orders.create({
         data: {
           order_no: orderNo,
@@ -135,7 +107,6 @@ export class OrderingRepository {
         },
       });
 
-      // 3. Create Provisional Quote
       const quote = await tx.quotes.create({
         data: {
           quote_no: quoteNo,
@@ -152,11 +123,9 @@ export class OrderingRepository {
         },
       });
 
-      // 4. Create Ring Items, Versions, Gemstones and Quote Items
       let itemNumber = 1;
       const createdItems: RingItemSummary[] = [];
       for (const draft of params.selectedDrafts) {
-        // Create Ring Item
         const ringItem = await tx.ring_items.create({
           data: {
             order_id: order.id,
@@ -165,8 +134,7 @@ export class OrderingRepository {
           },
         });
 
-        // Extract maintenance plan & gemstone selections from draft.gemstone_config_json
-        const draftConfig = draft.gemstone_config_json as
+        const draftConfig = draft.gemstoneConfigJson as
           | Array<{
               slotNumber?: number;
               slot_number?: number;
@@ -191,15 +159,14 @@ export class OrderingRepository {
             ? draftConfig.maintenancePlan
             : undefined;
 
-        // Create Ring Item Version V1
         const ringItemVersion = await tx.ring_item_versions.create({
           data: {
             ring_item_id: ringItem.id,
             version_no: 1,
-            template_variant_id: draft.template_variant_id,
-            target_size: draft.target_size,
-            personalization_package: draft.personalization_package,
-            memory_enabled: draft.memory_enabled,
+            template_variant_id: draft.templateVariantId,
+            target_size: new Prisma.Decimal(draft.targetSize),
+            personalization_package: draft.personalizationPackage,
+            memory_enabled: draft.memoryEnabled,
             preview_snapshot_json: maintenancePlan
               ? { maintenancePlan }
               : Prisma.JsonNull,
@@ -209,18 +176,16 @@ export class OrderingRepository {
           },
         });
 
-        // Update Ring Item current_version_id
         await tx.ring_items.update({
           where: { id: ringItem.id },
           data: { current_version_id: ringItemVersion.id },
         });
 
-        // Map gemstone selections to ring_item_version_gemstones
         if (rawSelections.length > 0) {
           const slots = await tx.gemstone_slots.findMany({
             where: {
               gemstone_groups: {
-                ring_template_id: draft.template_variants.ring_template_id,
+                ring_template_id: draft.ringTemplateId,
               },
             },
             orderBy: { slot_index: 'asc' },
@@ -244,15 +209,11 @@ export class OrderingRepository {
           }
         }
 
-        // Create Quote Item for this Ring Item
-        const totalDraftPrice = draft.estimated_price
-          ? Number(draft.estimated_price)
-          : 0;
         const maintenanceAmount =
           maintenancePlan === 'LIFETIME_POLISHING' ? 500000 : 0;
         const ringBlankAmount = Math.max(
           0,
-          totalDraftPrice - maintenanceAmount,
+          draft.estimatedPrice - maintenanceAmount,
         );
 
         await tx.quote_items.create({
@@ -260,7 +221,7 @@ export class OrderingRepository {
             quote_id: quote.id,
             ring_item_id: ringItem.id,
             component_type: 'RING_BLANK',
-            description: `${draft.template_variants.ring_templates.name} - ${draft.template_variants.materials.name}`,
+            description: `${draft.templateName} - ${draft.materialName}`,
             quantity: new Prisma.Decimal(1),
             unit_amount: new Prisma.Decimal(ringBlankAmount),
             line_amount: new Prisma.Decimal(ringBlankAmount),
@@ -289,28 +250,25 @@ export class OrderingRepository {
           sourceRingDesignDraftId: draft.id,
           currentVersionId: ringItemVersion.id,
           versionNo: 1,
-          templateVariantId: draft.template_variant_id,
-          templateCode: draft.template_variants.ring_templates.code,
-          templateName: draft.template_variants.ring_templates.name,
-          materialName: draft.template_variants.materials.name,
-          targetSize: Number(draft.target_size),
-          personalizationPackage: draft.personalization_package,
-          memoryEnabled: draft.memory_enabled,
+          templateVariantId: draft.templateVariantId,
+          templateCode: draft.templateCode,
+          templateName: draft.templateName,
+          materialName: draft.materialName,
+          targetSize: draft.targetSize,
+          personalizationPackage: draft.personalizationPackage,
+          memoryEnabled: draft.memoryEnabled,
         });
 
         itemNumber++;
       }
 
-      // 5. Update Order current_quote_id
       const updatedOrder = await tx.orders.update({
         where: { id: order.id },
         data: { current_quote_id: quote.id },
       });
 
-      // 6. Convert selected drafts: status -> CONVERTED, cart_id -> null
-      const draftIds = params.selectedDrafts.map((d) => d.id);
       await tx.ring_design_drafts.updateMany({
-        where: { id: { in: draftIds } },
+        where: { id: { in: params.selectedDrafts.map((d) => d.id) } },
         data: {
           status: 'CONVERTED',
           cart_id: null,
@@ -319,10 +277,13 @@ export class OrderingRepository {
       });
 
       return {
-        order: updatedOrder,
-        quote,
+        orderId: updatedOrder.id,
+        orderNo: updatedOrder.order_no,
+        status: updatedOrder.status,
+        sourcePlanMode: updatedOrder.source_plan_mode,
+        createdAt: updatedOrder.created_at,
         itemsCount: params.selectedDrafts.length,
-        totalAmount,
+        totalAmount: Number(totalAmount),
         items: createdItems,
       };
     });
@@ -334,7 +295,7 @@ export class OrderingRepository {
     status?: string,
     skip = 0,
     take = 20,
-  ) {
+  ): Promise<{ items: OrderingListItemRecord[]; total: number }> {
     const where: Prisma.ordersWhereInput = {
       OR: [
         { owner_customer_identity_id: actorId },
@@ -357,44 +318,26 @@ export class OrderingRepository {
       this.prisma.orders.count({ where }),
     ]);
 
-    return { items, total };
+    return { items: items.map((o) => toOrderListItemRecord(o)), total };
   }
 
   async findOrderById(
     orderId: string,
     actorId: string,
     guestEmail?: string,
-  ): Promise<OrderWithRelations | null> {
-    const where: Prisma.ordersWhereInput = {
-      id: orderId,
-      OR: [
-        { owner_customer_identity_id: actorId },
-        ...(guestEmail ? [{ guest_email: guestEmail }] : []),
-      ],
-    };
-
-    return this.prisma.orders.findFirst({
-      where,
-      include: {
-        quotes_orders_current_quote_idToquotes: true,
-        ring_items: {
-          orderBy: { item_no: 'asc' },
-          include: {
-            ring_item_versions_ring_items_current_version_idToring_item_versions:
-              {
-                include: {
-                  template_variants: {
-                    include: {
-                      materials: { select: { name: true } },
-                      ring_templates: { select: { code: true, name: true } },
-                    },
-                  },
-                },
-              },
-          },
-        },
+  ): Promise<OrderingDetailRecord | null> {
+    const row = await this.prisma.orders.findFirst({
+      where: {
+        id: orderId,
+        OR: [
+          { owner_customer_identity_id: actorId },
+          ...(guestEmail ? [{ guest_email: guestEmail }] : []),
+        ],
       },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
     });
+
+    return row ? toOrderDetailRecord(row) : null;
   }
 
   async findRingItemWithDetails(
@@ -402,7 +345,7 @@ export class OrderingRepository {
     ringItemId: string,
     actorId: string,
     guestEmail?: string,
-  ) {
+  ): Promise<OrderingRingItemDetailRecord | null> {
     const order = await this.prisma.orders.findFirst({
       where: {
         id: orderId,
@@ -412,16 +355,12 @@ export class OrderingRepository {
         ],
       },
     });
-
     if (!order) {
       return null;
     }
 
-    return this.prisma.ring_items.findFirst({
-      where: {
-        id: ringItemId,
-        order_id: orderId,
-      },
+    const item = await this.prisma.ring_items.findFirst({
+      where: { id: ringItemId, order_id: orderId },
       include: {
         ring_item_versions_ring_items_current_version_idToring_item_versions: {
           include: {
@@ -441,11 +380,42 @@ export class OrderingRepository {
         },
       },
     });
-  }
 
-  // ---------------------------------------------------------------------------
-  // Admin Operations
-  // ---------------------------------------------------------------------------
+    if (!item) {
+      return null;
+    }
+
+    const ver =
+      item.ring_item_versions_ring_items_current_version_idToring_item_versions;
+    const maintenancePlan =
+      typeof ver?.preview_snapshot_json === 'object' &&
+      ver?.preview_snapshot_json !== null &&
+      'maintenancePlan' in ver.preview_snapshot_json &&
+      typeof ver.preview_snapshot_json.maintenancePlan === 'string'
+        ? ver.preview_snapshot_json.maintenancePlan
+        : undefined;
+
+    return {
+      id: item.id,
+      orderId: item.order_id,
+      itemNo: item.item_no,
+      sourceRingDesignDraftId: item.source_ring_design_draft_id,
+      currentVersionId: item.current_version_id ?? undefined,
+      versionNo: ver?.version_no ?? 1,
+      templateVariantId: ver?.template_variants.id ?? '',
+      templateCode: ver?.template_variants.ring_templates.code ?? '',
+      templateName: ver?.template_variants.ring_templates.name ?? '',
+      materialName: ver?.template_variants.materials.name ?? '',
+      targetSize: Number(ver?.target_size ?? 0),
+      personalizationPackage: ver?.personalization_package ?? 'NONE',
+      memoryEnabled: ver?.memory_enabled ?? false,
+      maintenancePlan,
+      gemstones: toGemstoneDetailRecords(
+        ver?.ring_item_version_gemstones ?? [],
+      ),
+      createdAt: item.created_at,
+    };
+  }
 
   async listAdminOrders(params: {
     page?: number;
@@ -454,17 +424,20 @@ export class OrderingRepository {
     search?: string;
     dateFrom?: string;
     dateTo?: string;
-  }) {
+  }): Promise<{
+    items: OrderingListItemRecord[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const page = params.page && params.page > 0 ? params.page : 1;
     const limit = params.limit && params.limit > 0 ? params.limit : 20;
     const skip = (page - 1) * limit;
 
     const where: Prisma.ordersWhereInput = {};
-
     if (params.status) {
       where.status = params.status;
     }
-
     if (params.search) {
       const search = params.search.trim();
       where.OR = [
@@ -473,7 +446,6 @@ export class OrderingRepository {
         { recipient_phone: { contains: search } },
       ];
     }
-
     if (params.dateFrom || params.dateTo) {
       where.created_at = {
         ...(params.dateFrom ? { gte: new Date(params.dateFrom) } : {}),
@@ -495,67 +467,62 @@ export class OrderingRepository {
       this.prisma.orders.count({ where }),
     ]);
 
-    return { items, total, page, limit };
+    return {
+      items: items.map((o) => toOrderListItemRecord(o)),
+      total,
+      page,
+      limit,
+    };
   }
 
   async findAdminOrderById(
     orderId: string,
-  ): Promise<OrderWithRelations | null> {
-    return this.prisma.orders.findUnique({
+  ): Promise<OrderingDetailRecord | null> {
+    const row = await this.prisma.orders.findUnique({
       where: { id: orderId },
-      include: {
-        quotes_orders_current_quote_idToquotes: true,
-        ring_items: {
-          orderBy: { item_no: 'asc' },
-          include: {
-            ring_item_versions_ring_items_current_version_idToring_item_versions:
-              {
-                include: {
-                  template_variants: {
-                    include: {
-                      materials: { select: { name: true } },
-                      ring_templates: { select: { code: true, name: true } },
-                    },
-                  },
-                },
-              },
-          },
-        },
-      },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
     });
+    return row ? toOrderDetailRecord(row) : null;
   }
 
   async updateOrderStatus(params: {
     orderId: string;
     targetStatus: string;
     reason?: string;
-  }) {
+  }): Promise<{
+    id: string;
+    orderNo: string;
+    status: string;
+    updatedAt: Date;
+  }> {
     const data: Prisma.ordersUpdateInput = {
       status: params.targetStatus,
       updated_at: new Date(),
     };
-
     if (params.targetStatus === 'CANCELLED') {
       data.cancelled_at = new Date();
       data.cancellation_reason = params.reason || 'Admin cancelled';
     }
 
-    return this.prisma.orders.update({
+    const updated = await this.prisma.orders.update({
       where: { id: params.orderId },
       data,
     });
-  }
 
-  // ---------------------------------------------------------------------------
-  // Ring Item Versions & Quotes
-  // ---------------------------------------------------------------------------
+    return {
+      id: updated.id,
+      orderNo: updated.order_no,
+      status: updated.status,
+      updatedAt: updated.updated_at,
+    };
+  }
 
   async listRingItemVersions(
     orderId: string,
     ringItemId: string,
     actorId: string,
     guestEmail?: string,
-  ) {
+  ): Promise<OrderingRingItemVersionRecord[] | null> {
     const order = await this.prisma.orders.findFirst({
       where: {
         id: orderId,
@@ -565,7 +532,6 @@ export class OrderingRepository {
         ],
       },
     });
-
     if (!order) {
       return null;
     }
@@ -573,12 +539,11 @@ export class OrderingRepository {
     const ringItem = await this.prisma.ring_items.findFirst({
       where: { id: ringItemId, order_id: orderId },
     });
-
     if (!ringItem) {
       return null;
     }
 
-    return this.prisma.ring_item_versions.findMany({
+    const versions = await this.prisma.ring_item_versions.findMany({
       where: { ring_item_id: ringItemId },
       orderBy: { version_no: 'asc' },
       include: {
@@ -596,6 +561,22 @@ export class OrderingRepository {
         },
       },
     });
+
+    return versions.map((ver) => ({
+      id: ver.id,
+      versionNo: ver.version_no,
+      status: ver.status,
+      targetSize: Number(ver.target_size),
+      personalizationPackage: ver.personalization_package,
+      memoryEnabled: ver.memory_enabled,
+      changeReason: ver.change_reason ?? undefined,
+      templateVariantId: ver.template_variants.id,
+      templateCode: ver.template_variants.ring_templates.code,
+      templateName: ver.template_variants.ring_templates.name,
+      materialName: ver.template_variants.materials.name,
+      gemstones: toGemstoneDetailRecords(ver.ring_item_version_gemstones),
+      createdAt: ver.created_at,
+    }));
   }
 
   async findCurrentRingItemVersion(
@@ -603,7 +584,7 @@ export class OrderingRepository {
     ringItemId: string,
     actorId: string,
     guestEmail?: string,
-  ) {
+  ): Promise<{ id: string; status: string } | null> {
     const order = await this.prisma.orders.findFirst({
       where: {
         id: orderId,
@@ -613,7 +594,6 @@ export class OrderingRepository {
         ],
       },
     });
-
     if (!order) {
       return null;
     }
@@ -622,20 +602,7 @@ export class OrderingRepository {
       where: { id: ringItemId, order_id: orderId },
       include: {
         ring_item_versions_ring_items_current_version_idToring_item_versions: {
-          include: {
-            template_variants: {
-              include: {
-                materials: { select: { name: true } },
-                ring_templates: { select: { code: true, name: true } },
-              },
-            },
-            ring_item_version_gemstones: {
-              include: {
-                gemstone_slots: true,
-                gemstone_options: true,
-              },
-            },
-          },
+          select: { id: true, status: true },
         },
       },
     });
@@ -654,26 +621,46 @@ export class OrderingRepository {
       changeReason?: string;
       memoryEnabled?: boolean;
     },
-  ) {
-    const updateData: Prisma.ring_item_versionsUpdateInput = {};
+  ): Promise<{
+    id: string;
+    versionNo: number;
+    status: string;
+    targetSize: number;
+    changeReason?: string;
+    createdAt: Date;
+  }> {
+    const updateData: Prisma.ring_item_versionsUpdateInput = {
+      ...(data.targetSize !== undefined
+        ? { target_size: new Prisma.Decimal(data.targetSize) }
+        : {}),
+      ...(data.changeReason !== undefined
+        ? { change_reason: data.changeReason }
+        : {}),
+      ...(data.memoryEnabled !== undefined
+        ? { memory_enabled: data.memoryEnabled }
+        : {}),
+    };
 
-    if (data.targetSize !== undefined) {
-      updateData.target_size = new Prisma.Decimal(data.targetSize);
-    }
-    if (data.changeReason !== undefined) {
-      updateData.change_reason = data.changeReason;
-    }
-    if (data.memoryEnabled !== undefined) {
-      updateData.memory_enabled = data.memoryEnabled;
-    }
-
-    return this.prisma.ring_item_versions.update({
+    const updated = await this.prisma.ring_item_versions.update({
       where: { id: versionId },
       data: updateData,
     });
+
+    return {
+      id: updated.id,
+      versionNo: updated.version_no,
+      status: updated.status,
+      targetSize: Number(updated.target_size),
+      changeReason: updated.change_reason ?? undefined,
+      createdAt: updated.created_at,
+    };
   }
 
-  async listOrderQuotes(orderId: string, actorId: string, guestEmail?: string) {
+  async listOrderQuotes(
+    orderId: string,
+    actorId: string,
+    guestEmail?: string,
+  ): Promise<OrderingQuoteRecord[] | null> {
     const order = await this.prisma.orders.findFirst({
       where: {
         id: orderId,
@@ -683,28 +670,26 @@ export class OrderingRepository {
         ],
       },
     });
-
     if (!order) {
       return null;
     }
 
-    return this.prisma.quotes.findMany({
+    const quotes = await this.prisma.quotes.findMany({
       where: { order_id: orderId },
       orderBy: { version_no: 'desc' },
-      include: {
-        quote_items: {
-          orderBy: { created_at: 'asc' },
-        },
-      },
+      include: { quote_items: { orderBy: { created_at: 'asc' } } },
     });
+
+    return quotes.map((q) => toQuoteRecord(q));
   }
 
-  async findOrderPersonalizationContext(orderId: string) {
-    return this.prisma.orders.findUnique({
+  async findOrderPersonalizationContext(
+    orderId: string,
+  ): Promise<OrderingPersonalizationContextRecord | null> {
+    const order = await this.prisma.orders.findUnique({
       where: { id: orderId },
       select: {
         id: true,
-        order_no: true,
         owner_customer_identity_id: true,
         status: true,
         source_plan_mode: true,
@@ -725,7 +710,6 @@ export class OrderingRepository {
               {
                 select: {
                   id: true,
-                  version_no: true,
                   personalization_package: true,
                   status: true,
                 },
@@ -734,13 +718,41 @@ export class OrderingRepository {
         },
       },
     });
+
+    if (!order) {
+      return null;
+    }
+
+    return {
+      id: order.id,
+      ownerCustomerIdentityId: order.owner_customer_identity_id,
+      status: order.status,
+      sourcePlanMode: order.source_plan_mode,
+      p1Paid: order.payment_transactions.length > 0,
+      ringItems: order.ring_items.map((item) => {
+        const ver =
+          item.ring_item_versions_ring_items_current_version_idToring_item_versions;
+        return {
+          ringItemId: item.id,
+          itemNo: item.item_no,
+          currentVersionId: item.current_version_id || ver?.id || '',
+          personalizationPackage: ver?.personalization_package || 'NONE',
+          versionStatus: ver?.status || 'DRAFT',
+        };
+      }),
+    };
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-005] Cancel Order & Release Allocations
-  // ---------------------------------------------------------------------------
-  async cancelOrder(orderId: string, reason?: string) {
-    return this.prisma.$transaction(async (tx) => {
+  async cancelOrder(
+    orderId: string,
+    reason?: string,
+  ): Promise<{
+    id: string;
+    status: string;
+    cancelledAt?: Date;
+    cancellationReason?: string;
+  }> {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const ringItems = await tx.ring_items.findMany({
         where: { order_id: orderId },
         select: { id: true },
@@ -766,11 +778,15 @@ export class OrderingRepository {
         },
       });
     });
+
+    return {
+      id: updated.id,
+      status: updated.status,
+      cancelledAt: updated.cancelled_at ?? undefined,
+      cancellationReason: updated.cancellation_reason ?? undefined,
+    };
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-011] Create Final Quote
-  // ---------------------------------------------------------------------------
   async createFinalQuote(params: {
     orderId: string;
     subtotalAmount?: number;
@@ -780,7 +796,7 @@ export class OrderingRepository {
     currency?: string;
     validUntil?: string;
     staffUserId?: string;
-    items: Array<{
+    items: readonly {
       ringItemId?: string;
       componentType: string;
       description?: string;
@@ -788,9 +804,9 @@ export class OrderingRepository {
       unitAmount: number;
       lineAmount: number;
       priceSourceType?: string;
-    }>;
-  }) {
-    return this.prisma.$transaction(async (tx) => {
+    }[];
+  }): Promise<OrderingQuoteRecord | null> {
+    const created = await this.prisma.$transaction(async (tx) => {
       const order = await tx.orders.findUnique({
         where: { id: params.orderId },
         select: { id: true, order_no: true },
@@ -834,32 +850,24 @@ export class OrderingRepository {
             })),
           },
         },
-        include: {
-          quote_items: {
-            orderBy: { created_at: 'asc' },
-          },
-        },
+        include: { quote_items: { orderBy: { created_at: 'asc' } } },
       });
     });
+
+    return created ? toQuoteRecord(created) : null;
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-013 Part B] Find Quote By ID
-  // ---------------------------------------------------------------------------
-  async findQuoteById(orderId: string, quoteId: string) {
-    return this.prisma.quotes.findFirst({
+  async findQuoteById(
+    orderId: string,
+    quoteId: string,
+  ): Promise<OrderingQuoteRecord | null> {
+    const row = await this.prisma.quotes.findFirst({
       where: { id: quoteId, order_id: orderId },
-      include: {
-        quote_items: {
-          orderBy: { created_at: 'asc' },
-        },
-      },
+      include: { quote_items: { orderBy: { created_at: 'asc' } } },
     });
+    return row ? toQuoteRecord(row) : null;
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-012] Update Final Quote (DRAFT only)
-  // ---------------------------------------------------------------------------
   async updateFinalQuote(params: {
     orderId: string;
     quoteId: string;
@@ -869,7 +877,7 @@ export class OrderingRepository {
     totalAmount?: number;
     validUntil?: string;
     staffUserId?: string;
-    items?: Array<{
+    items?: readonly {
       id?: string;
       ringItemId?: string;
       componentType: string;
@@ -878,27 +886,26 @@ export class OrderingRepository {
       unitAmount: number;
       lineAmount: number;
       priceSourceType?: string;
-    }>;
-  }) {
-    return this.prisma.$transaction(async (tx) => {
-      const updateData: Prisma.quotesUpdateInput = {};
-      if (params.subtotalAmount !== undefined) {
-        updateData.subtotal_amount = new Prisma.Decimal(params.subtotalAmount);
-      }
-      if (params.deliveryAmount !== undefined) {
-        updateData.delivery_amount = new Prisma.Decimal(params.deliveryAmount);
-      }
-      if (params.adjustmentAmount !== undefined) {
-        updateData.adjustment_amount = new Prisma.Decimal(
-          params.adjustmentAmount,
-        );
-      }
-      if (params.totalAmount !== undefined) {
-        updateData.total_amount = new Prisma.Decimal(params.totalAmount);
-      }
-      if (params.validUntil !== undefined) {
-        updateData.valid_until = new Date(params.validUntil);
-      }
+    }[];
+  }): Promise<OrderingQuoteRecord> {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updateData: Prisma.quotesUpdateInput = {
+        ...(params.subtotalAmount !== undefined
+          ? { subtotal_amount: new Prisma.Decimal(params.subtotalAmount) }
+          : {}),
+        ...(params.deliveryAmount !== undefined
+          ? { delivery_amount: new Prisma.Decimal(params.deliveryAmount) }
+          : {}),
+        ...(params.adjustmentAmount !== undefined
+          ? { adjustment_amount: new Prisma.Decimal(params.adjustmentAmount) }
+          : {}),
+        ...(params.totalAmount !== undefined
+          ? { total_amount: new Prisma.Decimal(params.totalAmount) }
+          : {}),
+        ...(params.validUntil !== undefined
+          ? { valid_until: new Date(params.validUntil) }
+          : {}),
+      };
 
       if (params.items && params.items.length > 0) {
         await tx.quote_items.deleteMany({
@@ -921,23 +928,19 @@ export class OrderingRepository {
       return tx.quotes.update({
         where: { id: params.quoteId },
         data: updateData,
-        include: {
-          quote_items: {
-            orderBy: { created_at: 'asc' },
-          },
-        },
+        include: { quote_items: { orderBy: { created_at: 'asc' } } },
       });
     });
+
+    return toQuoteRecord(updated);
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-013 Part A] Publish Final Quote
-  // ---------------------------------------------------------------------------
-  async publishFinalQuote(orderId: string, quoteId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.quotes.findUnique({
-        where: { id: quoteId },
-      });
+  async publishFinalQuote(
+    orderId: string,
+    quoteId: string,
+  ): Promise<OrderingQuoteRecord> {
+    const published = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.quotes.findUnique({ where: { id: quoteId } });
       const validUntil =
         existing?.valid_until ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -948,11 +951,7 @@ export class OrderingRepository {
           issued_at: new Date(),
           valid_until: validUntil,
         },
-        include: {
-          quote_items: {
-            orderBy: { created_at: 'asc' },
-          },
-        },
+        include: { quote_items: { orderBy: { created_at: 'asc' } } },
       });
 
       await tx.orders.update({
@@ -965,168 +964,196 @@ export class OrderingRepository {
 
       return quote;
     });
+
+    return toQuoteRecord(published);
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-014] Customer Confirm Final Quote
-  // ---------------------------------------------------------------------------
   async confirmFinalQuote(
     orderId: string,
     quoteId: string,
     customerIdentityId: string,
     nextOrderStatus: string,
-  ) {
-    return this.prisma.$transaction(async (tx) => {
-      // 1. Invalidate any existing active confirmations for this order
-      await tx.final_confirmations.updateMany({
-        where: { order_id: orderId, status: 'ACTIVE' },
-        data: {
-          status: 'INVALIDATED',
-          invalidated_at: new Date(),
-          invalidation_reason: 'Superseded by new confirmation',
-        },
-      });
-
-      // 2. Query all ring items for current versions
-      const ringItems = await tx.ring_items.findMany({
-        where: { order_id: orderId },
-        select: {
-          id: true,
-          current_version_id: true,
-          ring_item_versions_ring_items_current_version_idToring_item_versions:
-            {
-              select: { version_no: true },
-            },
-        },
-      });
-
-      // 3. Create final confirmation record
-      const confirmation = await tx.final_confirmations.create({
-        data: {
-          order_id: orderId,
-          quote_id: quoteId,
-          confirmed_by_customer_identity_id: customerIdentityId,
-          status: 'ACTIVE',
-          confirmed_at: new Date(),
-          final_confirmation_items: {
-            create: ringItems
-              .filter((r) => r.current_version_id)
-              .map((r) => ({
-                ring_item_id: r.id,
-                ring_item_version_id: r.current_version_id!,
-              })),
+  ): Promise<OrderingFinalConfirmationRecord> {
+    const { confirmation, ringItems } = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.final_confirmations.updateMany({
+          where: { order_id: orderId, status: 'ACTIVE' },
+          data: {
+            status: 'INVALIDATED',
+            invalidated_at: new Date(),
+            invalidation_reason: 'Superseded by new confirmation',
           },
-        },
-        include: {
-          final_confirmation_items: true,
-        },
-      });
+        });
 
-      // 4. Update quote
-      await tx.quotes.update({
-        where: { id: quoteId },
-        data: {
-          status: 'ACCEPTED',
-          accepted_by_customer_identity_id: customerIdentityId,
-          accepted_at: new Date(),
-        },
-      });
+        const items = await tx.ring_items.findMany({
+          where: { order_id: orderId },
+          select: {
+            id: true,
+            current_version_id: true,
+            ring_item_versions_ring_items_current_version_idToring_item_versions:
+              { select: { version_no: true } },
+          },
+        });
 
-      // 5. Advance order status
-      await tx.orders.update({
-        where: { id: orderId },
-        data: { status: nextOrderStatus },
-      });
+        const created = await tx.final_confirmations.create({
+          data: {
+            order_id: orderId,
+            quote_id: quoteId,
+            confirmed_by_customer_identity_id: customerIdentityId,
+            status: 'ACTIVE',
+            confirmed_at: new Date(),
+            final_confirmation_items: {
+              create: items
+                .filter((r) => r.current_version_id)
+                .map((r) => ({
+                  ring_item_id: r.id,
+                  ring_item_version_id: r.current_version_id!,
+                })),
+            },
+          },
+          include: { final_confirmation_items: true },
+        });
 
-      return { confirmation, ringItems };
-    });
+        await tx.quotes.update({
+          where: { id: quoteId },
+          data: {
+            status: 'ACCEPTED',
+            accepted_by_customer_identity_id: customerIdentityId,
+            accepted_at: new Date(),
+          },
+        });
+
+        await tx.orders.update({
+          where: { id: orderId },
+          data: { status: nextOrderStatus },
+        });
+
+        return { confirmation: created, ringItems: items };
+      },
+    );
+
+    return {
+      id: confirmation.id,
+      orderId: confirmation.order_id,
+      quoteId: confirmation.quote_id,
+      quoteNo: '',
+      quoteTotalAmount: 0,
+      confirmedByCustomerIdentityId:
+        confirmation.confirmed_by_customer_identity_id,
+      status: confirmation.status,
+      confirmedAt: confirmation.confirmed_at,
+      items: confirmation.final_confirmation_items.map((i) => {
+        const item = ringItems.find((r) => r.id === i.ring_item_id);
+        const ver =
+          item?.ring_item_versions_ring_items_current_version_idToring_item_versions;
+        return {
+          id: i.id,
+          ringItemId: i.ring_item_id,
+          ringItemVersionId: i.ring_item_version_id,
+          versionNo: ver?.version_no ?? 1,
+        };
+      }),
+    };
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-015 Part B] Customer Reject Final Quote
-  // ---------------------------------------------------------------------------
-  async rejectFinalQuote(orderId: string, quoteId: string, _reason?: string) {
-    return this.prisma.$transaction(async (tx) => {
+  async rejectFinalQuote(
+    orderId: string,
+    quoteId: string,
+    _reason?: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
       await tx.quotes.update({
         where: { id: quoteId },
         data: { status: 'REJECTED' },
       });
 
-      return tx.orders.update({
+      await tx.orders.update({
         where: { id: orderId },
         data: { status: 'PENDING_FINAL_QUOTE' },
       });
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-015 Part A] List Final Confirmations
-  // ---------------------------------------------------------------------------
-  async findFinalConfirmations(orderId: string) {
-    return this.prisma.final_confirmations.findMany({
+  async findFinalConfirmations(
+    orderId: string,
+  ): Promise<OrderingFinalConfirmationRecord[]> {
+    const rows = await this.prisma.final_confirmations.findMany({
       where: { order_id: orderId },
       orderBy: { confirmed_at: 'desc' },
       include: {
         quotes: true,
         final_confirmation_items: {
-          include: {
-            ring_item_versions: true,
-          },
+          include: { ring_item_versions: true },
         },
       },
     });
+
+    return rows.map((c) => ({
+      id: c.id,
+      orderId: c.order_id,
+      quoteId: c.quote_id,
+      quoteNo: c.quotes?.quote_no ?? '',
+      quoteTotalAmount: c.quotes ? Number(c.quotes.total_amount) : 0,
+      confirmedByCustomerIdentityId: c.confirmed_by_customer_identity_id,
+      status: c.status,
+      confirmedAt: c.confirmed_at,
+      invalidatedAt: c.invalidated_at ?? undefined,
+      invalidationReason: c.invalidation_reason ?? undefined,
+      items: c.final_confirmation_items.map((i) => ({
+        id: i.id,
+        ringItemId: i.ring_item_id,
+        ringItemVersionId: i.ring_item_version_id,
+        versionNo: i.ring_item_versions?.version_no ?? 1,
+      })),
+    }));
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-017] List Order Payments
-  // ---------------------------------------------------------------------------
-  async findOrderPayments(orderId: string) {
-    return this.prisma.payment_transactions.findMany({
+  async findOrderPayments(
+    orderId: string,
+  ): Promise<OrderingPaymentTransactionRecord[]> {
+    const rows = await this.prisma.payment_transactions.findMany({
       where: { order_id: orderId },
       orderBy: { requested_at: 'desc' },
     });
+    return rows.map((p) => toPaymentTransactionRecord(p));
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-018] Get Payment Transaction by ID
-  // ---------------------------------------------------------------------------
-  async findOrderPaymentById(orderId: string, transactionId: string) {
-    return this.prisma.payment_transactions.findFirst({
+  async findOrderPaymentById(
+    orderId: string,
+    transactionId: string,
+  ): Promise<OrderingPaymentTransactionRecord | null> {
+    const row = await this.prisma.payment_transactions.findFirst({
       where: { id: transactionId, order_id: orderId },
     });
+    return row ? toPaymentTransactionRecord(row) : null;
   }
 
-  async findPaymentTransactionById(transactionId: string) {
-    return this.prisma.payment_transactions.findUnique({
+  async findPaymentTransactionById(
+    transactionId: string,
+  ): Promise<OrderingPaymentTransactionRecord | null> {
+    const row = await this.prisma.payment_transactions.findUnique({
       where: { id: transactionId },
-      include: {
-        orders: true,
-        quotes: true,
-      },
+      include: { orders: true, quotes: true },
     });
+    return row ? toPaymentTransactionRecord(row) : null;
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-021] Get Payment Receipt
-  // ---------------------------------------------------------------------------
-  async findPaymentReceipt(orderId: string, transactionId: string) {
+  async findPaymentReceipt(
+    orderId: string,
+    transactionId: string,
+  ): Promise<OrderingPaymentTransactionRecord | null> {
     const tx = await this.prisma.payment_transactions.findFirst({
       where: { id: transactionId, order_id: orderId },
       include: {
         orders: {
-          select: {
-            order_no: true,
-            recipient_name: true,
-          },
+          select: { order_no: true, recipient_name: true },
         },
       },
     });
-
     if (!tx) {
       return null;
     }
 
-    // Auto-generate immutable receipt_no if not assigned yet
     if (!tx.receipt_no && tx.status === 'SUCCEEDED') {
       const orderNo = tx.orders?.order_no || 'ORD';
       const randomSuffix = Math.random()
@@ -1151,22 +1178,17 @@ export class OrderingRepository {
       tx.receipt_asset_key = receiptAssetKey;
     }
 
-    return tx;
+    return toPaymentTransactionRecord(tx);
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-022] Get Order Invoice
-  // ---------------------------------------------------------------------------
-  async findOrderInvoice(orderId: string) {
+  async findOrderInvoice(
+    orderId: string,
+  ): Promise<OrderingInvoiceRecord | null> {
     const order = await this.prisma.orders.findUnique({
       where: { id: orderId },
       include: {
         quotes_orders_current_quote_idToquotes: {
-          include: {
-            quote_items: {
-              orderBy: { created_at: 'asc' },
-            },
-          },
+          include: { quote_items: { orderBy: { created_at: 'asc' } } },
         },
         payment_transactions: {
           where: { status: 'SUCCEEDED' },
@@ -1174,46 +1196,37 @@ export class OrderingRepository {
         },
       },
     });
-
     if (!order) {
       return null;
     }
 
-    // Auto-generate invoice_no if not assigned yet
     if (!order.invoice_no) {
       const invoiceNo = `INV-${order.order_no}`;
       const now = new Date();
 
       await this.prisma.orders.update({
         where: { id: order.id },
-        data: {
-          invoice_no: invoiceNo,
-          invoice_issued_at: now,
-        },
+        data: { invoice_no: invoiceNo, invoice_issued_at: now },
       });
 
       order.invoice_no = invoiceNo;
       order.invoice_issued_at = now;
     }
 
-    return order;
+    return toOrderInvoiceRecord(order);
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-023] Create Refund Request
-  // ---------------------------------------------------------------------------
   async createRefundRequest(params: {
     transactionId: string;
     refundAmount: number;
     reason: string;
     notes?: string;
     staffUserId?: string;
-  }) {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<OrderingPaymentTransactionRecord | null> {
+    const refund = await this.prisma.$transaction(async (tx) => {
       const original = await tx.payment_transactions.findUnique({
         where: { id: params.transactionId },
       });
-
       if (!original) {
         return null;
       }
@@ -1239,60 +1252,46 @@ export class OrderingRepository {
         },
       });
     });
+
+    return refund ? toPaymentTransactionRecord(refund) : null;
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-024] Find Claim Quotes (quote_type = 'SERVICE')
-  // ---------------------------------------------------------------------------
-  async findClaimQuotes(claimId: string) {
-    return this.prisma.quotes.findMany({
-      where: {
-        claim_id: claimId,
-        quote_type: 'SERVICE',
-      },
-      include: {
-        quote_items: {
-          orderBy: { created_at: 'asc' },
-        },
-      },
+  async findClaimQuotes(claimId: string): Promise<OrderingQuoteRecord[]> {
+    const rows = await this.prisma.quotes.findMany({
+      where: { claim_id: claimId, quote_type: 'SERVICE' },
+      include: { quote_items: { orderBy: { created_at: 'asc' } } },
       orderBy: { created_at: 'desc' },
     });
+    return rows.map((q) => toQuoteRecord(q));
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-025] Accept Service Quote
-  // ---------------------------------------------------------------------------
-  async findClaimQuoteById(claimId: string, quoteId: string) {
-    return this.prisma.quotes.findFirst({
-      where: {
-        id: quoteId,
-        claim_id: claimId,
-      },
-      include: {
-        quote_items: {
-          orderBy: { created_at: 'asc' },
-        },
-      },
+  async findClaimQuoteById(
+    claimId: string,
+    quoteId: string,
+  ): Promise<OrderingQuoteRecord | null> {
+    const row = await this.prisma.quotes.findFirst({
+      where: { id: quoteId, claim_id: claimId },
+      include: { quote_items: { orderBy: { created_at: 'asc' } } },
     });
+    return row ? toQuoteRecord(row) : null;
   }
 
   async acceptClaimQuote(params: {
     quoteId: string;
     customerIdentityId: string;
-  }) {
-    return this.prisma.quotes.update({
+  }): Promise<OrderingQuoteRecord> {
+    const updated = await this.prisma.quotes.update({
       where: { id: params.quoteId },
       data: {
         status: 'ACCEPTED',
         accepted_by_customer_identity_id: params.customerIdentityId,
         accepted_at: new Date(),
       },
+      include: { quote_items: { orderBy: { created_at: 'asc' } } },
     });
+    return toQuoteRecord(updated);
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-016 & ORDER-026] Create Payment Transaction for PayOS
-  // ---------------------------------------------------------------------------
   async createPaymentTransaction(params: {
     orderId?: string;
     claimId?: string;
@@ -1302,9 +1301,9 @@ export class OrderingRepository {
     amount: number;
     currency?: string;
     expiresAt?: Date;
-    metadata?: Prisma.InputJsonValue;
-  }) {
-    return this.prisma.payment_transactions.create({
+    metadata?: Record<string, unknown>;
+  }): Promise<OrderingPaymentTransactionRecord> {
+    const created = await this.prisma.payment_transactions.create({
       data: {
         order_id: params.orderId ?? null,
         claim_id: params.claimId ?? null,
@@ -1318,22 +1317,20 @@ export class OrderingRepository {
         currency: params.currency ?? 'VND',
         status: 'PENDING',
         expires_at: params.expiresAt ?? null,
-        metadata_json: params.metadata ?? {},
+        metadata_json: (params.metadata as Prisma.InputJsonValue) ?? {},
       },
     });
+    return toPaymentTransactionRecord(created);
   }
 
-  // ---------------------------------------------------------------------------
-  // [ORDER-019 & ORDER-020] Find and Complete Transaction by Provider Order Code
-  // ---------------------------------------------------------------------------
-  async findTransactionByOrderCode(orderCode: bigint) {
-    return this.prisma.payment_transactions.findFirst({
+  async findTransactionByOrderCode(
+    orderCode: bigint,
+  ): Promise<OrderingPaymentTransactionRecord | null> {
+    const row = await this.prisma.payment_transactions.findFirst({
       where: { provider_order_code: orderCode },
-      include: {
-        orders: true,
-        quotes: true,
-      },
+      include: { orders: true, quotes: true },
     });
+    return row ? toPaymentTransactionRecord(row) : null;
   }
 
   async markPaymentTransactionSucceeded(params: {
@@ -1342,8 +1339,8 @@ export class OrderingRepository {
     providerReference?: string;
     completedAt?: Date;
     nextOrderStatus?: string;
-  }) {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<OrderingPaymentTransactionRecord> {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updatedTx = await tx.payment_transactions.update({
         where: { id: params.transactionId },
         data: {
@@ -1352,10 +1349,7 @@ export class OrderingRepository {
           provider_transaction_id: params.providerTransactionId ?? null,
           provider_reference: params.providerReference ?? null,
         },
-        include: {
-          orders: true,
-          quotes: true,
-        },
+        include: { orders: true, quotes: true },
       });
 
       if (updatedTx.order_id && params.nextOrderStatus) {
@@ -1367,5 +1361,7 @@ export class OrderingRepository {
 
       return updatedTx;
     });
+
+    return toPaymentTransactionRecord(updated);
   }
 }
