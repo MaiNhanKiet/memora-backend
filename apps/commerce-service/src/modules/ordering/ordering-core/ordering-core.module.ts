@@ -1,10 +1,53 @@
 import { Module } from '@nestjs/common';
+import {
+  AcceptServiceQuoteUseCase,
+  ListClaimQuotesUseCase,
+} from './application/claim-quote.use-cases';
 import { CreateOrderUseCase } from './application/create-order.use-case';
-import { OrderLifecycleUseCases } from './application/order-lifecycle.use-cases';
-import { OrderQueryUseCases } from './application/order-query.use-cases';
+import {
+  ConfirmFinalQuoteUseCase,
+  CreateFinalQuoteUseCase,
+  PublishFinalQuoteUseCase,
+  RejectFinalQuoteUseCase,
+  UpdateFinalQuoteUseCase,
+} from './application/final-quote.use-cases';
+import {
+  CancelOrderUseCase,
+  UpdateOrderStatusUseCase,
+} from './application/order-lifecycle.use-cases';
+import {
+  GetAdminOrderDetailsUseCase,
+  GetOrderByIdUseCase,
+  GetOrderPersonalizationContextUseCase,
+  GetOrderTimelineUseCase,
+  ListAdminOrdersUseCase,
+  ListOrdersUseCase,
+} from './application/order-query.use-cases';
+import {
+  GetOrderFinalConfirmationsUseCase,
+  GetOrderQuoteByIdUseCase,
+  ListOrderQuotesUseCase,
+} from './application/order-quote-query.use-cases';
 import { ORDERING_REPOSITORY } from './application/ordering.repository';
-import { PaymentUseCases } from './application/payment.use-cases';
-import { QuoteUseCases } from './application/quote.use-cases';
+import {
+  CreateRefundRequestUseCase,
+  GetOrderInvoiceUseCase,
+  GetOrderPaymentByIdUseCase,
+  GetPaymentReceiptUseCase,
+  ListOrderPaymentsUseCase,
+} from './application/payment-query-and-refund.use-cases';
+import {
+  CreateClaimPaymentLinkUseCase,
+  CreateOrderPaymentLinkUseCase,
+  ProcessPayosWebhookUseCase,
+  ReconcilePaymentTransactionUseCase,
+} from './application/payos-payment.use-cases';
+import { PAYOS_GATEWAY } from './application/payos.gateway';
+import {
+  GetRingItemDetailsUseCase,
+  ListRingItemVersionsUseCase,
+  UpdateCurrentRingItemVersionUseCase,
+} from './application/ring-item.use-cases';
 import { PayosProvider } from './infrastructure/payment/payos.provider';
 import { PrismaOrderingRepository } from './infrastructure/prisma-ordering.repository';
 import { OrderingGrpcController } from './presentation/ordering.grpc.controller';
@@ -13,13 +56,40 @@ import { OrderingGrpcController } from './presentation/ordering.grpc.controller'
   controllers: [OrderingGrpcController],
   providers: [
     CreateOrderUseCase,
-    OrderQueryUseCases,
-    OrderLifecycleUseCases,
-    QuoteUseCases,
-    PaymentUseCases,
+    ListOrdersUseCase,
+    GetOrderByIdUseCase,
+    GetOrderTimelineUseCase,
+    ListAdminOrdersUseCase,
+    GetAdminOrderDetailsUseCase,
+    GetOrderPersonalizationContextUseCase,
+    GetRingItemDetailsUseCase,
+    ListRingItemVersionsUseCase,
+    UpdateCurrentRingItemVersionUseCase,
+    UpdateOrderStatusUseCase,
+    CancelOrderUseCase,
+    ListOrderQuotesUseCase,
+    GetOrderQuoteByIdUseCase,
+    GetOrderFinalConfirmationsUseCase,
+    CreateFinalQuoteUseCase,
+    UpdateFinalQuoteUseCase,
+    PublishFinalQuoteUseCase,
+    ConfirmFinalQuoteUseCase,
+    RejectFinalQuoteUseCase,
+    ListClaimQuotesUseCase,
+    AcceptServiceQuoteUseCase,
+    ListOrderPaymentsUseCase,
+    GetOrderPaymentByIdUseCase,
+    GetPaymentReceiptUseCase,
+    GetOrderInvoiceUseCase,
+    CreateRefundRequestUseCase,
+    CreateOrderPaymentLinkUseCase,
+    ProcessPayosWebhookUseCase,
+    ReconcilePaymentTransactionUseCase,
+    CreateClaimPaymentLinkUseCase,
     PayosProvider,
+    { provide: PAYOS_GATEWAY, useExisting: PayosProvider },
     { provide: ORDERING_REPOSITORY, useClass: PrismaOrderingRepository },
   ],
-  exports: [ORDERING_REPOSITORY, PayosProvider],
+  exports: [ORDERING_REPOSITORY, PAYOS_GATEWAY, PayosProvider],
 })
 export class OrderingCoreModule {}

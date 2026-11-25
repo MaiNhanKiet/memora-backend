@@ -4,14 +4,26 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { PayosProvider } from '../infrastructure/payment/payos.provider';
+import { AcceptServiceQuoteUseCase } from './claim-quote.use-cases';
+import { ConfirmFinalQuoteUseCase } from './final-quote.use-cases';
 import { ORDERING_REPOSITORY } from './ordering.repository';
-import { PaymentUseCases } from './payment.use-cases';
-import { QuoteUseCases } from './quote.use-cases';
+import {
+  CreateRefundRequestUseCase,
+  GetOrderInvoiceUseCase,
+} from './payment-query-and-refund.use-cases';
+import {
+  CreateOrderPaymentLinkUseCase,
+  ProcessPayosWebhookUseCase,
+} from './payos-payment.use-cases';
+import { PAYOS_GATEWAY } from './payos.gateway';
 
-describe('QuoteUseCases & PaymentUseCases', () => {
-  let quoteUseCases: QuoteUseCases;
-  let paymentUseCases: PaymentUseCases;
+describe('Quote & Payment UseCases', () => {
+  let confirmFinalQuoteUseCase: ConfirmFinalQuoteUseCase;
+  let acceptServiceQuoteUseCase: AcceptServiceQuoteUseCase;
+  let createOrderPaymentLinkUseCase: CreateOrderPaymentLinkUseCase;
+  let processPayosWebhookUseCase: ProcessPayosWebhookUseCase;
+  let getOrderInvoiceUseCase: GetOrderInvoiceUseCase;
+  let createRefundRequestUseCase: CreateRefundRequestUseCase;
 
   const mockRepository = {
     findOrderById: jest.fn(),
@@ -38,7 +50,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
     markPaymentTransactionSucceeded: jest.fn(),
   };
 
-  const mockPayosProvider = {
+  const mockPayosGateway = {
     generateOrderCode: jest.fn().mockReturnValue(123456),
     createPaymentLink: jest.fn(),
     verifyWebhookSignature: jest.fn(),
@@ -50,19 +62,39 @@ describe('QuoteUseCases & PaymentUseCases', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        QuoteUseCases,
-        PaymentUseCases,
+        ConfirmFinalQuoteUseCase,
+        AcceptServiceQuoteUseCase,
+        CreateOrderPaymentLinkUseCase,
+        ProcessPayosWebhookUseCase,
+        GetOrderInvoiceUseCase,
+        CreateRefundRequestUseCase,
         { provide: ORDERING_REPOSITORY, useValue: mockRepository },
-        { provide: PayosProvider, useValue: mockPayosProvider },
+        { provide: PAYOS_GATEWAY, useValue: mockPayosGateway },
       ],
     }).compile();
 
-    quoteUseCases = module.get<QuoteUseCases>(QuoteUseCases);
-    paymentUseCases = module.get<PaymentUseCases>(PaymentUseCases);
+    confirmFinalQuoteUseCase = module.get<ConfirmFinalQuoteUseCase>(
+      ConfirmFinalQuoteUseCase,
+    );
+    acceptServiceQuoteUseCase = module.get<AcceptServiceQuoteUseCase>(
+      AcceptServiceQuoteUseCase,
+    );
+    createOrderPaymentLinkUseCase = module.get<CreateOrderPaymentLinkUseCase>(
+      CreateOrderPaymentLinkUseCase,
+    );
+    processPayosWebhookUseCase = module.get<ProcessPayosWebhookUseCase>(
+      ProcessPayosWebhookUseCase,
+    );
+    getOrderInvoiceUseCase = module.get<GetOrderInvoiceUseCase>(
+      GetOrderInvoiceUseCase,
+    );
+    createRefundRequestUseCase = module.get<CreateRefundRequestUseCase>(
+      CreateRefundRequestUseCase,
+    );
     jest.clearAllMocks();
   });
 
-  describe('QuoteUseCases', () => {
+  describe('Quote UseCases', () => {
     it('should confirm final quote and advance order to AWAITING_P2', async () => {
       mockRepository.findOrderById.mockResolvedValue({
         id: 'order-1',
@@ -86,7 +118,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
         items: [],
       });
 
-      const res = await quoteUseCases.confirmFinalQuote({
+      const res = await confirmFinalQuoteUseCase.execute({
         actor: { userId: validUserId },
         orderId: 'order-1',
       });
@@ -108,7 +140,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
         acceptedAt: new Date('2026-11-25T10:00:00Z'),
       });
 
-      const res = await quoteUseCases.acceptServiceQuote({
+      const res = await acceptServiceQuoteUseCase.execute({
         actor: { userId: validUserId },
         claimId: 'claim-1',
         quoteId: 'q-srv-1',
@@ -126,7 +158,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
       });
 
       await expect(
-        quoteUseCases.acceptServiceQuote({
+        acceptServiceQuoteUseCase.execute({
           actor: { userId: validUserId },
           claimId: 'claim-1',
           quoteId: 'q-srv-1',
@@ -135,7 +167,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
     });
   });
 
-  describe('PaymentUseCases', () => {
+  describe('Payment UseCases', () => {
     it('should create payment link for DEPOSIT_P1 (30%)', async () => {
       mockRepository.findOrderById.mockResolvedValue({
         id: 'order-1',
@@ -147,8 +179,8 @@ describe('QuoteUseCases & PaymentUseCases', () => {
           currency: 'VND',
         },
       });
-      mockPayosProvider.generateOrderCode.mockReturnValue(987654);
-      mockPayosProvider.createPaymentLink.mockResolvedValue({
+      mockPayosGateway.generateOrderCode.mockReturnValue(987654);
+      mockPayosGateway.createPaymentLink.mockResolvedValue({
         paymentLinkId: 'pl_987654',
         checkoutUrl: 'https://pay.payos.vn/web/pl_987654',
         qrCode: 'QR_MOCK',
@@ -161,7 +193,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
         expiresAt: new Date('2026-11-26T10:00:00Z'),
       });
 
-      const res = await paymentUseCases.createOrderPaymentLink({
+      const res = await createOrderPaymentLinkUseCase.execute({
         actor: { userId: validUserId },
         orderId: 'order-1',
       });
@@ -172,10 +204,10 @@ describe('QuoteUseCases & PaymentUseCases', () => {
     });
 
     it('should throw ForbiddenException if PayOS webhook signature is invalid', async () => {
-      mockPayosProvider.verifyWebhookSignature.mockReturnValue(false);
+      mockPayosGateway.verifyWebhookSignature.mockReturnValue(false);
 
       await expect(
-        paymentUseCases.processPayosWebhook({
+        processPayosWebhookUseCase.execute({
           code: '00',
           desc: 'success',
           success: true,
@@ -186,7 +218,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
     });
 
     it('should mark transaction succeeded on valid PayOS webhook', async () => {
-      mockPayosProvider.verifyWebhookSignature.mockReturnValue(true);
+      mockPayosGateway.verifyWebhookSignature.mockReturnValue(true);
       mockRepository.findTransactionByOrderCode.mockResolvedValue({
         id: 'tx-1',
         orderId: 'order-1',
@@ -199,7 +231,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
         status: 'SUCCEEDED',
       });
 
-      const res = await paymentUseCases.processPayosWebhook({
+      const res = await processPayosWebhookUseCase.execute({
         code: '00',
         desc: 'success',
         success: true,
@@ -229,7 +261,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
         ],
       });
 
-      const res = await paymentUseCases.getOrderInvoice({
+      const res = await getOrderInvoiceUseCase.execute({
         actor: { userId: validUserId },
         orderId: 'order-1',
       });
@@ -243,7 +275,7 @@ describe('QuoteUseCases & PaymentUseCases', () => {
       mockRepository.createRefundRequest.mockResolvedValue(null);
 
       await expect(
-        paymentUseCases.createRefundRequest({
+        createRefundRequestUseCase.execute({
           transactionId: 'missing',
           refundAmount: 100000,
           reason: 'Customer request',

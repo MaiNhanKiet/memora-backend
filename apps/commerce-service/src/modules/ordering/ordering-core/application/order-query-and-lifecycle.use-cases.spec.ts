@@ -1,12 +1,26 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { OrderLifecycleUseCases } from './order-lifecycle.use-cases';
-import { OrderQueryUseCases } from './order-query.use-cases';
+import {
+  CancelOrderUseCase,
+  UpdateOrderStatusUseCase,
+} from './order-lifecycle.use-cases';
+import {
+  GetAdminOrderDetailsUseCase,
+  GetOrderPersonalizationContextUseCase,
+  GetOrderTimelineUseCase,
+  ListAdminOrdersUseCase,
+} from './order-query.use-cases';
 import { ORDERING_REPOSITORY } from './ordering.repository';
+import { UpdateCurrentRingItemVersionUseCase } from './ring-item.use-cases';
 
-describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
-  let queryUseCases: OrderQueryUseCases;
-  let lifecycleUseCases: OrderLifecycleUseCases;
+describe('Order Query, Ring Item & Lifecycle UseCases', () => {
+  let getOrderTimelineUseCase: GetOrderTimelineUseCase;
+  let listAdminOrdersUseCase: ListAdminOrdersUseCase;
+  let getAdminOrderDetailsUseCase: GetAdminOrderDetailsUseCase;
+  let getOrderPersonalizationContextUseCase: GetOrderPersonalizationContextUseCase;
+  let updateOrderStatusUseCase: UpdateOrderStatusUseCase;
+  let cancelOrderUseCase: CancelOrderUseCase;
+  let updateCurrentRingItemVersionUseCase: UpdateCurrentRingItemVersionUseCase;
 
   const mockRepository = {
     findOrderById: jest.fn(),
@@ -25,20 +39,42 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        OrderQueryUseCases,
-        OrderLifecycleUseCases,
+        GetOrderTimelineUseCase,
+        ListAdminOrdersUseCase,
+        GetAdminOrderDetailsUseCase,
+        GetOrderPersonalizationContextUseCase,
+        UpdateOrderStatusUseCase,
+        CancelOrderUseCase,
+        UpdateCurrentRingItemVersionUseCase,
         { provide: ORDERING_REPOSITORY, useValue: mockRepository },
       ],
     }).compile();
 
-    queryUseCases = module.get<OrderQueryUseCases>(OrderQueryUseCases);
-    lifecycleUseCases = module.get<OrderLifecycleUseCases>(
-      OrderLifecycleUseCases,
+    getOrderTimelineUseCase = module.get<GetOrderTimelineUseCase>(
+      GetOrderTimelineUseCase,
     );
+    listAdminOrdersUseCase = module.get<ListAdminOrdersUseCase>(
+      ListAdminOrdersUseCase,
+    );
+    getAdminOrderDetailsUseCase = module.get<GetAdminOrderDetailsUseCase>(
+      GetAdminOrderDetailsUseCase,
+    );
+    getOrderPersonalizationContextUseCase =
+      module.get<GetOrderPersonalizationContextUseCase>(
+        GetOrderPersonalizationContextUseCase,
+      );
+    updateOrderStatusUseCase = module.get<UpdateOrderStatusUseCase>(
+      UpdateOrderStatusUseCase,
+    );
+    cancelOrderUseCase = module.get<CancelOrderUseCase>(CancelOrderUseCase);
+    updateCurrentRingItemVersionUseCase =
+      module.get<UpdateCurrentRingItemVersionUseCase>(
+        UpdateCurrentRingItemVersionUseCase,
+      );
     jest.clearAllMocks();
   });
 
-  describe('getOrderTimeline', () => {
+  describe('GetOrderTimelineUseCase', () => {
     it('should return timeline and stage gates for order', async () => {
       mockRepository.findOrderById.mockResolvedValue({
         id: 'order-1',
@@ -52,7 +88,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
         updatedAt: new Date('2026-11-25T10:00:00Z'),
       });
 
-      const res = await queryUseCases.getOrderTimeline({
+      const res = await getOrderTimelineUseCase.execute({
         actor: { userId: validUserId },
         orderId: 'order-1',
       });
@@ -63,7 +99,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
     });
   });
 
-  describe('listAdminOrders & getAdminOrderDetails', () => {
+  describe('ListAdminOrdersUseCase & GetAdminOrderDetailsUseCase', () => {
     it('should return mapped admin order items and pagination', async () => {
       mockRepository.listAdminOrders.mockResolvedValue({
         items: [
@@ -94,7 +130,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
         limit: 20,
       });
 
-      const res = await queryUseCases.listAdminOrders({ page: 1, limit: 20 });
+      const res = await listAdminOrdersUseCase.execute({ page: 1, limit: 20 });
       expect(res.items).toHaveLength(1);
       expect(res.items[0].totalAmount).toBe(1000000);
     });
@@ -103,12 +139,12 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
       mockRepository.findAdminOrderById.mockResolvedValue(null);
 
       await expect(
-        queryUseCases.getAdminOrderDetails({ orderId: 'missing' }),
+        getAdminOrderDetailsUseCase.execute({ orderId: 'missing' }),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
-  describe('updateOrderStatus & cancelOrder', () => {
+  describe('UpdateOrderStatusUseCase & CancelOrderUseCase', () => {
     it('should throw BadRequestException if status transition is invalid', async () => {
       mockRepository.findAdminOrderById.mockResolvedValue({
         id: 'order-1',
@@ -116,7 +152,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
       });
 
       await expect(
-        lifecycleUseCases.updateOrderStatus({
+        updateOrderStatusUseCase.execute({
           orderId: 'order-1',
           targetStatus: 'CANCELLED',
         }),
@@ -135,7 +171,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
         updatedAt: new Date('2026-11-25T10:00:00Z'),
       });
 
-      const res = await lifecycleUseCases.updateOrderStatus({
+      const res = await updateOrderStatusUseCase.execute({
         orderId: 'order-1',
         targetStatus: 'PENDING_FINAL_QUOTE',
       });
@@ -154,7 +190,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
         cancellationReason: 'Changed mind',
       });
 
-      const res = await lifecycleUseCases.cancelOrder({
+      const res = await cancelOrderUseCase.execute({
         actor: { userId: validUserId },
         orderId: 'order-1',
         reason: 'Changed mind',
@@ -164,7 +200,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
     });
   });
 
-  describe('ring item versions', () => {
+  describe('UpdateCurrentRingItemVersionUseCase', () => {
     it('should throw BadRequestException if version is locked', async () => {
       mockRepository.findCurrentRingItemVersion.mockResolvedValue({
         id: 'ver-1',
@@ -172,7 +208,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
       });
 
       await expect(
-        queryUseCases.updateCurrentRingItemVersion({
+        updateCurrentRingItemVersionUseCase.execute({
           actor: { userId: validUserId },
           orderId: 'order-1',
           ringItemId: 'item-1',
@@ -195,7 +231,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
         createdAt: new Date('2026-11-25T10:00:00Z'),
       });
 
-      const res = await queryUseCases.updateCurrentRingItemVersion({
+      const res = await updateCurrentRingItemVersionUseCase.execute({
         actor: { userId: validUserId },
         orderId: 'order-1',
         ringItemId: 'item-1',
@@ -207,10 +243,10 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
     });
   });
 
-  describe('getOrderPersonalizationContext', () => {
+  describe('GetOrderPersonalizationContextUseCase', () => {
     it('should validate UUID and return personalization context', async () => {
       await expect(
-        queryUseCases.getOrderPersonalizationContext({ orderId: 'bad-id' }),
+        getOrderPersonalizationContextUseCase.execute({ orderId: 'bad-id' }),
       ).rejects.toThrow(BadRequestException);
 
       mockRepository.findOrderPersonalizationContext.mockResolvedValue({
@@ -222,7 +258,7 @@ describe('OrderQueryUseCases & OrderLifecycleUseCases', () => {
         ringItems: [],
       });
 
-      const res = await queryUseCases.getOrderPersonalizationContext({
+      const res = await getOrderPersonalizationContextUseCase.execute({
         orderId: validUserId,
       });
       expect(res.p1Paid).toBe(true);

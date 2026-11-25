@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type {
   GetAdminOrderDetailsRequest,
   GetAdminOrderDetailsResponse,
@@ -13,17 +8,11 @@ import type {
   GetOrderPersonalizationContextResponse,
   GetOrderTimelineRequest,
   GetOrderTimelineResponse,
-  GetRingItemDetailsRequest,
-  GetRingItemDetailsResponse,
   ListAdminOrdersRequest,
   ListAdminOrdersResponse,
   ListOrdersRequest,
   ListOrdersResponse,
-  ListRingItemVersionsRequest,
-  ListRingItemVersionsResponse,
   TimelineEventItem,
-  UpdateCurrentRingItemVersionRequest,
-  UpdateCurrentRingItemVersionResponse,
 } from '@app/contracts';
 import { resolveOrderStageGates } from './ordering-state';
 import {
@@ -31,8 +20,6 @@ import {
   mapAdminOrderSummary,
   mapOrderDetail,
   mapOrderSummary,
-  mapRingItemDetail,
-  mapRingItemVersion,
 } from './ordering.mapper';
 import {
   ORDERING_REPOSITORY,
@@ -45,13 +32,13 @@ import {
 } from './ordering.validation';
 
 @Injectable()
-export class OrderQueryUseCases {
+export class ListOrdersUseCase {
   constructor(
     @Inject(ORDERING_REPOSITORY)
     private readonly repository: OrderingRepository,
   ) {}
 
-  async listOrders(request: ListOrdersRequest): Promise<ListOrdersResponse> {
+  async execute(request: ListOrdersRequest): Promise<ListOrdersResponse> {
     const actor = validateOrderingActor(request.actor);
     const { actorId, guestSessionId } = resolveOrderingActorId(actor);
     const page = Math.max(request.page || 1, 1);
@@ -73,10 +60,16 @@ export class OrderQueryUseCases {
       limit,
     };
   }
+}
 
-  async getOrderById(
-    request: GetOrderByIdRequest,
-  ): Promise<GetOrderByIdResponse> {
+@Injectable()
+export class GetOrderByIdUseCase {
+  constructor(
+    @Inject(ORDERING_REPOSITORY)
+    private readonly repository: OrderingRepository,
+  ) {}
+
+  async execute(request: GetOrderByIdRequest): Promise<GetOrderByIdResponse> {
     const actor = validateOrderingActor(request.actor);
     const { actorId, guestSessionId } = resolveOrderingActorId(actor);
 
@@ -91,8 +84,16 @@ export class OrderQueryUseCases {
 
     return mapOrderDetail(order);
   }
+}
 
-  async getOrderTimeline(
+@Injectable()
+export class GetOrderTimelineUseCase {
+  constructor(
+    @Inject(ORDERING_REPOSITORY)
+    private readonly repository: OrderingRepository,
+  ) {}
+
+  async execute(
     request: GetOrderTimelineRequest,
   ): Promise<GetOrderTimelineResponse> {
     const actor = validateOrderingActor(request.actor);
@@ -150,29 +151,16 @@ export class OrderQueryUseCases {
       ),
     };
   }
+}
 
-  async getRingItemDetails(
-    request: GetRingItemDetailsRequest,
-  ): Promise<GetRingItemDetailsResponse> {
-    const actor = validateOrderingActor(request.actor);
-    const { actorId, guestSessionId } = resolveOrderingActorId(actor);
+@Injectable()
+export class ListAdminOrdersUseCase {
+  constructor(
+    @Inject(ORDERING_REPOSITORY)
+    private readonly repository: OrderingRepository,
+  ) {}
 
-    const item = await this.repository.findRingItemWithDetails(
-      request.orderId,
-      request.ringItemId,
-      actorId,
-      guestSessionId,
-    );
-    if (!item) {
-      throw new NotFoundException(
-        'Ring item not found in this order or access denied',
-      );
-    }
-
-    return mapRingItemDetail(item);
-  }
-
-  async listAdminOrders(
+  async execute(
     request: ListAdminOrdersRequest,
   ): Promise<ListAdminOrdersResponse> {
     const { items, total, page, limit } = await this.repository.listAdminOrders(
@@ -193,8 +181,16 @@ export class OrderQueryUseCases {
       limit,
     };
   }
+}
 
-  async getAdminOrderDetails(
+@Injectable()
+export class GetAdminOrderDetailsUseCase {
+  constructor(
+    @Inject(ORDERING_REPOSITORY)
+    private readonly repository: OrderingRepository,
+  ) {}
+
+  async execute(
     request: GetAdminOrderDetailsRequest,
   ): Promise<GetAdminOrderDetailsResponse> {
     const order = await this.repository.findAdminOrderById(request.orderId);
@@ -203,80 +199,16 @@ export class OrderQueryUseCases {
     }
     return mapAdminOrderDetail(order);
   }
+}
 
-  async listRingItemVersions(
-    request: ListRingItemVersionsRequest,
-  ): Promise<ListRingItemVersionsResponse> {
-    const actor = validateOrderingActor(request.actor);
-    const { actorId, guestSessionId } = resolveOrderingActorId(actor);
+@Injectable()
+export class GetOrderPersonalizationContextUseCase {
+  constructor(
+    @Inject(ORDERING_REPOSITORY)
+    private readonly repository: OrderingRepository,
+  ) {}
 
-    const versions = await this.repository.listRingItemVersions(
-      request.orderId,
-      request.ringItemId,
-      actorId,
-      guestSessionId,
-    );
-    if (!versions) {
-      throw new NotFoundException(
-        'Order or ring item not found or access denied',
-      );
-    }
-
-    return {
-      ringItemId: request.ringItemId,
-      orderId: request.orderId,
-      versions: versions.map((v) => mapRingItemVersion(v)),
-    };
-  }
-
-  async updateCurrentRingItemVersion(
-    request: UpdateCurrentRingItemVersionRequest,
-  ): Promise<UpdateCurrentRingItemVersionResponse> {
-    const actor = validateOrderingActor(request.actor);
-    const { actorId, guestSessionId } = resolveOrderingActorId(actor);
-
-    const currentVersion = await this.repository.findCurrentRingItemVersion(
-      request.orderId,
-      request.ringItemId,
-      actorId,
-      guestSessionId,
-    );
-    if (!currentVersion) {
-      throw new NotFoundException(
-        'Ring item current version not found or access denied',
-      );
-    }
-
-    if (
-      currentVersion.status !== 'DRAFT' &&
-      currentVersion.status !== 'SUBMITTED'
-    ) {
-      throw new BadRequestException(
-        `Cannot modify ring item version in status '${currentVersion.status}'. Only DRAFT or SUBMITTED versions can be updated.`,
-      );
-    }
-
-    const updated = await this.repository.updateCurrentRingItemVersion(
-      currentVersion.id,
-      {
-        targetSize: request.targetSize,
-        changeReason: request.changeReason,
-        memoryEnabled: request.memoryEnabled,
-      },
-    );
-
-    return {
-      ringItemId: request.ringItemId,
-      versionId: updated.id,
-      versionNo: updated.versionNo,
-      status: updated.status,
-      targetSize: updated.targetSize,
-      changeReason: updated.changeReason,
-      updatedAt: updated.createdAt.toISOString(),
-    };
-  }
-
-  async getOrderPersonalizationContext(
+  async execute(
     request: GetOrderPersonalizationContextRequest,
   ): Promise<GetOrderPersonalizationContextResponse> {
     const orderId = validateOrderUuid(request?.orderId);

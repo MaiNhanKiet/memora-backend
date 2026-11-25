@@ -8,194 +8,59 @@ import {
 import type {
   CreateClaimPaymentLinkRequest,
   CreateOrderPaymentLinkRequest,
-  CreateRefundRequestMessage,
-  CreateRefundResponse,
-  GetOrderInvoiceRequest,
-  GetOrderPaymentByIdRequest,
-  GetPaymentReceiptRequest,
-  ListOrderPaymentsRequest,
-  ListOrderPaymentsResponse,
-  OrderInvoiceDetail,
   PaymentLinkResponse,
-  PaymentReceiptDetail,
   PaymentTransactionDetail,
   PayosWebhookRequest,
   PayosWebhookResponse,
   ReconcilePaymentTransactionRequest,
 } from '@app/contracts';
-import type { PayosWebhookData } from '../infrastructure/payment/payos.interface';
-import { PayosProvider } from '../infrastructure/payment/payos.provider';
 import {
   resolveNextOrderStatusAfterPayment,
   resolvePaymentStageForOrderStatus,
 } from './ordering-state';
-import {
-  mapOrderInvoice,
-  mapPaymentReceipt,
-  mapPaymentTransactionDetail,
-} from './ordering.mapper';
+import { mapPaymentTransactionDetail } from './ordering.mapper';
 import {
   ORDERING_REPOSITORY,
+  type OrderingPaymentTransactionRecord,
   type OrderingRepository,
 } from './ordering.repository';
 import { validateOrderingActor } from './ordering.validation';
+import {
+  PAYOS_GATEWAY,
+  type PayosGateway,
+  type PayosPaymentLinkData,
+  type PayosWebhookData,
+} from './payos.gateway';
+
+function toPaymentLinkResponse(
+  tx: OrderingPaymentTransactionRecord,
+  orderCode: number,
+  paymentLink: PayosPaymentLinkData,
+  paymentStage: string,
+): PaymentLinkResponse {
+  return {
+    transactionId: tx.id,
+    orderCode,
+    checkoutUrl: paymentLink.checkoutUrl,
+    qrCode: paymentLink.qrCode,
+    amount: tx.amount,
+    currency: tx.currency,
+    paymentStage,
+    status: tx.status,
+    expiresAt: tx.expiresAt?.toISOString(),
+  };
+}
 
 @Injectable()
-export class PaymentUseCases {
+export class CreateOrderPaymentLinkUseCase {
   constructor(
     @Inject(ORDERING_REPOSITORY)
     private readonly repository: OrderingRepository,
-    private readonly payosProvider: PayosProvider,
+    @Inject(PAYOS_GATEWAY)
+    private readonly payosGateway: PayosGateway,
   ) {}
 
-  async listOrderPayments(
-    request: ListOrderPaymentsRequest,
-  ): Promise<ListOrderPaymentsResponse> {
-    const actor = validateOrderingActor(request.actor);
-    const actorId = actor.userId ?? actor.guestSessionId!;
-
-    const order = await this.repository.findOrderById(request.orderId, actorId);
-    if (!order) {
-      throw new NotFoundException(`Order ${request.orderId} not found`);
-    }
-
-    const payments = await this.repository.findOrderPayments(request.orderId);
-    const totalPaidAmount = payments
-      .filter(
-        (p) => p.status === 'SUCCEEDED' && p.transactionType === 'PAYMENT',
-      )
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    return {
-      orderId: request.orderId,
-      totalPaidAmount,
-      currency: payments[0]?.currency || 'VND',
-      payments: payments.map((p) => ({
-        id: p.id,
-        orderId: p.orderId || request.orderId,
-        paymentStage: p.paymentStage,
-        transactionType: p.transactionType,
-        amount: p.amount,
-        currency: p.currency,
-        status: p.status,
-        provider: p.provider,
-        paymentMethod: p.paymentMethod,
-        requestedAt: p.requestedAt.toISOString(),
-        completedAt: p.completedAt?.toISOString(),
-        receiptNo: p.receiptNo,
-      })),
-    };
-  }
-
-  async getOrderPaymentById(
-    request: GetOrderPaymentByIdRequest,
-  ): Promise<PaymentTransactionDetail> {
-    const actor = validateOrderingActor(request.actor);
-    const actorId = actor.userId ?? actor.guestSessionId!;
-
-    const order = await this.repository.findOrderById(request.orderId, actorId);
-    if (!order) {
-      throw new NotFoundException(`Order ${request.orderId} not found`);
-    }
-
-    const p = await this.repository.findOrderPaymentById(
-      request.orderId,
-      request.transactionId,
-    );
-    if (!p) {
-      throw new NotFoundException(
-        `Payment transaction ${request.transactionId} not found for order ${request.orderId}`,
-      );
-    }
-
-    return mapPaymentTransactionDetail(p, request.orderId);
-  }
-
-  async getPaymentReceipt(
-    request: GetPaymentReceiptRequest,
-  ): Promise<PaymentReceiptDetail> {
-    const actor = validateOrderingActor(request.actor);
-    const actorId = actor.userId ?? actor.guestSessionId!;
-
-    const order = await this.repository.findOrderById(request.orderId, actorId);
-    if (!order) {
-      throw new NotFoundException(`Order ${request.orderId} not found`);
-    }
-
-    const tx = await this.repository.findPaymentReceipt(
-      request.orderId,
-      request.transactionId,
-    );
-    if (!tx) {
-      throw new NotFoundException(
-        `Payment transaction ${request.transactionId} not found for order ${request.orderId}`,
-      );
-    }
-
-    if (tx.status !== 'SUCCEEDED') {
-      throw new BadRequestException(
-        `Receipt is only available for SUCCEEDED transactions. Current status: '${tx.status}'.`,
-      );
-    }
-
-    return mapPaymentReceipt(tx, request.orderId);
-  }
-
-  async getOrderInvoice(
-    request: GetOrderInvoiceRequest,
-  ): Promise<OrderInvoiceDetail> {
-    const actor = validateOrderingActor(request.actor);
-    const actorId = actor.userId ?? actor.guestSessionId!;
-
-    const order = await this.repository.findOrderById(request.orderId, actorId);
-    if (!order) {
-      throw new NotFoundException(`Order ${request.orderId} not found`);
-    }
-
-    const orderDetails = await this.repository.findOrderInvoice(
-      request.orderId,
-    );
-    if (!orderDetails) {
-      throw new NotFoundException(
-        `Invoice details not found for order ${request.orderId}`,
-      );
-    }
-
-    return mapOrderInvoice(orderDetails);
-  }
-
-  async createRefundRequest(
-    request: CreateRefundRequestMessage,
-  ): Promise<CreateRefundResponse> {
-    if (!request.refundAmount || request.refundAmount <= 0) {
-      throw new BadRequestException('Refund amount must be greater than zero');
-    }
-
-    if (!request.reason || request.reason.trim().length === 0) {
-      throw new BadRequestException('A reason for the refund is required');
-    }
-
-    const refund = await this.repository.createRefundRequest(request);
-    if (!refund) {
-      throw new NotFoundException(
-        `Original payment transaction ${request.transactionId} not found`,
-      );
-    }
-
-    return {
-      refundTransactionId: refund.id,
-      originalTransactionId:
-        refund.relatedTransactionId || request.transactionId,
-      orderId: refund.orderId || '',
-      refundAmount: refund.amount,
-      currency: refund.currency,
-      status: refund.status,
-      requestedAt: refund.requestedAt.toISOString(),
-      reason: request.reason,
-    };
-  }
-
-  async createOrderPaymentLink(
+  async execute(
     request: CreateOrderPaymentLinkRequest,
   ): Promise<PaymentLinkResponse> {
     const actor = validateOrderingActor(request.actor);
@@ -236,13 +101,13 @@ export class PaymentUseCases {
       throw new BadRequestException('Payment amount must be greater than 0');
     }
 
-    const orderCode = this.payosProvider.generateOrderCode();
+    const orderCode = this.payosGateway.generateOrderCode();
     const returnUrl =
       request.returnUrl || `https://memora.vn/orders/${order.id}`;
     const cancelUrl =
       request.cancelUrl || `https://memora.vn/orders/${order.id}`;
 
-    const paymentLink = await this.payosProvider.createPaymentLink({
+    const paymentLink = await this.payosGateway.createPaymentLink({
       orderCode,
       amount,
       description: `MEMORA ${order.orderNo} ${stage}`,
@@ -264,22 +129,20 @@ export class PaymentUseCases {
       },
     });
 
-    return {
-      transactionId: tx.id,
-      orderCode,
-      checkoutUrl: paymentLink.checkoutUrl,
-      qrCode: paymentLink.qrCode,
-      amount,
-      currency: tx.currency,
-      paymentStage: stage,
-      status: tx.status,
-      expiresAt: tx.expiresAt?.toISOString(),
-    };
+    return toPaymentLinkResponse(tx, orderCode, paymentLink, stage);
   }
+}
 
-  async processPayosWebhook(
-    request: PayosWebhookRequest,
-  ): Promise<PayosWebhookResponse> {
+@Injectable()
+export class ProcessPayosWebhookUseCase {
+  constructor(
+    @Inject(ORDERING_REPOSITORY)
+    private readonly repository: OrderingRepository,
+    @Inject(PAYOS_GATEWAY)
+    private readonly payosGateway: PayosGateway,
+  ) {}
+
+  async execute(request: PayosWebhookRequest): Promise<PayosWebhookResponse> {
     let payloadData: PayosWebhookData;
     try {
       const parsed: unknown =
@@ -291,7 +154,7 @@ export class PaymentUseCases {
       throw new BadRequestException('Invalid dataJson in PayOS webhook');
     }
 
-    const isValid = this.payosProvider.verifyWebhookSignature({
+    const isValid = this.payosGateway.verifyWebhookSignature({
       code: request.code,
       desc: request.desc,
       success: request.success,
@@ -345,8 +208,18 @@ export class PaymentUseCases {
       orderId: tx.orderId,
     };
   }
+}
 
-  async reconcilePaymentTransaction(
+@Injectable()
+export class ReconcilePaymentTransactionUseCase {
+  constructor(
+    @Inject(ORDERING_REPOSITORY)
+    private readonly repository: OrderingRepository,
+    @Inject(PAYOS_GATEWAY)
+    private readonly payosGateway: PayosGateway,
+  ) {}
+
+  async execute(
     request: ReconcilePaymentTransactionRequest,
   ): Promise<PaymentTransactionDetail> {
     const tx = await this.repository.findPaymentTransactionById(
@@ -368,7 +241,7 @@ export class PaymentUseCases {
       );
     }
 
-    const info = await this.payosProvider.getPaymentInformation(
+    const info = await this.payosGateway.getPaymentInformation(
       Number(tx.providerOrderCode),
     );
 
@@ -389,8 +262,18 @@ export class PaymentUseCases {
 
     return mapPaymentTransactionDetail(tx);
   }
+}
 
-  async createClaimPaymentLink(
+@Injectable()
+export class CreateClaimPaymentLinkUseCase {
+  constructor(
+    @Inject(ORDERING_REPOSITORY)
+    private readonly repository: OrderingRepository,
+    @Inject(PAYOS_GATEWAY)
+    private readonly payosGateway: PayosGateway,
+  ) {}
+
+  async execute(
     request: CreateClaimPaymentLinkRequest,
   ): Promise<PaymentLinkResponse> {
     if (!request.claimId) {
@@ -413,13 +296,13 @@ export class PaymentUseCases {
       );
     }
 
-    const orderCode = this.payosProvider.generateOrderCode();
+    const orderCode = this.payosGateway.generateOrderCode();
     const returnUrl =
       request.returnUrl || `https://memora.vn/claims/${request.claimId}`;
     const cancelUrl =
       request.cancelUrl || `https://memora.vn/claims/${request.claimId}`;
 
-    const paymentLink = await this.payosProvider.createPaymentLink({
+    const paymentLink = await this.payosGateway.createPaymentLink({
       orderCode,
       amount,
       description: `MEMORA CLAIM ${acceptedQuote.quoteNo}`,
@@ -442,16 +325,6 @@ export class PaymentUseCases {
       },
     });
 
-    return {
-      transactionId: tx.id,
-      orderCode,
-      checkoutUrl: paymentLink.checkoutUrl,
-      qrCode: paymentLink.qrCode,
-      amount,
-      currency: tx.currency,
-      paymentStage: 'SERVICE_FEE',
-      status: tx.status,
-      expiresAt: tx.expiresAt?.toISOString(),
-    };
+    return toPaymentLinkResponse(tx, orderCode, paymentLink, 'SERVICE_FEE');
   }
 }

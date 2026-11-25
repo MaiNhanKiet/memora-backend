@@ -3,12 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import type {
   PayosCreatePaymentLinkParams,
+  PayosGateway,
+  PayosPaymentInfo,
   PayosPaymentLinkData,
   PayosWebhookPayload,
-} from './payos.interface';
+} from '../../application/payos.gateway';
 
 @Injectable()
-export class PayosProvider {
+export class PayosProvider implements PayosGateway {
   private readonly logger = new Logger(PayosProvider.name);
   private readonly clientId?: string;
   private readonly apiKey?: string;
@@ -164,7 +166,7 @@ export class PayosProvider {
 
   async getPaymentInformation(
     orderCode: number,
-  ): Promise<{ status: string; amount: number; orderCode: number } | null> {
+  ): Promise<PayosPaymentInfo | null> {
     if (!this.isConfigured) {
       this.logger.log(
         `[MOCK PayOS] Fetching payment info for orderCode: ${orderCode}`,

@@ -16,13 +16,13 @@ import {
 import { validateOrderingActor } from './ordering.validation';
 
 @Injectable()
-export class OrderLifecycleUseCases {
+export class UpdateOrderStatusUseCase {
   constructor(
     @Inject(ORDERING_REPOSITORY)
     private readonly repository: OrderingRepository,
   ) {}
 
-  async updateOrderStatus(
+  async execute(
     request: UpdateOrderStatusRequest,
   ): Promise<UpdateOrderStatusResponse> {
     const order = await this.repository.findAdminOrderById(request.orderId);
@@ -48,8 +48,16 @@ export class OrderLifecycleUseCases {
       updatedAt: updated.updatedAt.toISOString(),
     };
   }
+}
 
-  async cancelOrder(request: CancelOrderRequest): Promise<CancelOrderResponse> {
+@Injectable()
+export class CancelOrderUseCase {
+  constructor(
+    @Inject(ORDERING_REPOSITORY)
+    private readonly repository: OrderingRepository,
+  ) {}
+
+  async execute(request: CancelOrderRequest): Promise<CancelOrderResponse> {
     const actor = validateOrderingActor(request.actor);
     const actorId = actor.userId ?? actor.guestSessionId!;
 
