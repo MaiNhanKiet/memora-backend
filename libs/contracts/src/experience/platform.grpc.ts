@@ -100,3 +100,84 @@ export interface PlatformSharingServiceGrpcController {
     metadata?: Metadata,
   ): Promise<RevokeShareLinkResponse>;
 }
+
+// ---------------------------------------------------------------------------
+// Platform Audit Service
+// ---------------------------------------------------------------------------
+
+export const PLATFORM_AUDIT_SERVICE_NAME = 'PlatformAuditService';
+
+export interface AuditLogItem {
+  id: string;
+  actorUserId?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  requestId?: string;
+  traceId?: string;
+  resultStatus?: string;
+  changeSummaryJson?: string;
+  metadataJson?: string;
+  createdAt: string;
+}
+
+export interface ListAuditLogsRequest {
+  actor: VerifiedActor;
+  actorUserId?: string;
+  entityType?: string;
+  action?: string;
+  resultStatus?: string;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ListAuditLogsResponse {
+  items: AuditLogItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface RecordAuditEventRequest {
+  actorUserId?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  requestId?: string;
+  traceId?: string;
+  resultStatus?: string;
+  changeSummaryJson?: string;
+  metadataJson?: string;
+}
+
+export interface RecordAuditEventResponse {
+  id: string;
+  createdAt: string;
+}
+
+export interface PlatformAuditServiceClient {
+  listAuditLogs(
+    request: ListAuditLogsRequest,
+    metadata?: Metadata,
+  ): Observable<ListAuditLogsResponse>;
+
+  recordAuditEvent(
+    request: RecordAuditEventRequest,
+    metadata?: Metadata,
+  ): Observable<RecordAuditEventResponse>;
+}
+
+export interface PlatformAuditServiceGrpcController {
+  listAuditLogs(
+    request: ListAuditLogsRequest,
+    metadata?: Metadata,
+  ): Promise<ListAuditLogsResponse>;
+
+  recordAuditEvent(
+    request: RecordAuditEventRequest,
+    metadata?: Metadata,
+  ): Promise<RecordAuditEventResponse>;
+}
