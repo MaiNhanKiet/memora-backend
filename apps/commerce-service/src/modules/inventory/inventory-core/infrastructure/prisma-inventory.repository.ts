@@ -8,27 +8,107 @@ import type {
   stock_lots,
 } from '../../../../../generated/prisma/client';
 import { PrismaService } from '../../../../persistence/prisma/prisma.service';
+import type {
+  AllocationRecord,
+  CertifiedGemstoneRecord,
+  InventoryMovementRecord,
+  InventoryRepository,
+  StockLotRecord,
+} from '../application/inventory.repository';
+
+function toStockLotRecord(lot: stock_lots): StockLotRecord {
+  return {
+    id: lot.id,
+    stockCode: lot.stock_code,
+    stockType: lot.stock_type,
+    templateVariantId: lot.template_variant_id ?? undefined,
+    gemstoneOptionId: lot.gemstone_option_id ?? undefined,
+    lotCode: lot.lot_code ?? undefined,
+    supplierRef: lot.supplier_ref ?? undefined,
+    quantityOnHand: lot.quantity_on_hand,
+    quantityReserved: lot.quantity_reserved,
+    unitCost: lot.unit_cost !== null ? Number(lot.unit_cost) : undefined,
+    locationCode: lot.location_code ?? undefined,
+    status: lot.status,
+    receivedAt: lot.received_at ?? undefined,
+    updatedAt: lot.updated_at,
+  };
+}
+
+function toCertifiedGemstoneRecord(
+  gem: certified_gemstones,
+): CertifiedGemstoneRecord {
+  return {
+    id: gem.id,
+    internalCode: gem.internal_code,
+    gemstoneOptionId: gem.gemstone_option_id,
+    certificateProvider: gem.certificate_provider ?? undefined,
+    certificateNumber: gem.certificate_number ?? undefined,
+    certificateUrl: gem.certificate_url ?? undefined,
+    certificateMetadataJson: gem.certificate_metadata_json ?? undefined,
+    purchaseCost:
+      gem.purchase_cost !== null ? Number(gem.purchase_cost) : undefined,
+    status: gem.status,
+    locationCode: gem.location_code ?? undefined,
+    receivedAt: gem.received_at ?? undefined,
+    updatedAt: gem.updated_at,
+  };
+}
+
+function toInventoryMovementRecord(
+  m: inventory_movements,
+): InventoryMovementRecord {
+  return {
+    id: m.id,
+    movementType: m.movement_type,
+    stockLotId: m.stock_lot_id ?? undefined,
+    certifiedGemstoneId: m.certified_gemstone_id ?? undefined,
+    allocationId: m.allocation_id ?? undefined,
+    ringItemId: m.ring_item_id ?? undefined,
+    productionAttemptId: m.production_attempt_id ?? undefined,
+    quantity: m.quantity,
+    unitCostSnapshot:
+      m.unit_cost_snapshot !== null ? Number(m.unit_cost_snapshot) : undefined,
+    reason: m.reason ?? undefined,
+    performedByUserId: m.performed_by_user_id ?? undefined,
+    occurredAt: m.occurred_at,
+    metadataJson: m.metadata_json ?? undefined,
+  };
+}
+
+function toAllocationRecord(a: allocations): AllocationRecord {
+  return {
+    id: a.id,
+    ringItemId: a.ring_item_id,
+    productionAttemptId: a.production_attempt_id ?? undefined,
+    stockLotId: a.stock_lot_id ?? undefined,
+    certifiedGemstoneId: a.certified_gemstone_id ?? undefined,
+    quantity: a.quantity,
+    status: a.status,
+    expiresAt: a.expires_at ?? undefined,
+    allocatedByUserId: a.allocated_by_user_id ?? undefined,
+    createdAt: a.created_at,
+    updatedAt: a.updated_at,
+  };
+}
 
 @Injectable()
-export class InventoryRepository {
+export class PrismaInventoryRepository implements InventoryRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  // --- INVEN-001: List Ring Blank Stocks ---
   async findRingBlankStocks(filter: {
     templateVariantId?: string;
     status?: string;
     limit: number;
     offset: number;
-  }): Promise<{ items: stock_lots[]; total: number }> {
+  }): Promise<{ items: StockLotRecord[]; total: number }> {
     const where: Prisma.stock_lotsWhereInput = {
       stock_type: 'RING_BLANK',
+      ...(filter.templateVariantId
+        ? { template_variant_id: filter.templateVariantId }
+        : {}),
+      ...(filter.status ? { status: filter.status } : {}),
     };
-    if (filter.templateVariantId) {
-      where.template_variant_id = filter.templateVariantId;
-    }
-    if (filter.status) {
-      where.status = filter.status;
-    }
 
     const [items, total] = await Promise.all([
       this.prisma.stock_lots.findMany({
@@ -40,10 +120,9 @@ export class InventoryRepository {
       this.prisma.stock_lots.count({ where }),
     ]);
 
-    return { items, total };
+    return { items: items.map((l) => toStockLotRecord(l)), total };
   }
 
-  // --- INVEN-002: Receive Ring Blank Stock ---
   async receiveRingBlankStock(params: {
     templateVariantId: string;
     lotCode?: string;
@@ -53,10 +132,10 @@ export class InventoryRepository {
     locationCode?: string;
     receivedAt?: Date;
     performedByUserId?: string;
-  }): Promise<stock_lots> {
+  }): Promise<StockLotRecord> {
     const stockCode = `RB-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)}`;
 
-    return this.prisma.$transaction(async (tx) => {
+    const row = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
       const stockLot = await tx.stock_lots.create({
         data: {
@@ -84,33 +163,30 @@ export class InventoryRepository {
           unit_cost_snapshot:
             params.unitCost !== undefined ? params.unitCost : null,
           reason: 'Initial ring blank receipt',
-          performed_by_user_id: params.performedByUserId
-            ? params.performedByUserId
-            : null,
+          performed_by_user_id: params.performedByUserId ?? null,
           occurred_at: now,
         },
       });
 
       return stockLot;
     });
+
+    return toStockLotRecord(row);
   }
 
-  // --- INVEN-003: List Gemstone Batches ---
   async findGemstoneBatches(filter: {
     gemstoneOptionId?: string;
     status?: string;
     limit: number;
     offset: number;
-  }): Promise<{ items: stock_lots[]; total: number }> {
+  }): Promise<{ items: StockLotRecord[]; total: number }> {
     const where: Prisma.stock_lotsWhereInput = {
       stock_type: 'GEMSTONE',
+      ...(filter.gemstoneOptionId
+        ? { gemstone_option_id: filter.gemstoneOptionId }
+        : {}),
+      ...(filter.status ? { status: filter.status } : {}),
     };
-    if (filter.gemstoneOptionId) {
-      where.gemstone_option_id = filter.gemstoneOptionId;
-    }
-    if (filter.status) {
-      where.status = filter.status;
-    }
 
     const [items, total] = await Promise.all([
       this.prisma.stock_lots.findMany({
@@ -122,10 +198,9 @@ export class InventoryRepository {
       this.prisma.stock_lots.count({ where }),
     ]);
 
-    return { items, total };
+    return { items: items.map((l) => toStockLotRecord(l)), total };
   }
 
-  // --- INVEN-004: Receive Gemstone Batch ---
   async receiveGemstoneBatch(params: {
     gemstoneOptionId: string;
     lotCode?: string;
@@ -135,10 +210,10 @@ export class InventoryRepository {
     locationCode?: string;
     receivedAt?: Date;
     performedByUserId?: string;
-  }): Promise<stock_lots> {
+  }): Promise<StockLotRecord> {
     const stockCode = `GEM-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)}`;
 
-    return this.prisma.$transaction(async (tx) => {
+    const row = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
       const stockLot = await tx.stock_lots.create({
         data: {
@@ -166,31 +241,29 @@ export class InventoryRepository {
           unit_cost_snapshot:
             params.unitCost !== undefined ? params.unitCost : null,
           reason: 'Initial gemstone batch receipt',
-          performed_by_user_id: params.performedByUserId
-            ? params.performedByUserId
-            : null,
+          performed_by_user_id: params.performedByUserId ?? null,
           occurred_at: now,
         },
       });
 
       return stockLot;
     });
+
+    return toStockLotRecord(row);
   }
 
-  // --- INVEN-005: List Certified Gemstones Availability ---
   async findCertifiedGemstoneAvailability(filter: {
     gemstoneOptionId?: string;
     status?: string;
     limit: number;
     offset: number;
-  }): Promise<{ items: certified_gemstones[]; total: number }> {
-    const where: Prisma.certified_gemstonesWhereInput = {};
-    if (filter.gemstoneOptionId) {
-      where.gemstone_option_id = filter.gemstoneOptionId;
-    }
-    if (filter.status) {
-      where.status = filter.status;
-    }
+  }): Promise<{ items: CertifiedGemstoneRecord[]; total: number }> {
+    const where: Prisma.certified_gemstonesWhereInput = {
+      ...(filter.gemstoneOptionId
+        ? { gemstone_option_id: filter.gemstoneOptionId }
+        : {}),
+      ...(filter.status ? { status: filter.status } : {}),
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.certified_gemstones.findMany({
@@ -202,18 +275,18 @@ export class InventoryRepository {
       this.prisma.certified_gemstones.count({ where }),
     ]);
 
-    return { items, total };
+    return { items: items.map((g) => toCertifiedGemstoneRecord(g)), total };
   }
 
-  findCertifiedGemstoneByCode(
+  async findCertifiedGemstoneByCode(
     internalCode: string,
-  ): Promise<certified_gemstones | null> {
-    return this.prisma.certified_gemstones.findUnique({
+  ): Promise<CertifiedGemstoneRecord | null> {
+    const row = await this.prisma.certified_gemstones.findUnique({
       where: { internal_code: internalCode },
     });
+    return row ? toCertifiedGemstoneRecord(row) : null;
   }
 
-  // --- INVEN-006: Create Certified Gemstone ---
   async createCertifiedGemstone(params: {
     internalCode: string;
     gemstoneOptionId: string;
@@ -224,8 +297,8 @@ export class InventoryRepository {
     purchaseCost?: number;
     locationCode?: string;
     performedByUserId?: string;
-  }): Promise<certified_gemstones> {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<CertifiedGemstoneRecord> {
+    const row = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
       const gemstone = await tx.certified_gemstones.create({
         data: {
@@ -253,36 +326,32 @@ export class InventoryRepository {
           quantity: 1,
           unit_cost_snapshot:
             params.purchaseCost !== undefined ? params.purchaseCost : null,
-          reason: 'Initial certified gemstone intake',
-          performed_by_user_id: params.performedByUserId
-            ? params.performedByUserId
-            : null,
+          reason: 'Initial certified gemstone receipt',
+          performed_by_user_id: params.performedByUserId ?? null,
           occurred_at: now,
         },
       });
 
       return gemstone;
     });
+
+    return toCertifiedGemstoneRecord(row);
   }
 
-  // --- INVEN-012: List Inventory Movements (Audit Ledger) ---
   async findInventoryMovements(filter: {
     stockLotId?: string;
     certifiedGemstoneId?: string;
     movementType?: string;
     limit: number;
     offset: number;
-  }): Promise<{ items: inventory_movements[]; total: number }> {
-    const where: Prisma.inventory_movementsWhereInput = {};
-    if (filter.stockLotId) {
-      where.stock_lot_id = filter.stockLotId;
-    }
-    if (filter.certifiedGemstoneId) {
-      where.certified_gemstone_id = filter.certifiedGemstoneId;
-    }
-    if (filter.movementType) {
-      where.movement_type = filter.movementType;
-    }
+  }): Promise<{ items: InventoryMovementRecord[]; total: number }> {
+    const where: Prisma.inventory_movementsWhereInput = {
+      ...(filter.stockLotId ? { stock_lot_id: filter.stockLotId } : {}),
+      ...(filter.certifiedGemstoneId
+        ? { certified_gemstone_id: filter.certifiedGemstoneId }
+        : {}),
+      ...(filter.movementType ? { movement_type: filter.movementType } : {}),
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.inventory_movements.findMany({
@@ -294,18 +363,17 @@ export class InventoryRepository {
       this.prisma.inventory_movements.count({ where }),
     ]);
 
-    return { items, total };
+    return { items: items.map((m) => toInventoryMovementRecord(m)), total };
   }
 
-  // --- INVEN-013: Adjust Inventory ---
   async adjustInventory(params: {
     stockLotId: string;
     adjustedQuantity: number;
     reason: string;
     metadataJson?: Record<string, unknown>;
     performedByUserId?: string;
-  }): Promise<stock_lots> {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<StockLotRecord> {
+    const row = await this.prisma.$transaction(async (tx) => {
       const lot = await tx.stock_lots.findUnique({
         where: { id: params.stockLotId },
       });
@@ -337,27 +405,15 @@ export class InventoryRepository {
           reason: params.reason,
           metadata_json:
             (params.metadataJson as Prisma.InputJsonValue | undefined) ?? {},
-          performed_by_user_id: params.performedByUserId
-            ? params.performedByUserId
-            : null,
+          performed_by_user_id: params.performedByUserId ?? null,
           occurred_at: now,
         },
       });
 
       return updatedLot;
     });
-  }
 
-  // --- Allocations & Stock Lifecycle (INVEN-007..011) ---
-
-  async findAllocationById(id: string): Promise<allocations | null> {
-    return this.prisma.allocations.findUnique({
-      where: { id },
-      include: {
-        stock_lots: true,
-        certified_gemstones: true,
-      },
-    });
+    return toStockLotRecord(row);
   }
 
   async holdInventory(params: {
@@ -367,8 +423,8 @@ export class InventoryRepository {
     quantity: number;
     expiresAt: Date;
     allocatedByUserId: string;
-  }): Promise<allocations> {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<AllocationRecord> {
+    const row = await this.prisma.$transaction(async (tx) => {
       if (params.stockLotId) {
         const lot = await tx.stock_lots.findUnique({
           where: { id: params.stockLotId },
@@ -399,10 +455,7 @@ export class InventoryRepository {
 
         await tx.certified_gemstones.update({
           where: { id: params.certifiedGemstoneId },
-          data: {
-            status: 'RESERVED',
-            updated_at: new Date(),
-          },
+          data: { status: 'RESERVED', updated_at: new Date() },
         });
       }
 
@@ -418,13 +471,15 @@ export class InventoryRepository {
         },
       });
     });
+
+    return toAllocationRecord(row);
   }
 
   async reserveInventory(params: {
     allocationId: string;
     allocatedByUserId: string;
-  }): Promise<allocations> {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<AllocationRecord> {
+    const row = await this.prisma.$transaction(async (tx) => {
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
       });
@@ -437,20 +492,22 @@ export class InventoryRepository {
         where: { id: params.allocationId },
         data: {
           status: 'RESERVED',
-          expires_at: null, // clear TTL on reserve
+          expires_at: null,
           allocated_by_user_id: params.allocatedByUserId,
           updated_at: new Date(),
         },
       });
     });
+
+    return toAllocationRecord(row);
   }
 
   async allocateInventory(params: {
     allocationId: string;
     productionAttemptId: string;
     allocatedByUserId: string;
-  }): Promise<allocations> {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<AllocationRecord> {
+    const row = await this.prisma.$transaction(async (tx) => {
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
       });
@@ -469,13 +526,15 @@ export class InventoryRepository {
         },
       });
     });
+
+    return toAllocationRecord(row);
   }
 
   async consumeInventory(params: {
     allocationId: string;
     allocatedByUserId: string;
-  }): Promise<allocations> {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<AllocationRecord> {
+    const row = await this.prisma.$transaction(async (tx) => {
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
         include: { stock_lots: true, certified_gemstones: true },
@@ -510,9 +569,7 @@ export class InventoryRepository {
             quantity: allocation.quantity,
             unit_cost_snapshot: lot.unit_cost,
             reason: 'Consumed for production',
-            performed_by_user_id: params.allocatedByUserId
-              ? params.allocatedByUserId
-              : null,
+            performed_by_user_id: params.allocatedByUserId || null,
             occurred_at: now,
           },
         });
@@ -522,10 +579,7 @@ export class InventoryRepository {
         const gem = allocation.certified_gemstones;
         await tx.certified_gemstones.update({
           where: { id: allocation.certified_gemstone_id },
-          data: {
-            status: 'MOUNTED',
-            updated_at: now,
-          },
+          data: { status: 'MOUNTED', updated_at: now },
         });
 
         await tx.inventory_movements.create({
@@ -538,9 +592,7 @@ export class InventoryRepository {
             quantity: 1,
             unit_cost_snapshot: gem.purchase_cost ?? 0,
             reason: 'Mounted gemstone for production',
-            performed_by_user_id: params.allocatedByUserId
-              ? params.allocatedByUserId
-              : null,
+            performed_by_user_id: params.allocatedByUserId || null,
             occurred_at: now,
           },
         });
@@ -548,20 +600,19 @@ export class InventoryRepository {
 
       return tx.allocations.update({
         where: { id: params.allocationId },
-        data: {
-          status: 'CONSUMED',
-          updated_at: now,
-        },
+        data: { status: 'CONSUMED', updated_at: now },
       });
     });
+
+    return toAllocationRecord(row);
   }
 
   async releaseInventory(params: {
     allocationId: string;
     reason?: string;
     allocatedByUserId: string;
-  }): Promise<allocations> {
-    return this.prisma.$transaction(async (tx) => {
+  }): Promise<AllocationRecord> {
+    const row = await this.prisma.$transaction(async (tx) => {
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
         include: { stock_lots: true, certified_gemstones: true },
@@ -577,14 +628,13 @@ export class InventoryRepository {
       const now = new Date();
       if (allocation.stock_lot_id && allocation.stock_lots) {
         const lot = allocation.stock_lots;
-        const nextReserved = Math.max(
-          0,
-          lot.quantity_reserved - allocation.quantity,
-        );
         await tx.stock_lots.update({
           where: { id: allocation.stock_lot_id },
           data: {
-            quantity_reserved: nextReserved,
+            quantity_reserved: Math.max(
+              0,
+              lot.quantity_reserved - allocation.quantity,
+            ),
             updated_at: now,
           },
         });
@@ -593,20 +643,16 @@ export class InventoryRepository {
       if (allocation.certified_gemstone_id) {
         await tx.certified_gemstones.update({
           where: { id: allocation.certified_gemstone_id },
-          data: {
-            status: 'AVAILABLE',
-            updated_at: now,
-          },
+          data: { status: 'AVAILABLE', updated_at: now },
         });
       }
 
       return tx.allocations.update({
         where: { id: params.allocationId },
-        data: {
-          status: 'RELEASED',
-          updated_at: now,
-        },
+        data: { status: 'RELEASED', updated_at: now },
       });
     });
+
+    return toAllocationRecord(row);
   }
 }

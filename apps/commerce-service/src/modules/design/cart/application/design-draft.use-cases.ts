@@ -5,7 +5,7 @@ import type {
   GetDesignDraftRequest,
   GetDesignDraftResponse,
 } from '@app/contracts';
-import { PricingService } from '../../../pricing/pricing-core/application/pricing.service';
+import { EstimatePriceUseCase } from '../../../pricing/pricing-core/application/estimate-price.use-case';
 import {
   buildGemstoneConfigJson,
   extractMaintenancePlan,
@@ -25,7 +25,7 @@ export class DesignDraftUseCases {
   constructor(
     @Inject(CART_REPOSITORY)
     private readonly repository: CartRepository,
-    private readonly pricingService: PricingService,
+    private readonly estimatePriceUseCase: EstimatePriceUseCase,
   ) {}
 
   async getDesignDraft(
@@ -63,7 +63,7 @@ export class DesignDraftUseCases {
       sourceDraft.gemstoneConfigJson,
     );
     const currentPlan = extractMaintenancePlan(sourceDraft.gemstoneConfigJson);
-    const pricing = await this.pricingService.estimatePrice({
+    const pricing = await this.estimatePriceUseCase.execute({
       templateVariantId: sourceDraft.templateVariantId,
       targetSize: sourceDraft.targetSize,
       gemstoneOptionIds: currentGemstones.map((g) => g.gemstoneOptionId),

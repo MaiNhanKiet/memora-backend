@@ -3,7 +3,7 @@ import type {
   ValidateCheckoutRequest,
   ValidateCheckoutResponse,
 } from '@app/contracts';
-import { PricingService } from '../../../pricing/pricing-core/application/pricing.service';
+import { EstimatePriceUseCase } from '../../../pricing/pricing-core/application/estimate-price.use-case';
 import { parseGemstoneSelections } from './cart.mapper';
 import { CART_REPOSITORY, type CartRepository } from './cart.repository';
 import { validateCartActor } from './cart.validation';
@@ -13,7 +13,7 @@ export class ValidateCheckoutUseCase {
   constructor(
     @Inject(CART_REPOSITORY)
     private readonly repository: CartRepository,
-    private readonly pricingService: PricingService,
+    private readonly estimatePriceUseCase: EstimatePriceUseCase,
   ) {}
 
   async execute(
@@ -55,7 +55,7 @@ export class ValidateCheckoutUseCase {
         const gemstoneSelections = parseGemstoneSelections(
           draft.gemstoneConfigJson,
         );
-        const pricing = await this.pricingService.estimatePrice({
+        const pricing = await this.estimatePriceUseCase.execute({
           templateVariantId: draft.templateVariantId,
           targetSize: draft.targetSize,
           gemstoneOptionIds: gemstoneSelections.map((g) => g.gemstoneOptionId),

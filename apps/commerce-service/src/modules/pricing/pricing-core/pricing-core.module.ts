@@ -1,12 +1,21 @@
 import { Module } from '@nestjs/common';
+import { EstimatePriceUseCase } from './application/estimate-price.use-case';
+import { PriceItemUseCases } from './application/price-item.use-cases';
+import { PriceVersionUseCases } from './application/price-version.use-cases';
+import { PRICING_REPOSITORY } from './application/pricing.repository';
+import { PricingRuleUseCases } from './application/pricing-rule.use-cases';
+import { PrismaPricingRepository } from './infrastructure/prisma-pricing.repository';
 import { PricingGrpcController } from './presentation/pricing.grpc.controller';
-import { PricingService } from './application/pricing.service';
-import { PricingMapper } from './application/pricing.mapper';
-import { PricingRepository } from './infrastructure/pricing.repository';
 
 @Module({
   controllers: [PricingGrpcController],
-  providers: [PricingService, PricingMapper, PricingRepository],
-  exports: [PricingService, PricingMapper, PricingRepository],
+  providers: [
+    EstimatePriceUseCase,
+    PriceItemUseCases,
+    PriceVersionUseCases,
+    PricingRuleUseCases,
+    { provide: PRICING_REPOSITORY, useClass: PrismaPricingRepository },
+  ],
+  exports: [EstimatePriceUseCase, PRICING_REPOSITORY],
 })
 export class PricingCoreModule {}

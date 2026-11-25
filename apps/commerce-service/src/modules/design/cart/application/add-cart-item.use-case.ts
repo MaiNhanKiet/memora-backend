@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { AddCartItemRequest, AddCartItemResponse } from '@app/contracts';
-import { PricingService } from '../../../pricing/pricing-core/application/pricing.service';
+import { EstimatePriceUseCase } from '../../../pricing/pricing-core/application/estimate-price.use-case';
 import {
   buildGemstoneConfigJson,
   mapCartResponse,
@@ -18,7 +18,7 @@ export class AddCartItemUseCase {
   constructor(
     @Inject(CART_REPOSITORY)
     private readonly repository: CartRepository,
-    private readonly pricingService: PricingService,
+    private readonly estimatePriceUseCase: EstimatePriceUseCase,
   ) {}
 
   async execute(request: AddCartItemRequest): Promise<AddCartItemResponse> {
@@ -29,7 +29,7 @@ export class AddCartItemUseCase {
     const selections = request.gemstoneSelections || [];
     const gemstoneOptionIds = selections.map((g) => g.gemstoneOptionId);
 
-    const pricing = await this.pricingService.estimatePrice({
+    const pricing = await this.estimatePriceUseCase.execute({
       templateVariantId: request.templateVariantId,
       targetSize: request.targetSize,
       gemstoneOptionIds,

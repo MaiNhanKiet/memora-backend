@@ -3,7 +3,7 @@ import type {
   UpdateCartItemRequest,
   UpdateCartItemResponse,
 } from '@app/contracts';
-import { PricingService } from '../../../pricing/pricing-core/application/pricing.service';
+import { EstimatePriceUseCase } from '../../../pricing/pricing-core/application/estimate-price.use-case';
 import {
   buildGemstoneConfigJson,
   extractMaintenancePlan,
@@ -19,7 +19,7 @@ export class UpdateCartItemUseCase {
   constructor(
     @Inject(CART_REPOSITORY)
     private readonly repository: CartRepository,
-    private readonly pricingService: PricingService,
+    private readonly estimatePriceUseCase: EstimatePriceUseCase,
   ) {}
 
   async execute(
@@ -42,7 +42,7 @@ export class UpdateCartItemUseCase {
     const currentPlan = extractMaintenancePlan(draft.gemstoneConfigJson);
     const maintenancePlan = request.maintenancePlan ?? currentPlan ?? 'NONE';
 
-    const pricing = await this.pricingService.estimatePrice({
+    const pricing = await this.estimatePriceUseCase.execute({
       templateVariantId: draft.templateVariantId,
       targetSize,
       gemstoneOptionIds: currentGemstones.map((g) => g.gemstoneOptionId),
