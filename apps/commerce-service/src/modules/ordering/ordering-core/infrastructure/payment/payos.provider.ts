@@ -149,10 +149,9 @@ export class PayosProvider {
 
     // PayOS sorted key signature calculation:
     // amount, cancelUrl (if any), description, orderCode, returnUrl, etc.
-    const dataRecord = data as unknown as Record<string, unknown>;
-    const sortedKeys = Object.keys(dataRecord).sort();
-    const signString = sortedKeys
-      .map((k) => `${k}=${formatValue(dataRecord[k])}`)
+    const signString = Object.entries(data)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${formatValue(v)}`)
       .join('&');
 
     const expectedSignature = crypto

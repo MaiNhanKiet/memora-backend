@@ -208,11 +208,24 @@ export class PricingRepository {
     return latest?.version_no ?? 0;
   }
 
-  createPriceVersion(
-    data: Prisma.price_versionsUncheckedCreateInput,
-  ): Promise<price_versions> {
+  createPriceVersion(data: {
+    price_item_id: string;
+    amount: number;
+    currency: string;
+    version_no: number;
+    status: string;
+    effective_from?: Date;
+    effective_to?: Date;
+    source_type: string;
+    market_snapshot_json?: Record<string, unknown>;
+    created_by_user_id?: string;
+  }): Promise<price_versions> {
     return this.prisma.price_versions.create({
-      data,
+      data: {
+        ...data,
+        market_snapshot_json: data.market_snapshot_json as
+          Prisma.InputJsonValue | undefined,
+      },
     });
   }
 
@@ -327,11 +340,27 @@ export class PricingRepository {
     return latest?.version_no ?? 0;
   }
 
-  createPricingRule(
-    data: Prisma.pricing_rulesUncheckedCreateInput,
-  ): Promise<pricing_rules> {
+  createPricingRule(data: {
+    rule_type: string;
+    code: string;
+    name: string;
+    template_variant_id?: string;
+    resize_direction?: string;
+    delivery_zone_code?: string;
+    cancellation_stage?: string;
+    redelivery_reason?: string;
+    config_json: Record<string, unknown>;
+    version_no: number;
+    status: string;
+    effective_from?: Date;
+    effective_to?: Date;
+    created_by_user_id?: string;
+  }): Promise<pricing_rules> {
     return this.prisma.pricing_rules.create({
-      data,
+      data: {
+        ...data,
+        config_json: data.config_json as Prisma.InputJsonValue,
+      },
     });
   }
 

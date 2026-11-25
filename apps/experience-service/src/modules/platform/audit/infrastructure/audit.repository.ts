@@ -69,8 +69,8 @@ export class AuditRepository {
     requestId?: string | null;
     traceId?: string | null;
     resultStatus?: string | null;
-    changeSummaryJson?: Prisma.InputJsonValue;
-    metadataJson?: Prisma.InputJsonValue;
+    changeSummaryJson?: Record<string, unknown>;
+    metadataJson?: Record<string, unknown>;
   }): Promise<audit_logs> {
     return this.prisma.audit_logs.create({
       data: {
@@ -81,8 +81,10 @@ export class AuditRepository {
         request_id: data.requestId,
         trace_id: data.traceId,
         result_status: data.resultStatus,
-        change_summary_json: data.changeSummaryJson ?? {},
-        metadata_json: data.metadataJson ?? {},
+        change_summary_json:
+          (data.changeSummaryJson as Prisma.InputJsonValue | undefined) ?? {},
+        metadata_json:
+          (data.metadataJson as Prisma.InputJsonValue | undefined) ?? {},
       },
     });
   }

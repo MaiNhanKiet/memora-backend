@@ -68,14 +68,14 @@ export class CheckoutOrdersController {
     );
 
     // Fault-tolerant memory card provisioning for memory-enabled ring items
-    if (order.items && order.items.length > 0) {
-      const ownerCustomerIdentityId =
-        actor.customerIdentityId ?? actor.userId ?? '';
-      const ownerEmail =
-        (principal as unknown as { email?: string }).email ??
-        body.recipientEmail ??
-        'customer@memora.vn';
-
+    const ownerCustomerIdentityId = actor.customerIdentityId;
+    const ownerEmail = body.recipientEmail?.trim();
+    if (
+      order.items &&
+      order.items.length > 0 &&
+      ownerCustomerIdentityId &&
+      ownerEmail
+    ) {
       for (const item of order.items) {
         if (item.memoryEnabled) {
           try {
@@ -183,22 +183,25 @@ export class CheckoutOrdersController {
         });
         memoryCard = { id: card.id, status: card.status };
       } catch {
-        // Fallback: if not found, lazy-provision card
-        try {
-          const ownerCustomerIdentityId =
-            actor.customerIdentityId ?? actor.userId ?? '';
-          const ownerEmail =
-            (principal as unknown as { email?: string }).email ??
-            'customer@memora.vn';
-          const card = await this.memoryClient.provisionMemoryCard({
-            actor,
-            ringItemId,
-            ownerCustomerIdentityId,
-            ownerEmail,
-          });
-          memoryCard = { id: card.id, status: card.status };
-        } catch {
-          // If experience service is unreachable, keep memoryCard undefined
+        // Fallback: if not found, lazy-provision card when customer identity and recipientEmail are available
+        if (actor.customerIdentityId) {
+          try {
+            const order = await this.orderingClient.getOrderById(
+              toGetOrderByIdGrpcRequest(actor, orderId),
+            );
+            const ownerEmail = order.recipientEmail?.trim();
+            if (ownerEmail) {
+              const card = await this.memoryClient.provisionMemoryCard({
+                actor,
+                ringItemId,
+                ownerCustomerIdentityId: actor.customerIdentityId,
+                ownerEmail,
+              });
+              memoryCard = { id: card.id, status: card.status };
+            }
+          } catch {
+            // If experience service is unreachable, keep memoryCard undefined
+          }
         }
       }
     }

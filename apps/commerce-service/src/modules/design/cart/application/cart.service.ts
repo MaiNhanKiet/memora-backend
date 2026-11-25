@@ -37,15 +37,39 @@ import {
 } from '../infrastructure/cart.repository';
 import { PricingService } from '../../../pricing/pricing-core/application/pricing.service';
 
-function extractGemstones(json: unknown): GemstoneSelectionItem[] {
-  if (Array.isArray(json)) return json as GemstoneSelectionItem[];
+function isGemstoneSelectionItem(item: unknown): item is GemstoneSelectionItem {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return false;
+  }
+  if (
+    !('gemstoneOptionId' in item) ||
+    typeof item.gemstoneOptionId !== 'string'
+  ) {
+    return false;
+  }
+  if (
+    'slotIndex' in item &&
+    item.slotIndex !== undefined &&
+    typeof item.slotIndex !== 'number'
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function parseGemstoneSelections(
+  json: unknown,
+): GemstoneSelectionItem[] {
+  if (Array.isArray(json)) {
+    return json.filter(isGemstoneSelectionItem);
+  }
   if (
     json &&
     typeof json === 'object' &&
     'selections' in json &&
     Array.isArray(json.selections)
   ) {
-    return json.selections as GemstoneSelectionItem[];
+    return json.selections.filter(isGemstoneSelectionItem);
   }
   return [];
 }
@@ -175,7 +199,9 @@ export class CartService {
     const memoryEnabled = request.memoryEnabled ?? draft.memory_enabled;
 
     // Recalculate price if size, personalization, or maintenance plan changed
-    const currentGemstones = extractGemstones(draft.gemstone_config_json);
+    const currentGemstones = parseGemstoneSelections(
+      draft.gemstone_config_json,
+    );
     const currentPlan = extractMaintenancePlan(draft.gemstone_config_json);
     const maintenancePlan = request.maintenancePlan ?? currentPlan ?? 'NONE';
 
@@ -284,9 +310,9 @@ export class CartService {
       }
 
       try {
-        const gemstoneSelections =
-          (draft.gemstone_config_json as unknown as GemstoneSelectionItem[]) ||
-          [];
+        const gemstoneSelections = parseGemstoneSelections(
+          draft.gemstone_config_json,
+        );
         const pricing = await this.pricingService.estimatePrice({
           templateVariantId: draft.template_variant_id,
           targetSize: Number(draft.target_size),
@@ -382,7 +408,9 @@ export class CartService {
       cart = await this.repository.findActiveCartByActor(actor);
     }
 
-    const currentGemstones = extractGemstones(sourceDraft.gemstone_config_json);
+    const currentGemstones = parseGemstoneSelections(
+      sourceDraft.gemstone_config_json,
+    );
     const currentPlan = extractMaintenancePlan(
       sourceDraft.gemstone_config_json,
     );
@@ -507,7 +535,7 @@ export class CartService {
       ring_templates: { code: string; name: string };
     };
   }): CartItemDraft {
-    const selections = extractGemstones(draft.gemstone_config_json);
+    const selections = parseGemstoneSelections(draft.gemstone_config_json);
     const maintenancePlan = extractMaintenancePlan(draft.gemstone_config_json);
 
     return {

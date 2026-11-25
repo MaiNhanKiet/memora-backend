@@ -90,15 +90,7 @@ export class MemoryCardService {
 
     const isOwner = card.owner_customer_identity_id === customerIdentityId;
     if (!isOwner) {
-      const grants =
-        (
-          card as unknown as {
-            access_grants?: Array<{
-              status: string;
-              grantee_user_id?: string | null;
-            }>;
-          }
-        ).access_grants ?? [];
+      const grants = card.access_grants ?? [];
       const hasGrant = grants.some(
         (g) =>
           g.status === 'ACTIVE' &&

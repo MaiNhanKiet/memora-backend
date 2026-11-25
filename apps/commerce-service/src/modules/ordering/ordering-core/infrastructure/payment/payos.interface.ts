@@ -25,7 +25,7 @@ export interface PayosPaymentLinkData {
   qrCode: string;
 }
 
-export interface PayosWebhookData {
+export type PayosWebhookData = {
   orderCode: number;
   amount: number;
   description: string;
@@ -36,7 +36,7 @@ export interface PayosWebhookData {
   paymentLinkId: string;
   code: string;
   desc: string;
-}
+};
 
 export interface PayosWebhookPayload {
   code: string;

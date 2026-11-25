@@ -220,7 +220,7 @@ export class InventoryRepository {
     certificateProvider?: string;
     certificateNumber?: string;
     certificateUrl?: string;
-    certificateMetadataJson?: Prisma.InputJsonValue;
+    certificateMetadataJson?: Record<string, unknown>;
     purchaseCost?: number;
     locationCode?: string;
     performedByUserId?: string;
@@ -234,7 +234,9 @@ export class InventoryRepository {
           certificate_provider: params.certificateProvider,
           certificate_number: params.certificateNumber,
           certificate_url: params.certificateUrl,
-          certificate_metadata_json: params.certificateMetadataJson ?? {},
+          certificate_metadata_json:
+            (params.certificateMetadataJson as
+              Prisma.InputJsonValue | undefined) ?? {},
           purchase_cost:
             params.purchaseCost !== undefined ? params.purchaseCost : null,
           location_code: params.locationCode,
@@ -300,7 +302,7 @@ export class InventoryRepository {
     stockLotId: string;
     adjustedQuantity: number;
     reason: string;
-    metadataJson?: Prisma.InputJsonValue;
+    metadataJson?: Record<string, unknown>;
     performedByUserId?: string;
   }): Promise<stock_lots> {
     return this.prisma.$transaction(async (tx) => {
@@ -333,7 +335,8 @@ export class InventoryRepository {
           quantity: params.adjustedQuantity,
           unit_cost_snapshot: lot.unit_cost,
           reason: params.reason,
-          metadata_json: params.metadataJson ?? {},
+          metadata_json:
+            (params.metadataJson as Prisma.InputJsonValue | undefined) ?? {},
           performed_by_user_id: params.performedByUserId
             ? params.performedByUserId
             : null,

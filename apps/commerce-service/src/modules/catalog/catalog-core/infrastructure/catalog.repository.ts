@@ -32,6 +32,72 @@ export interface FindGemstonesFilter {
   status?: string;
 }
 
+export interface UpdateTemplateInput {
+  name?: string;
+  description?: string;
+  glb_asset_key?: string;
+  stone_layout?: string;
+  design_supported_personalization_packages?: string[];
+  status?: string;
+}
+
+export interface CreateMaterialInput {
+  code: string;
+  name: string;
+  material_family?: string;
+  purity_percent?: number;
+  color?: string;
+  status: string;
+}
+
+export interface UpdateMaterialInput {
+  name?: string;
+  material_family?: string;
+  purity_percent?: number;
+  color?: string;
+  status?: string;
+}
+
+export interface CreateVariantInput {
+  ring_template_id: string;
+  material_id: string;
+  standard_size: number;
+  max_up_delta?: number;
+  max_down_delta?: number;
+  resize_method?: string;
+  added_metal_allowed: boolean;
+  local_wall_thickness_mm: number;
+  min_remaining_wall_thickness_mm: number;
+  max_safe_engraving_depth_mm: number;
+  status: string;
+  created_by_user_id?: string;
+}
+
+export interface UpdateVariantInput {
+  standard_size?: number;
+  max_up_delta?: number;
+  max_down_delta?: number;
+  resize_method?: string;
+  added_metal_allowed?: boolean;
+  local_wall_thickness_mm?: number;
+  min_remaining_wall_thickness_mm?: number;
+  max_safe_engraving_depth_mm?: number;
+  status?: string;
+}
+
+export interface CreateGemstoneOptionInput {
+  code: string;
+  name: string;
+  stone_type: string;
+  shape: string;
+  length_mm: number;
+  width_mm: number;
+  color_grade?: string;
+  clarity_grade?: string;
+  certified_required: boolean;
+  status: string;
+}
+
 @Injectable()
 export class CatalogRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -87,7 +153,7 @@ export class CatalogRepository {
 
   updateTemplate(
     id: string,
-    data: Prisma.ring_templatesUpdateInput,
+    data: UpdateTemplateInput,
   ): Promise<ring_templates> {
     return this.prisma.ring_templates.update({
       where: { id },
@@ -128,17 +194,37 @@ export class CatalogRepository {
     });
   }
 
-  createMaterial(data: Prisma.materialsCreateInput): Promise<materials> {
-    return this.prisma.materials.create({ data });
+  createMaterial(data: CreateMaterialInput): Promise<materials> {
+    return this.prisma.materials.create({
+      data: {
+        code: data.code,
+        name: data.name,
+        material_family: data.material_family,
+        purity_percent:
+          data.purity_percent !== undefined
+            ? new Prisma.Decimal(data.purity_percent)
+            : undefined,
+        color: data.color,
+        status: data.status,
+      },
+    });
   }
 
-  updateMaterial(
-    id: string,
-    data: Prisma.materialsUpdateInput,
-  ): Promise<materials> {
+  updateMaterial(id: string, data: UpdateMaterialInput): Promise<materials> {
+    const updateData: Prisma.materialsUpdateInput = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.material_family !== undefined) {
+      updateData.material_family = data.material_family;
+    }
+    if (data.purity_percent !== undefined) {
+      updateData.purity_percent = new Prisma.Decimal(data.purity_percent);
+    }
+    if (data.color !== undefined) updateData.color = data.color;
+    if (data.status !== undefined) updateData.status = data.status;
+
     return this.prisma.materials.update({
       where: { id },
-      data,
+      data: updateData,
     });
   }
 
@@ -189,19 +275,79 @@ export class CatalogRepository {
     });
   }
 
-  createVariant(
-    data: Prisma.template_variantsCreateInput,
-  ): Promise<template_variants> {
-    return this.prisma.template_variants.create({ data });
+  createVariant(data: CreateVariantInput): Promise<template_variants> {
+    return this.prisma.template_variants.create({
+      data: {
+        ring_templates: { connect: { id: data.ring_template_id } },
+        materials: { connect: { id: data.material_id } },
+        standard_size: new Prisma.Decimal(data.standard_size),
+        max_up_delta:
+          data.max_up_delta !== undefined
+            ? new Prisma.Decimal(data.max_up_delta)
+            : undefined,
+        max_down_delta:
+          data.max_down_delta !== undefined
+            ? new Prisma.Decimal(data.max_down_delta)
+            : undefined,
+        resize_method: data.resize_method,
+        added_metal_allowed: data.added_metal_allowed,
+        local_wall_thickness_mm: new Prisma.Decimal(
+          data.local_wall_thickness_mm,
+        ),
+        min_remaining_wall_thickness_mm: new Prisma.Decimal(
+          data.min_remaining_wall_thickness_mm,
+        ),
+        max_safe_engraving_depth_mm: new Prisma.Decimal(
+          data.max_safe_engraving_depth_mm,
+        ),
+        status: data.status,
+        created_by_user_id: data.created_by_user_id,
+      },
+    });
   }
 
   updateVariant(
     id: string,
-    data: Prisma.template_variantsUpdateInput,
+    data: UpdateVariantInput,
   ): Promise<template_variants> {
+    const updateData: Prisma.template_variantsUpdateInput = {};
+    if (data.standard_size !== undefined) {
+      updateData.standard_size = new Prisma.Decimal(data.standard_size);
+    }
+    if (data.max_up_delta !== undefined) {
+      updateData.max_up_delta = new Prisma.Decimal(data.max_up_delta);
+    }
+    if (data.max_down_delta !== undefined) {
+      updateData.max_down_delta = new Prisma.Decimal(data.max_down_delta);
+    }
+    if (data.resize_method !== undefined) {
+      updateData.resize_method = data.resize_method;
+    }
+    if (data.added_metal_allowed !== undefined) {
+      updateData.added_metal_allowed = data.added_metal_allowed;
+    }
+    if (data.local_wall_thickness_mm !== undefined) {
+      updateData.local_wall_thickness_mm = new Prisma.Decimal(
+        data.local_wall_thickness_mm,
+      );
+    }
+    if (data.min_remaining_wall_thickness_mm !== undefined) {
+      updateData.min_remaining_wall_thickness_mm = new Prisma.Decimal(
+        data.min_remaining_wall_thickness_mm,
+      );
+    }
+    if (data.max_safe_engraving_depth_mm !== undefined) {
+      updateData.max_safe_engraving_depth_mm = new Prisma.Decimal(
+        data.max_safe_engraving_depth_mm,
+      );
+    }
+    if (data.status !== undefined) {
+      updateData.status = data.status;
+    }
+
     return this.prisma.template_variants.update({
       where: { id },
-      data,
+      data: updateData,
     });
   }
 
@@ -257,9 +403,22 @@ export class CatalogRepository {
   }
 
   createGemstoneOption(
-    data: Prisma.gemstone_optionsCreateInput,
+    data: CreateGemstoneOptionInput,
   ): Promise<gemstone_options> {
-    return this.prisma.gemstone_options.create({ data });
+    return this.prisma.gemstone_options.create({
+      data: {
+        code: data.code,
+        name: data.name,
+        stone_type: data.stone_type,
+        shape: data.shape,
+        length_mm: new Prisma.Decimal(data.length_mm),
+        width_mm: new Prisma.Decimal(data.width_mm),
+        color_grade: data.color_grade,
+        clarity_grade: data.clarity_grade,
+        certified_required: data.certified_required,
+        status: data.status,
+      },
+    });
   }
 
   // ---------------------------------------------------------------------------

@@ -73,10 +73,10 @@ import type {
 import { OrderingRepository } from '../infrastructure/ordering.repository';
 import { PayosProvider } from '../infrastructure/payment/payos.provider';
 import type { PayosWebhookData } from '../infrastructure/payment/payos.interface';
-import type {
-  payment_transactions,
-  Prisma,
-} from '../../../../../generated/prisma/client';
+import {
+  mapPaymentTransactionDetail,
+  mapQuoteToDetail,
+} from './ordering.mapper';
 
 @Injectable()
 export class OrderingService {
@@ -131,7 +131,7 @@ export class OrderingService {
     let preP1NoticeVersion: string | undefined;
     let privacyNoticeAcknowledgedAt: Date | undefined;
     let p1NonrefundAcknowledgedAt: Date | undefined;
-    let preP1EvidenceJson: Prisma.InputJsonValue | undefined;
+    let preP1EvidenceJson: Record<string, unknown> | undefined;
 
     if (hasPersonalization) {
       if (
@@ -178,11 +178,15 @@ export class OrderingService {
 
     // 8. Execute transactional order creation
     const cartId = drafts[0]?.cart_id ?? undefined;
-    let deliveryAddressJson: Prisma.InputJsonValue = {};
+    let deliveryAddressJson: Record<string, unknown> = {};
     if (request.deliveryAddressJson) {
       try {
         const parsed: unknown = JSON.parse(request.deliveryAddressJson);
-        deliveryAddressJson = parsed as Prisma.InputJsonValue;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          deliveryAddressJson = parsed as Record<string, unknown>;
+        } else {
+          deliveryAddressJson = { raw: request.deliveryAddressJson };
+        }
       } catch {
         deliveryAddressJson = { raw: request.deliveryAddressJson };
       }
@@ -948,7 +952,7 @@ export class OrderingService {
       throw new NotFoundException(`Failed to create quote: order not found`);
     }
 
-    return this.mapQuoteToDetail(quote);
+    return mapQuoteToDetail(quote);
   }
 
   // ---------------------------------------------------------------------------
@@ -980,7 +984,7 @@ export class OrderingService {
     }
 
     const updated = await this.repository.updateFinalQuote(request);
-    return this.mapQuoteToDetail(updated);
+    return mapQuoteToDetail(updated);
   }
 
   // ---------------------------------------------------------------------------
@@ -1009,7 +1013,7 @@ export class OrderingService {
       request.orderId,
       request.quoteId,
     );
-    return this.mapQuoteToDetail(published);
+    return mapQuoteToDetail(published);
   }
 
   // ---------------------------------------------------------------------------
@@ -1040,7 +1044,7 @@ export class OrderingService {
       );
     }
 
-    return this.mapQuoteToDetail(quote);
+    return mapQuoteToDetail(quote);
   }
 
   // ---------------------------------------------------------------------------
@@ -1217,64 +1221,6 @@ export class OrderingService {
           ringItemVersionId: i.ring_item_version_id,
           versionNo: i.ring_item_versions?.version_no ?? 1,
         })),
-      })),
-    };
-  }
-
-  private mapQuoteToDetail(quote: {
-    id: string;
-    quote_no: string;
-    quote_type: string;
-    version_no: number;
-    status: string;
-    subtotal_amount: Prisma.Decimal;
-    delivery_amount: Prisma.Decimal;
-    adjustment_amount: Prisma.Decimal;
-    total_amount: Prisma.Decimal;
-    currency: string;
-    created_at: Date;
-    valid_until: Date | null;
-    issued_at: Date | null;
-    accepted_at: Date | null;
-    quote_items: Array<{
-      id: string;
-      ring_item_id: string | null;
-      component_type: string;
-      description: string | null;
-      quantity: Prisma.Decimal;
-      unit_amount: Prisma.Decimal;
-      line_amount: Prisma.Decimal;
-      price_source_type: string;
-    }>;
-  }): FullQuoteDetail {
-    return {
-      id: quote.id,
-      quoteNo: quote.quote_no,
-      quoteType: quote.quote_type,
-      versionNo: quote.version_no,
-      status: quote.status,
-      subtotalAmount: Number(quote.subtotal_amount),
-      deliveryAmount: Number(quote.delivery_amount),
-      adjustmentAmount: Number(quote.adjustment_amount),
-      totalAmount: Number(quote.total_amount),
-      currency: quote.currency,
-      createdAt: quote.created_at.toISOString(),
-      validUntil: quote.valid_until
-        ? quote.valid_until.toISOString()
-        : undefined,
-      issuedAt: quote.issued_at ? quote.issued_at.toISOString() : undefined,
-      acceptedAt: quote.accepted_at
-        ? quote.accepted_at.toISOString()
-        : undefined,
-      items: quote.quote_items.map((i) => ({
-        id: i.id,
-        ringItemId: i.ring_item_id ?? undefined,
-        componentType: i.component_type,
-        description: i.description ?? undefined,
-        quantity: Number(i.quantity),
-        unitAmount: Number(i.unit_amount),
-        lineAmount: Number(i.line_amount),
-        priceSourceType: i.price_source_type,
       })),
     };
   }
@@ -1539,7 +1485,7 @@ export class OrderingService {
 
     const quotes = await this.repository.findClaimQuotes(request.claimId);
     return {
-      quotes: quotes.map((q) => this.mapQuoteToDetail(q)),
+      quotes: quotes.map((q) => mapQuoteToDetail(q)),
     };
   }
 
@@ -1818,7 +1764,7 @@ export class OrderingService {
     }
 
     if (tx.status === 'SUCCEEDED') {
-      return this.mapPaymentTransactionDetail(tx);
+      return mapPaymentTransactionDetail(tx);
     }
 
     if (!tx.provider_order_code) {
@@ -1847,43 +1793,10 @@ export class OrderingService {
         nextOrderStatus,
       });
 
-      return this.mapPaymentTransactionDetail(updated);
+      return mapPaymentTransactionDetail(updated);
     }
 
-    return this.mapPaymentTransactionDetail(tx);
-  }
-
-  private mapPaymentTransactionDetail(
-    p: payment_transactions,
-  ): PaymentTransactionDetail {
-    return {
-      id: p.id,
-      orderId: p.order_id || '',
-      paymentStage: p.payment_stage,
-      transactionType: p.transaction_type,
-      amount: Number(p.amount),
-      currency: p.currency,
-      status: p.status,
-      provider: p.provider ?? undefined,
-      paymentMethod: p.payment_method ?? undefined,
-      providerOrderCode: p.provider_order_code
-        ? p.provider_order_code.toString()
-        : undefined,
-      providerTransactionId: p.provider_transaction_id ?? undefined,
-      providerReference: p.provider_reference ?? undefined,
-      relatedTransactionId: p.related_transaction_id ?? undefined,
-      requestedAt: p.requested_at.toISOString(),
-      completedAt: p.completed_at ? p.completed_at.toISOString() : undefined,
-      failedAt: p.failed_at ? p.failed_at.toISOString() : undefined,
-      failureReason: p.failure_reason ?? undefined,
-      receiptNo: p.receipt_no ?? undefined,
-      receiptIssuedAt: p.receipt_issued_at
-        ? p.receipt_issued_at.toISOString()
-        : undefined,
-      metadataJson: p.metadata_json
-        ? JSON.stringify(p.metadata_json)
-        : undefined,
-    };
+    return mapPaymentTransactionDetail(tx);
   }
 
   // ---------------------------------------------------------------------------

@@ -7,8 +7,22 @@ import type {
   RecordAuditEventRequest,
   RecordAuditEventResponse,
 } from '@app/contracts';
-import type { Prisma } from '../../../../../generated/prisma/client';
 import { AuditRepository } from '../infrastructure/audit.repository';
+
+function parseJsonRecord(raw?: string): Record<string, unknown> {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
 
 @Injectable()
 export class AuditService {
@@ -89,25 +103,8 @@ export class AuditService {
       );
     }
 
-    let changeSummary: Prisma.InputJsonValue = {};
-    if (request.changeSummaryJson) {
-      try {
-        changeSummary = JSON.parse(
-          request.changeSummaryJson,
-        ) as Prisma.InputJsonValue;
-      } catch {
-        changeSummary = {};
-      }
-    }
-
-    let metadata: Prisma.InputJsonValue = {};
-    if (request.metadataJson) {
-      try {
-        metadata = JSON.parse(request.metadataJson) as Prisma.InputJsonValue;
-      } catch {
-        metadata = {};
-      }
-    }
+    const changeSummary = parseJsonRecord(request.changeSummaryJson);
+    const metadata = parseJsonRecord(request.metadataJson);
 
     const created = await this.auditRepository.createAuditLog({
       actorUserId: request.actorUserId || null,

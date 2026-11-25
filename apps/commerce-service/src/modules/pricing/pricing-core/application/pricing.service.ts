@@ -24,9 +24,40 @@ import type {
   PricingRuleResponse,
   RejectPriceVersionRequest,
 } from '@app/contracts';
-import type { Prisma } from '../../../../../generated/prisma/client';
 import { PricingRepository } from '../infrastructure/pricing.repository';
 import { PricingMapper } from './pricing.mapper';
+
+function parseJsonRecord(raw?: string): Record<string, unknown> {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+function parseOptionalJsonRecord(
+  raw?: string,
+): Record<string, unknown> | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 @Injectable()
 export class PricingService {
@@ -277,16 +308,9 @@ export class PricingService {
     );
     const nextVersion = latestVersion + 1;
 
-    let parsedMarketSnapshot: Prisma.InputJsonValue | undefined;
-    if (request.marketSnapshotJson) {
-      try {
-        parsedMarketSnapshot = JSON.parse(
-          request.marketSnapshotJson,
-        ) as Prisma.InputJsonValue;
-      } catch {
-        parsedMarketSnapshot = undefined;
-      }
-    }
+    const parsedMarketSnapshot = parseOptionalJsonRecord(
+      request.marketSnapshotJson,
+    );
 
     const created = await this.repository.createPriceVersion({
       price_item_id: request.priceItemId,
@@ -395,14 +419,7 @@ export class PricingService {
       );
     const nextVersion = latestVersion + 1;
 
-    let parsedConfig: Prisma.InputJsonValue = {};
-    if (request.configJson) {
-      try {
-        parsedConfig = JSON.parse(request.configJson) as Prisma.InputJsonValue;
-      } catch {
-        parsedConfig = {};
-      }
-    }
+    const parsedConfig = parseJsonRecord(request.configJson);
 
     const created = await this.repository.createPricingRule({
       rule_type: request.ruleType,

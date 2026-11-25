@@ -28,6 +28,12 @@ import {
   ResolvedShareLinkResponseDto,
   RevokeShareLinkResponseDto,
 } from '../dto';
+import {
+  toCreateShareLinkGrpcRequest,
+  toCreateShareLinkResponseDto,
+  toResolveShareLinkResponseDto,
+  toRevokeShareLinkResponseDto,
+} from '../mappers/sharing-http.mapper';
 
 @ApiTags('Platform - 3D Ring Sharing')
 @Controller('shares')
@@ -48,28 +54,7 @@ export class SharingController {
     const res = await this.platformSharingClient.resolveShareLink({
       shareToken,
     });
-
-    let sanitizedSnapshot: Record<string, unknown> = {};
-    if (res.sanitizedSnapshotJson) {
-      try {
-        sanitizedSnapshot = JSON.parse(res.sanitizedSnapshotJson) as Record<
-          string,
-          unknown
-        >;
-      } catch {
-        sanitizedSnapshot = {};
-      }
-    }
-
-    return {
-      shareToken: res.shareToken,
-      status: res.status,
-      expiresAt: res.expiresAt || undefined,
-      ringTemplateId: res.ringTemplateId || undefined,
-      ringDesignDraftId: res.ringDesignDraftId || undefined,
-      sanitizedSnapshot,
-      createdAt: res.createdAt,
-    };
+    return toResolveShareLinkResponseDto(res);
   }
 
   // ---------------------------------------------------------------------------
@@ -85,21 +70,10 @@ export class SharingController {
     @CurrentGuest() guest?: GatewayGuest,
   ): Promise<CreateShareLinkResponseDto> {
     const actor = toActorFromUserOrGuest(user, guest);
-    const res = await this.platformSharingClient.createShareLink({
-      actor,
-      ringDesignDraftId: body.ringDesignDraftId,
-      ringTemplateId: body.ringTemplateId,
-      sanitizedSnapshotJson: JSON.stringify(body.sanitizedSnapshot ?? {}),
-      expiresInDays: body.expiresInDays,
-    });
-
-    return {
-      id: res.id,
-      shareToken: res.shareToken,
-      shareUrl: res.shareUrl,
-      status: res.status,
-      expiresAt: res.expiresAt,
-    };
+    const res = await this.platformSharingClient.createShareLink(
+      toCreateShareLinkGrpcRequest(actor, body),
+    );
+    return toCreateShareLinkResponseDto(res);
   }
 
   // ---------------------------------------------------------------------------
@@ -119,11 +93,6 @@ export class SharingController {
       actor,
       shareLinkId,
     });
-
-    return {
-      id: res.id,
-      status: res.status,
-      revokedAt: res.revokedAt,
-    };
+    return toRevokeShareLinkResponseDto(res);
   }
 }

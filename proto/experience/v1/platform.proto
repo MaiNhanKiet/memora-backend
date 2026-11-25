@@ -39,7 +39,7 @@ message ResolveShareLinkResponse {
 // ---------------------------------------------------------------------------
 
 message CreateShareLinkRequest {
-  common.v1.Actor actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
   string ring_design_draft_id = 2;
   string ring_template_id = 3;
   string sanitized_snapshot_json = 4;
@@ -59,7 +59,7 @@ message CreateShareLinkResponse {
 // ---------------------------------------------------------------------------
 
 message RevokeShareLinkRequest {
-  common.v1.Actor actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
   string share_link_id = 2;
 }
 
@@ -89,7 +89,7 @@ message AuditLogItem {
 }
 
 message ListAuditLogsRequest {
-  common.v1.Actor actor = 1;
+  memora.common.v1.VerifiedActor actor = 1;
   string actor_user_id = 2;
   string entity_type = 3;
   string action = 4;

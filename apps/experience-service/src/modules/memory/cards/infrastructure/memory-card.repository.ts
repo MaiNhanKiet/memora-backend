@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../persistence/prisma/prisma.service';
-import type { memory_cards } from '../../../../../generated/prisma/client';
+import type {
+  memory_cards,
+  Prisma,
+} from '../../../../../generated/prisma/client';
+
+export type MemoryCardWithGrants = Prisma.memory_cardsGetPayload<{
+  include: { access_grants: true };
+}>;
 
 @Injectable()
 export class MemoryCardRepository {
@@ -29,7 +36,7 @@ export class MemoryCardRepository {
     return { items, total };
   }
 
-  async findById(cardId: string): Promise<memory_cards | null> {
+  async findById(cardId: string): Promise<MemoryCardWithGrants | null> {
     return this.prisma.memory_cards.findFirst({
       where: {
         id: cardId,

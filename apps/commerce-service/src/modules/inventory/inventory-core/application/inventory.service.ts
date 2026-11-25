@@ -6,7 +6,6 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { parseVerifiedActor, requireUserActor } from '@app/common';
-import type { Prisma } from '../../../../../generated/prisma/client';
 import type {
   AdjustInventoryRequest,
   AllocateInventoryRequest,
@@ -31,6 +30,21 @@ import type {
 } from '@app/contracts';
 import { InventoryRepository } from '../infrastructure/inventory.repository';
 import { InventoryMapper } from './inventory.mapper';
+
+function parseJsonRecord(raw?: string): Record<string, unknown> {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
 
 @Injectable()
 export class InventoryService {
@@ -157,16 +171,7 @@ export class InventoryService {
       );
     }
 
-    let parsedMetadata: Prisma.InputJsonValue = {};
-    if (request.certificateMetadataJson) {
-      try {
-        parsedMetadata = JSON.parse(
-          request.certificateMetadataJson,
-        ) as Prisma.InputJsonValue;
-      } catch {
-        parsedMetadata = {};
-      }
-    }
+    const parsedMetadata = parseJsonRecord(request.certificateMetadataJson);
 
     const created = await this.repository.createCertifiedGemstone({
       internalCode: request.internalCode,
@@ -212,16 +217,7 @@ export class InventoryService {
       throw new UnprocessableEntityException('Adjusted quantity cannot be 0');
     }
 
-    let parsedMetadata: Prisma.InputJsonValue = {};
-    if (request.metadataJson) {
-      try {
-        parsedMetadata = JSON.parse(
-          request.metadataJson,
-        ) as Prisma.InputJsonValue;
-      } catch {
-        parsedMetadata = {};
-      }
-    }
+    const parsedMetadata = parseJsonRecord(request.metadataJson);
 
     try {
       const updated = await this.repository.adjustInventory({

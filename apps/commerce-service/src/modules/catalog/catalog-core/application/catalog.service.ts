@@ -44,9 +44,13 @@ import type {
   ValidateConfigurationResponse,
   ValidationError,
 } from '@app/contracts';
-import { CatalogRepository } from '../infrastructure/catalog.repository';
+import {
+  CatalogRepository,
+  type UpdateMaterialInput,
+  type UpdateTemplateInput,
+  type UpdateVariantInput,
+} from '../infrastructure/catalog.repository';
 import { CatalogMapper } from './catalog.mapper';
-import { Prisma } from '../../../../../generated/prisma/client';
 
 @Injectable()
 export class CatalogService {
@@ -439,7 +443,7 @@ export class CatalogService {
       throw new BadRequestException('Cannot update an ARCHIVED template');
     }
 
-    const data: Prisma.ring_templatesUpdateInput = {};
+    const data: UpdateTemplateInput = {};
     if (request.name !== undefined) data.name = request.name;
     if (request.description !== undefined)
       data.description = request.description;
@@ -526,10 +530,7 @@ export class CatalogService {
       code: request.code,
       name: request.name,
       material_family: request.materialFamily,
-      purity_percent:
-        request.purityPercent !== undefined
-          ? new Prisma.Decimal(request.purityPercent)
-          : undefined,
+      purity_percent: request.purityPercent,
       color: request.color,
       status: 'ACTIVE',
     });
@@ -550,12 +551,12 @@ export class CatalogService {
       );
     }
 
-    const data: Prisma.materialsUpdateInput = {};
+    const data: UpdateMaterialInput = {};
     if (request.name !== undefined) data.name = request.name;
     if (request.materialFamily !== undefined)
       data.material_family = request.materialFamily;
     if (request.purityPercent !== undefined) {
-      data.purity_percent = new Prisma.Decimal(request.purityPercent);
+      data.purity_percent = request.purityPercent;
     }
     if (request.color !== undefined) data.color = request.color;
     if (request.status !== undefined) data.status = request.status;
@@ -589,26 +590,16 @@ export class CatalogService {
     }
 
     const created = await this.repository.createVariant({
-      ring_templates: { connect: { id: request.ringTemplateId } },
-      materials: { connect: { id: request.materialId } },
-      standard_size: new Prisma.Decimal(request.standardSize),
-      max_up_delta:
-        request.maxUpDelta !== undefined
-          ? new Prisma.Decimal(request.maxUpDelta)
-          : undefined,
-      max_down_delta:
-        request.maxDownDelta !== undefined
-          ? new Prisma.Decimal(request.maxDownDelta)
-          : undefined,
+      ring_template_id: request.ringTemplateId,
+      material_id: request.materialId,
+      standard_size: request.standardSize,
+      max_up_delta: request.maxUpDelta,
+      max_down_delta: request.maxDownDelta,
       resize_method: request.resizeMethod,
       added_metal_allowed: request.addedMetalAllowed ?? false,
-      local_wall_thickness_mm: new Prisma.Decimal(request.localWallThicknessMm),
-      min_remaining_wall_thickness_mm: new Prisma.Decimal(
-        request.minRemainingWallThicknessMm,
-      ),
-      max_safe_engraving_depth_mm: new Prisma.Decimal(
-        request.maxSafeEngravingDepthMm,
-      ),
+      local_wall_thickness_mm: request.localWallThicknessMm,
+      min_remaining_wall_thickness_mm: request.minRemainingWallThicknessMm,
+      max_safe_engraving_depth_mm: request.maxSafeEngravingDepthMm,
       status: 'ACTIVE',
       created_by_user_id: request.createdByUserId,
     });
@@ -631,15 +622,15 @@ export class CatalogService {
       );
     }
 
-    const data: Prisma.template_variantsUpdateInput = {};
+    const data: UpdateVariantInput = {};
     if (request.standardSize !== undefined) {
-      data.standard_size = new Prisma.Decimal(request.standardSize);
+      data.standard_size = request.standardSize;
     }
     if (request.maxUpDelta !== undefined) {
-      data.max_up_delta = new Prisma.Decimal(request.maxUpDelta);
+      data.max_up_delta = request.maxUpDelta;
     }
     if (request.maxDownDelta !== undefined) {
-      data.max_down_delta = new Prisma.Decimal(request.maxDownDelta);
+      data.max_down_delta = request.maxDownDelta;
     }
     if (request.resizeMethod !== undefined)
       data.resize_method = request.resizeMethod;
@@ -647,19 +638,14 @@ export class CatalogService {
       data.added_metal_allowed = request.addedMetalAllowed;
     }
     if (request.localWallThicknessMm !== undefined) {
-      data.local_wall_thickness_mm = new Prisma.Decimal(
-        request.localWallThicknessMm,
-      );
+      data.local_wall_thickness_mm = request.localWallThicknessMm;
     }
     if (request.minRemainingWallThicknessMm !== undefined) {
-      data.min_remaining_wall_thickness_mm = new Prisma.Decimal(
-        request.minRemainingWallThicknessMm,
-      );
+      data.min_remaining_wall_thickness_mm =
+        request.minRemainingWallThicknessMm;
     }
     if (request.maxSafeEngravingDepthMm !== undefined) {
-      data.max_safe_engraving_depth_mm = new Prisma.Decimal(
-        request.maxSafeEngravingDepthMm,
-      );
+      data.max_safe_engraving_depth_mm = request.maxSafeEngravingDepthMm;
     }
     if (request.status !== undefined) data.status = request.status;
 
@@ -690,8 +676,8 @@ export class CatalogService {
       name: request.name,
       stone_type: request.stoneType,
       shape: request.shape,
-      length_mm: new Prisma.Decimal(request.lengthMm),
-      width_mm: new Prisma.Decimal(request.widthMm),
+      length_mm: request.lengthMm,
+      width_mm: request.widthMm,
       color_grade: request.colorGrade,
       clarity_grade: request.clarityGrade,
       certified_required: request.certifiedRequired ?? false,
@@ -781,12 +767,12 @@ export class CatalogService {
       );
     }
 
-    const data: Prisma.template_variantsUpdateInput = {};
+    const data: UpdateVariantInput = {};
     if (request.maxUpDelta !== undefined) {
-      data.max_up_delta = new Prisma.Decimal(request.maxUpDelta);
+      data.max_up_delta = request.maxUpDelta;
     }
     if (request.maxDownDelta !== undefined) {
-      data.max_down_delta = new Prisma.Decimal(request.maxDownDelta);
+      data.max_down_delta = request.maxDownDelta;
     }
     if (request.resizeMethod !== undefined)
       data.resize_method = request.resizeMethod;
@@ -794,14 +780,11 @@ export class CatalogService {
       data.added_metal_allowed = request.addedMetalAllowed;
     }
     if (request.minRemainingWallThicknessMm !== undefined) {
-      data.min_remaining_wall_thickness_mm = new Prisma.Decimal(
-        request.minRemainingWallThicknessMm,
-      );
+      data.min_remaining_wall_thickness_mm =
+        request.minRemainingWallThicknessMm;
     }
     if (request.maxSafeEngravingDepthMm !== undefined) {
-      data.max_safe_engraving_depth_mm = new Prisma.Decimal(
-        request.maxSafeEngravingDepthMm,
-      );
+      data.max_safe_engraving_depth_mm = request.maxSafeEngravingDepthMm;
     }
 
     await this.repository.updateVariant(request.templateVariantId, data);

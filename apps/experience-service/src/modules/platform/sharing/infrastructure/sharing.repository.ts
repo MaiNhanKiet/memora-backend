@@ -27,7 +27,7 @@ export class SharingRepository {
     ringDesignDraftId?: string | null;
     ringTemplateId?: string | null;
     tokenHash: string;
-    sanitizedSnapshotJson: Prisma.InputJsonValue;
+    sanitizedSnapshotJson: Record<string, unknown>;
     expiresAt: Date;
   }): Promise<share_links> {
     return this.prisma.share_links.create({
@@ -38,7 +38,8 @@ export class SharingRepository {
         ring_template_id: data.ringTemplateId,
         token_hash: data.tokenHash,
         status: 'ACTIVE',
-        sanitized_snapshot_json: data.sanitizedSnapshotJson,
+        sanitized_snapshot_json:
+          data.sanitizedSnapshotJson as Prisma.InputJsonValue,
         expires_at: data.expiresAt,
       },
     });

@@ -5,8 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
-import type { Prisma } from '../../../../../generated/prisma/client';
-import { SharingService } from './sharing.service';
+import { SharingService, sanitize3DSnapshot } from './sharing.service';
 import { SharingRepository } from '../infrastructure/sharing.repository';
 
 interface CreateShareLinkRepoParams {
@@ -15,7 +14,7 @@ interface CreateShareLinkRepoParams {
   ringDesignDraftId?: string | null;
   ringTemplateId?: string | null;
   tokenHash: string;
-  sanitizedSnapshotJson: Prisma.InputJsonValue;
+  sanitizedSnapshotJson: Record<string, unknown>;
   expiresAt: Date;
 }
 
@@ -187,6 +186,28 @@ describe('SharingService', () => {
           sanitizedSnapshotJson: '{}',
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should strip sensitive fields from snapshot using whitelist', () => {
+      const sanitized = sanitize3DSnapshot({
+        templateCode: 'T_TEST',
+        materialCode: 'GOLD_18K',
+        ringSize: 12,
+        price: 9999999,
+        email: 'secret@example.com',
+        phone: '0901234567',
+        userId: 'user-123',
+      });
+
+      expect(sanitized).toEqual({
+        templateCode: 'T_TEST',
+        materialCode: 'GOLD_18K',
+        ringSize: 12,
+      });
+      expect(sanitized).not.toHaveProperty('price');
+      expect(sanitized).not.toHaveProperty('email');
+      expect(sanitized).not.toHaveProperty('phone');
+      expect(sanitized).not.toHaveProperty('userId');
     });
   });
 

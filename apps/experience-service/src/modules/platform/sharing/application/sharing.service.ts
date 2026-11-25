@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
@@ -15,11 +16,48 @@ import type {
   RevokeShareLinkResponse,
   ShareLinkStatus,
 } from '@app/contracts';
-import type { Prisma } from '../../../../../generated/prisma/client';
 import { SharingRepository } from '../infrastructure/sharing.repository';
+
+const SNAPSHOT_WHITELIST_KEYS = [
+  'templateCode',
+  'templateName',
+  'materialCode',
+  'materialName',
+  'glbAssetKey',
+  'glbUrl',
+  'gemstones',
+  'ringSize',
+  'engravingPreview',
+] as const;
+
+export function sanitize3DSnapshot(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new BadRequestException('Invalid sanitized snapshot JSON');
+  }
+  const source = raw as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = {};
+  for (const key of SNAPSHOT_WHITELIST_KEYS) {
+    if (
+      Object.prototype.hasOwnProperty.call(source, key) &&
+      source[key] !== undefined
+    ) {
+      sanitized[key] = source[key];
+    }
+  }
+  return sanitized;
+}
+
+function toShareLinkStatus(status: string): ShareLinkStatus {
+  if (status === 'ACTIVE' || status === 'REVOKED' || status === 'EXPIRED') {
+    return status;
+  }
+  throw new Error(`Unexpected share link status: ${status}`);
+}
 
 @Injectable()
 export class SharingService {
+  private readonly logger = new Logger(SharingService.name);
+
   constructor(private readonly sharingRepository: SharingRepository) {}
 
   async resolveShareLink(
@@ -48,12 +86,16 @@ export class SharingService {
     }
 
     // Update last_accessed_at asynchronously
-    this.sharingRepository.updateLastAccessed(link.id).catch(() => {});
+    this.sharingRepository
+      .updateLastAccessed(link.id)
+      .catch((err: unknown) =>
+        this.logger.warn('Failed to update last_accessed_at', err),
+      );
 
     return {
       id: link.id,
       shareToken: request.shareToken,
-      status: link.status as ShareLinkStatus,
+      status: toShareLinkStatus(link.status),
       expiresAt: link.expires_at ? link.expires_at.toISOString() : '',
       ringTemplateId: link.ring_template_id ?? undefined,
       ringDesignDraftId: link.ring_design_draft_id ?? undefined,
@@ -76,15 +118,13 @@ export class SharingService {
       );
     }
 
-    let parsedSnapshot: Record<string, unknown>;
+    let parsedRaw: unknown;
     try {
-      parsedSnapshot = JSON.parse(request.sanitizedSnapshotJson) as Record<
-        string,
-        unknown
-      >;
+      parsedRaw = JSON.parse(request.sanitizedSnapshotJson);
     } catch {
       throw new BadRequestException('Invalid sanitized snapshot JSON');
     }
+    const sanitizedSnapshot = sanitize3DSnapshot(parsedRaw);
 
     const days =
       request.expiresInDays && request.expiresInDays > 0
@@ -104,7 +144,7 @@ export class SharingService {
       ringDesignDraftId: request.ringDesignDraftId || null,
       ringTemplateId: request.ringTemplateId || null,
       tokenHash,
-      sanitizedSnapshotJson: parsedSnapshot as Prisma.InputJsonValue,
+      sanitizedSnapshotJson: sanitizedSnapshot,
       expiresAt,
     });
 
@@ -112,7 +152,7 @@ export class SharingService {
       id: created.id,
       shareToken,
       shareUrl: `/api/v1/shares/${shareToken}`,
-      status: created.status as ShareLinkStatus,
+      status: toShareLinkStatus(created.status),
       expiresAt: created.expires_at
         ? created.expires_at.toISOString()
         : expiresAt.toISOString(),
@@ -162,7 +202,7 @@ export class SharingService {
 
     return {
       id: updated.id,
-      status: updated.status as ShareLinkStatus,
+      status: toShareLinkStatus(updated.status),
       revokedAt: updated.revoked_at
         ? updated.revoked_at.toISOString()
         : new Date().toISOString(),

@@ -18,12 +18,12 @@ export interface CreateOrderParams {
   preP1NoticeVersion?: string;
   privacyNoticeAcknowledgedAt?: Date;
   p1NonrefundAcknowledgedAt?: Date;
-  preP1EvidenceJson?: Prisma.InputJsonValue;
+  preP1EvidenceJson?: Record<string, unknown>;
   fulfillmentMode: string;
   recipientName: string;
   recipientPhone: string;
   recipientEmail: string;
-  deliveryAddressJson: Prisma.InputJsonValue;
+  deliveryAddressJson: Record<string, unknown>;
   selectedDrafts: Array<{
     id: string;
     cart_id: string | null;
@@ -123,12 +123,15 @@ export class OrderingRepository {
           pre_p1_notice_version: params.preP1NoticeVersion,
           privacy_notice_acknowledged_at: params.privacyNoticeAcknowledgedAt,
           p1_nonrefund_acknowledged_at: params.p1NonrefundAcknowledgedAt,
-          pre_p1_evidence_json: params.preP1EvidenceJson ?? Prisma.JsonNull,
+          pre_p1_evidence_json:
+            (params.preP1EvidenceJson as Prisma.InputJsonValue | undefined) ??
+            Prisma.JsonNull,
           fulfillment_mode: params.fulfillmentMode,
           recipient_name: params.recipientName,
           recipient_phone: params.recipientPhone,
           recipient_email: params.recipientEmail,
-          delivery_address_json: params.deliveryAddressJson,
+          delivery_address_json:
+            params.deliveryAddressJson as Prisma.InputJsonValue,
         },
       });
 
