@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -14,53 +15,23 @@ import type {
   ResolveShareLinkResponse,
   RevokeShareLinkRequest,
   RevokeShareLinkResponse,
-  ShareLinkStatus,
 } from '@app/contracts';
-import { SharingRepository } from '../infrastructure/sharing.repository';
-
-const SNAPSHOT_WHITELIST_KEYS = [
-  'templateCode',
-  'templateName',
-  'materialCode',
-  'materialName',
-  'glbAssetKey',
-  'glbUrl',
-  'gemstones',
-  'ringSize',
-  'engravingPreview',
-] as const;
-
-export function sanitize3DSnapshot(raw: unknown): Record<string, unknown> {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new BadRequestException('Invalid sanitized snapshot JSON');
-  }
-  const source = raw as Record<string, unknown>;
-  const sanitized: Record<string, unknown> = {};
-  for (const key of SNAPSHOT_WHITELIST_KEYS) {
-    if (
-      Object.prototype.hasOwnProperty.call(source, key) &&
-      source[key] !== undefined
-    ) {
-      sanitized[key] = source[key];
-    }
-  }
-  return sanitized;
-}
-
-function toShareLinkStatus(status: string): ShareLinkStatus {
-  if (status === 'ACTIVE' || status === 'REVOKED' || status === 'EXPIRED') {
-    return status;
-  }
-  throw new Error(`Unexpected share link status: ${status}`);
-}
+import {
+  SHARING_REPOSITORY,
+  type SharingRepository,
+} from './sharing.repository';
+import { sanitize3DSnapshot, toShareLinkStatus } from './sharing.validation';
 
 @Injectable()
-export class SharingService {
-  private readonly logger = new Logger(SharingService.name);
+export class ResolveShareLinkUseCase {
+  private readonly logger = new Logger(ResolveShareLinkUseCase.name);
 
-  constructor(private readonly sharingRepository: SharingRepository) {}
+  constructor(
+    @Inject(SHARING_REPOSITORY)
+    private readonly sharingRepository: SharingRepository,
+  ) {}
 
-  async resolveShareLink(
+  async execute(
     request: ResolveShareLinkRequest,
   ): Promise<ResolveShareLinkResponse> {
     if (!request.shareToken) {
@@ -81,11 +52,10 @@ export class SharingService {
       throw new NotFoundException('Share link is no longer active');
     }
 
-    if (link.expires_at && new Date() > link.expires_at) {
+    if (link.expiresAt && new Date() > link.expiresAt) {
       throw new NotFoundException('Share link has expired');
     }
 
-    // Update last_accessed_at asynchronously
     this.sharingRepository
       .updateLastAccessed(link.id)
       .catch((err: unknown) =>
@@ -96,21 +66,29 @@ export class SharingService {
       id: link.id,
       shareToken: request.shareToken,
       status: toShareLinkStatus(link.status),
-      expiresAt: link.expires_at ? link.expires_at.toISOString() : '',
-      ringTemplateId: link.ring_template_id ?? undefined,
-      ringDesignDraftId: link.ring_design_draft_id ?? undefined,
-      sanitizedSnapshotJson: JSON.stringify(link.sanitized_snapshot_json ?? {}),
-      createdAt: link.created_at.toISOString(),
+      expiresAt: link.expiresAt ? link.expiresAt.toISOString() : '',
+      ringTemplateId: link.ringTemplateId,
+      ringDesignDraftId: link.ringDesignDraftId,
+      sanitizedSnapshotJson: JSON.stringify(link.sanitizedSnapshotJson ?? {}),
+      createdAt: link.createdAt.toISOString(),
     };
   }
+}
 
-  async createShareLink(
+@Injectable()
+export class CreateShareLinkUseCase {
+  constructor(
+    @Inject(SHARING_REPOSITORY)
+    private readonly sharingRepository: SharingRepository,
+  ) {}
+
+  async execute(
     request: CreateShareLinkRequest,
   ): Promise<CreateShareLinkResponse> {
     const actor = parseVerifiedActor(request.actor);
-    const userId = actor.kind === 'USER' ? actor.userId : null;
+    const userId = actor.kind === 'USER' ? actor.userId : undefined;
     const guestSessionId =
-      actor.kind === 'GUEST_SESSION' ? actor.guestSessionId : null;
+      actor.kind === 'GUEST_SESSION' ? actor.guestSessionId : undefined;
 
     if (!userId && !guestSessionId) {
       throw new BadRequestException(
@@ -141,8 +119,8 @@ export class SharingService {
     const created = await this.sharingRepository.createShareLink({
       createdByUserId: userId,
       guestSessionId,
-      ringDesignDraftId: request.ringDesignDraftId || null,
-      ringTemplateId: request.ringTemplateId || null,
+      ringDesignDraftId: request.ringDesignDraftId || undefined,
+      ringTemplateId: request.ringTemplateId || undefined,
       tokenHash,
       sanitizedSnapshotJson: sanitizedSnapshot,
       expiresAt,
@@ -153,13 +131,21 @@ export class SharingService {
       shareToken,
       shareUrl: `/api/v1/shares/${shareToken}`,
       status: toShareLinkStatus(created.status),
-      expiresAt: created.expires_at
-        ? created.expires_at.toISOString()
+      expiresAt: created.expiresAt
+        ? created.expiresAt.toISOString()
         : expiresAt.toISOString(),
     };
   }
+}
 
-  async revokeShareLink(
+@Injectable()
+export class RevokeShareLinkUseCase {
+  constructor(
+    @Inject(SHARING_REPOSITORY)
+    private readonly sharingRepository: SharingRepository,
+  ) {}
+
+  async execute(
     request: RevokeShareLinkRequest,
   ): Promise<RevokeShareLinkResponse> {
     const actor = parseVerifiedActor(request.actor);
@@ -172,16 +158,12 @@ export class SharingService {
       throw new NotFoundException('Share link not found');
     }
 
-    // Ownership check
     if (actor.kind === 'USER') {
-      if (link.created_by_user_id && link.created_by_user_id !== actor.userId) {
+      if (link.createdByUserId && link.createdByUserId !== actor.userId) {
         throw new ForbiddenException('You do not own this share link');
       }
     } else if (actor.kind === 'GUEST_SESSION') {
-      if (
-        link.guest_session_id &&
-        link.guest_session_id !== actor.guestSessionId
-      ) {
+      if (link.guestSessionId && link.guestSessionId !== actor.guestSessionId) {
         throw new ForbiddenException('You do not own this share link');
       }
     } else {
@@ -192,8 +174,8 @@ export class SharingService {
       return {
         id: link.id,
         status: 'REVOKED',
-        revokedAt: link.revoked_at
-          ? link.revoked_at.toISOString()
+        revokedAt: link.revokedAt
+          ? link.revokedAt.toISOString()
           : new Date().toISOString(),
       };
     }
@@ -203,8 +185,8 @@ export class SharingService {
     return {
       id: updated.id,
       status: toShareLinkStatus(updated.status),
-      revokedAt: updated.revoked_at
-        ? updated.revoked_at.toISOString()
+      revokedAt: updated.revokedAt
+        ? updated.revokedAt.toISOString()
         : new Date().toISOString(),
     };
   }

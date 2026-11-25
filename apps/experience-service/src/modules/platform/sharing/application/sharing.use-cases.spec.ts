@@ -1,25 +1,26 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as crypto from 'crypto';
-import { SharingService, sanitize3DSnapshot } from './sharing.service';
-import { SharingRepository } from '../infrastructure/sharing.repository';
+import {
+  SHARING_REPOSITORY,
+  type CreateShareLinkInput,
+  type ShareLinkRecord,
+} from './sharing.repository';
+import {
+  CreateShareLinkUseCase,
+  ResolveShareLinkUseCase,
+  RevokeShareLinkUseCase,
+} from './sharing.use-cases';
+import { sanitize3DSnapshot } from './sharing.validation';
 
-interface CreateShareLinkRepoParams {
-  createdByUserId?: string | null;
-  guestSessionId?: string | null;
-  ringDesignDraftId?: string | null;
-  ringTemplateId?: string | null;
-  tokenHash: string;
-  sanitizedSnapshotJson: Record<string, unknown>;
-  expiresAt: Date;
-}
-
-describe('SharingService', () => {
-  let service: SharingService;
+describe('Sharing UseCases', () => {
+  let resolveShareLinkUseCase: ResolveShareLinkUseCase;
+  let createShareLinkUseCase: CreateShareLinkUseCase;
+  let revokeShareLinkUseCase: RevokeShareLinkUseCase;
 
   const mockRepository = {
     findByTokenHash: jest.fn(),
@@ -42,56 +43,64 @@ describe('SharingService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        SharingService,
-        {
-          provide: SharingRepository,
-          useValue: mockRepository,
-        },
+        ResolveShareLinkUseCase,
+        CreateShareLinkUseCase,
+        RevokeShareLinkUseCase,
+        { provide: SHARING_REPOSITORY, useValue: mockRepository },
       ],
     }).compile();
 
-    service = module.get<SharingService>(SharingService);
+    resolveShareLinkUseCase = module.get<ResolveShareLinkUseCase>(
+      ResolveShareLinkUseCase,
+    );
+    createShareLinkUseCase = module.get<CreateShareLinkUseCase>(
+      CreateShareLinkUseCase,
+    );
+    revokeShareLinkUseCase = module.get<RevokeShareLinkUseCase>(
+      RevokeShareLinkUseCase,
+    );
   });
 
-  describe('resolveShareLink', () => {
+  describe('ResolveShareLinkUseCase', () => {
     const rawToken = 'memora-3d-testtoken123';
     const tokenHash = crypto
       .createHash('sha256')
       .update(rawToken)
       .digest('hex');
 
-    const activeLink = {
+    const activeLink: ShareLinkRecord = {
       id: '22222222-2222-4222-8222-222222222222',
-      token_hash: tokenHash,
+      tokenHash,
       status: 'ACTIVE',
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      ring_template_id: '33333333-3333-4333-8333-333333333333',
-      ring_design_draft_id: null,
-      sanitized_snapshot_json: {
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      ringTemplateId: '33333333-3333-4333-8333-333333333333',
+      sanitizedSnapshotJson: {
         templateCode: 'T_TEST_BAND',
         materialCode: 'GOLD_18K_YELLOW',
       },
-      created_at: new Date('2026-11-24T10:00:00Z'),
+      createdAt: new Date('2026-11-24T10:00:00Z'),
     };
 
     it('should resolve active share link successfully', async () => {
       mockRepository.findByTokenHash.mockResolvedValue(activeLink);
 
-      const res = await service.resolveShareLink({ shareToken: rawToken });
+      const res = await resolveShareLinkUseCase.execute({
+        shareToken: rawToken,
+      });
 
       expect(res.shareToken).toBe(rawToken);
       expect(res.status).toBe('ACTIVE');
-      expect(res.ringTemplateId).toBe(activeLink.ring_template_id);
+      expect(res.ringTemplateId).toBe(activeLink.ringTemplateId);
       expect(mockRepository.updateLastAccessed).toHaveBeenCalledWith(
         activeLink.id,
       );
     });
 
     it('should throw NotFoundException if token hash does not exist', async () => {
-      mockRepository.findByTokenHash.mockResolvedValue(null);
+      mockRepository.findByTokenHash.mockResolvedValue(undefined);
 
       await expect(
-        service.resolveShareLink({ shareToken: 'unknown-token' }),
+        resolveShareLinkUseCase.execute({ shareToken: 'unknown-token' }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -102,39 +111,38 @@ describe('SharingService', () => {
       });
 
       await expect(
-        service.resolveShareLink({ shareToken: rawToken }),
+        resolveShareLinkUseCase.execute({ shareToken: rawToken }),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException if link has expired', async () => {
       mockRepository.findByTokenHash.mockResolvedValue({
         ...activeLink,
-        expires_at: new Date(Date.now() - 1000),
+        expiresAt: new Date(Date.now() - 1000),
       });
 
       await expect(
-        service.resolveShareLink({ shareToken: rawToken }),
+        resolveShareLinkUseCase.execute({ shareToken: rawToken }),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
-  describe('createShareLink', () => {
+  describe('CreateShareLinkUseCase', () => {
     it('should create a share link for registered user', async () => {
       mockRepository.createShareLink.mockImplementation(
-        (data: CreateShareLinkRepoParams) =>
+        (data: CreateShareLinkInput): Promise<ShareLinkRecord> =>
           Promise.resolve({
             id: '55555555-5555-4555-8555-555555555555',
-            created_by_user_id: data.createdByUserId,
-            guest_session_id: null,
-            token_hash: data.tokenHash,
+            createdByUserId: data.createdByUserId,
+            tokenHash: data.tokenHash,
             status: 'ACTIVE',
-            sanitized_snapshot_json: data.sanitizedSnapshotJson,
-            expires_at: data.expiresAt,
-            created_at: new Date(),
+            sanitizedSnapshotJson: data.sanitizedSnapshotJson,
+            expiresAt: data.expiresAt,
+            createdAt: new Date(),
           }),
       );
 
-      const res = await service.createShareLink({
+      const res = await createShareLinkUseCase.execute({
         actor: sampleUserActor,
         ringTemplateId: '33333333-3333-4333-8333-333333333333',
         sanitizedSnapshotJson: JSON.stringify({
@@ -150,20 +158,19 @@ describe('SharingService', () => {
 
     it('should create a share link for guest session', async () => {
       mockRepository.createShareLink.mockImplementation(
-        (data: CreateShareLinkRepoParams) =>
+        (data: CreateShareLinkInput): Promise<ShareLinkRecord> =>
           Promise.resolve({
             id: '66666666-6666-4666-8666-666666666666',
-            created_by_user_id: null,
-            guest_session_id: data.guestSessionId,
-            token_hash: data.tokenHash,
+            guestSessionId: data.guestSessionId,
+            tokenHash: data.tokenHash,
             status: 'ACTIVE',
-            sanitized_snapshot_json: data.sanitizedSnapshotJson,
-            expires_at: data.expiresAt,
-            created_at: new Date(),
+            sanitizedSnapshotJson: data.sanitizedSnapshotJson,
+            expiresAt: data.expiresAt,
+            createdAt: new Date(),
           }),
       );
 
-      const res = await service.createShareLink({
+      const res = await createShareLinkUseCase.execute({
         actor: sampleGuestActor,
         sanitizedSnapshotJson: JSON.stringify({
           templateCode: 'T_GUEST_BAND',
@@ -181,7 +188,7 @@ describe('SharingService', () => {
 
     it('should throw BadRequestException if actor has neither user nor guest session', async () => {
       await expect(
-        service.createShareLink({
+        createShareLinkUseCase.execute({
           actor: {},
           sanitizedSnapshotJson: '{}',
         }),
@@ -211,13 +218,13 @@ describe('SharingService', () => {
     });
   });
 
-  describe('revokeShareLink', () => {
-    const existingLink = {
+  describe('RevokeShareLinkUseCase', () => {
+    const existingLink: ShareLinkRecord = {
       id: '77777777-7777-4777-8777-777777777777',
-      created_by_user_id: sampleUserActor.userId,
-      guest_session_id: null,
+      createdByUserId: sampleUserActor.userId,
+      tokenHash: 'hash-1',
       status: 'ACTIVE',
-      revoked_at: null,
+      createdAt: new Date('2026-11-24T10:00:00Z'),
     };
 
     it('should allow owner to revoke share link', async () => {
@@ -225,10 +232,10 @@ describe('SharingService', () => {
       mockRepository.revokeShareLink.mockResolvedValue({
         ...existingLink,
         status: 'REVOKED',
-        revoked_at: new Date(),
+        revokedAt: new Date(),
       });
 
-      const res = await service.revokeShareLink({
+      const res = await revokeShareLinkUseCase.execute({
         actor: sampleUserActor,
         shareLinkId: existingLink.id,
       });
@@ -243,7 +250,7 @@ describe('SharingService', () => {
       mockRepository.findById.mockResolvedValue(existingLink);
 
       await expect(
-        service.revokeShareLink({
+        revokeShareLinkUseCase.execute({
           actor: { userId: '99999999-9999-4999-8999-999999999999' },
           shareLinkId: existingLink.id,
         }),
@@ -251,10 +258,10 @@ describe('SharingService', () => {
     });
 
     it('should throw NotFoundException if link does not exist', async () => {
-      mockRepository.findById.mockResolvedValue(null);
+      mockRepository.findById.mockResolvedValue(undefined);
 
       await expect(
-        service.revokeShareLink({
+        revokeShareLinkUseCase.execute({
           actor: sampleUserActor,
           shareLinkId: 'non-existent-id',
         }),

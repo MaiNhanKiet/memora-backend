@@ -1,10 +1,14 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { AuditService } from './audit.service';
-import { AuditRepository } from '../infrastructure/audit.repository';
+import { Test, TestingModule } from '@nestjs/testing';
+import { AUDIT_REPOSITORY, type AuditLogRecord } from './audit.repository';
+import {
+  ListAuditLogsUseCase,
+  RecordAuditEventUseCase,
+} from './audit.use-cases';
 
-describe('AuditService', () => {
-  let service: AuditService;
+describe('Audit UseCases', () => {
+  let listAuditLogsUseCase: ListAuditLogsUseCase;
+  let recordAuditEventUseCase: RecordAuditEventUseCase;
 
   const mockRepository = {
     listAuditLogs: jest.fn(),
@@ -15,18 +19,18 @@ describe('AuditService', () => {
     userId: '11111111-1111-4111-8111-111111111111',
   };
 
-  const sampleLog = {
+  const sampleLog: AuditLogRecord = {
     id: '22222222-2222-4222-8222-222222222222',
-    actor_user_id: '11111111-1111-4111-8111-111111111111',
+    actorUserId: '11111111-1111-4111-8111-111111111111',
     action: 'USER_ROLE_ASSIGNED',
-    entity_type: 'USER',
-    entity_id: '33333333-3333-4333-8333-333333333333',
-    request_id: 'req-123',
-    trace_id: 'trace-456',
-    result_status: 'SUCCESS',
-    change_summary_json: { role: 'STAFF' },
-    metadata_json: { ip: '127.0.0.1' },
-    created_at: new Date('2026-11-24T10:00:00Z'),
+    entityType: 'USER',
+    entityId: '33333333-3333-4333-8333-333333333333',
+    requestId: 'req-123',
+    traceId: 'trace-456',
+    resultStatus: 'SUCCESS',
+    changeSummaryJson: { role: 'STAFF' },
+    metadataJson: { ip: '127.0.0.1' },
+    createdAt: new Date('2026-11-24T10:00:00Z'),
   };
 
   beforeEach(async () => {
@@ -34,25 +38,27 @@ describe('AuditService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AuditService,
-        {
-          provide: AuditRepository,
-          useValue: mockRepository,
-        },
+        ListAuditLogsUseCase,
+        RecordAuditEventUseCase,
+        { provide: AUDIT_REPOSITORY, useValue: mockRepository },
       ],
     }).compile();
 
-    service = module.get<AuditService>(AuditService);
+    listAuditLogsUseCase =
+      module.get<ListAuditLogsUseCase>(ListAuditLogsUseCase);
+    recordAuditEventUseCase = module.get<RecordAuditEventUseCase>(
+      RecordAuditEventUseCase,
+    );
   });
 
-  describe('listAuditLogs', () => {
+  describe('ListAuditLogsUseCase', () => {
     it('should list audit logs with valid filters and pagination', async () => {
       mockRepository.listAuditLogs.mockResolvedValue({
         items: [sampleLog],
         total: 1,
       });
 
-      const res = await service.listAuditLogs({
+      const res = await listAuditLogsUseCase.execute({
         actor: sampleAdminActor,
         entityType: 'USER',
         action: 'USER_ROLE_ASSIGNED',
@@ -81,7 +87,7 @@ describe('AuditService', () => {
         total: 0,
       });
 
-      const res = await service.listAuditLogs({
+      const res = await listAuditLogsUseCase.execute({
         actor: sampleAdminActor,
         fromDate: '2026-11-01T00:00:00.000Z',
         toDate: '2026-11-30T23:59:59.999Z',
@@ -98,7 +104,7 @@ describe('AuditService', () => {
 
     it('should throw BadRequestException if fromDate is invalid', async () => {
       await expect(
-        service.listAuditLogs({
+        listAuditLogsUseCase.execute({
           actor: sampleAdminActor,
           fromDate: 'invalid-date-string',
         }),
@@ -106,11 +112,11 @@ describe('AuditService', () => {
     });
   });
 
-  describe('recordAuditEvent', () => {
+  describe('RecordAuditEventUseCase', () => {
     it('should record an audit event successfully', async () => {
       mockRepository.createAuditLog.mockResolvedValue(sampleLog);
 
-      const res = await service.recordAuditEvent({
+      const res = await recordAuditEventUseCase.execute({
         actorUserId: '11111111-1111-4111-8111-111111111111',
         action: 'ORDER_PAID',
         entityType: 'ORDER',
@@ -132,7 +138,7 @@ describe('AuditService', () => {
 
     it('should throw BadRequestException if action or entityType is missing', async () => {
       await expect(
-        service.recordAuditEvent({
+        recordAuditEventUseCase.execute({
           action: '',
           entityType: 'ORDER',
         }),

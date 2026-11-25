@@ -1,11 +1,19 @@
 import { Module } from '@nestjs/common';
-import { AuditRepository } from './infrastructure/audit.repository';
-import { AuditService } from './application/audit.service';
+import { AUDIT_REPOSITORY } from './application/audit.repository';
+import {
+  ListAuditLogsUseCase,
+  RecordAuditEventUseCase,
+} from './application/audit.use-cases';
+import { PrismaAuditRepository } from './infrastructure/prisma-audit.repository';
 import { AuditGrpcController } from './presentation/audit.grpc.controller';
 
 @Module({
   controllers: [AuditGrpcController],
-  providers: [AuditRepository, AuditService],
-  exports: [AuditService],
+  providers: [
+    { provide: AUDIT_REPOSITORY, useClass: PrismaAuditRepository },
+    ListAuditLogsUseCase,
+    RecordAuditEventUseCase,
+  ],
+  exports: [AUDIT_REPOSITORY, RecordAuditEventUseCase],
 })
 export class AuditModule {}

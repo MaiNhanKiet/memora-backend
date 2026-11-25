@@ -1,11 +1,21 @@
 import { Module } from '@nestjs/common';
-import { SharingRepository } from './infrastructure/sharing.repository';
-import { SharingService } from './application/sharing.service';
+import { SHARING_REPOSITORY } from './application/sharing.repository';
+import {
+  CreateShareLinkUseCase,
+  ResolveShareLinkUseCase,
+  RevokeShareLinkUseCase,
+} from './application/sharing.use-cases';
+import { PrismaSharingRepository } from './infrastructure/prisma-sharing.repository';
 import { SharingGrpcController } from './presentation/sharing.grpc.controller';
 
 @Module({
   controllers: [SharingGrpcController],
-  providers: [SharingRepository, SharingService],
-  exports: [SharingService],
+  providers: [
+    { provide: SHARING_REPOSITORY, useClass: PrismaSharingRepository },
+    ResolveShareLinkUseCase,
+    CreateShareLinkUseCase,
+    RevokeShareLinkUseCase,
+  ],
+  exports: [SHARING_REPOSITORY],
 })
 export class SharingModule {}

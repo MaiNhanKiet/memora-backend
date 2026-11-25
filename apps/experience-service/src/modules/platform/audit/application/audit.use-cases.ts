@@ -1,37 +1,22 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { parseVerifiedActor } from '@app/common';
 import type {
-  AuditLogItem,
   ListAuditLogsRequest,
   ListAuditLogsResponse,
   RecordAuditEventRequest,
   RecordAuditEventResponse,
 } from '@app/contracts';
-import { AuditRepository } from '../infrastructure/audit.repository';
-
-function parseJsonRecord(raw?: string): Record<string, unknown> {
-  if (!raw) {
-    return {};
-  }
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-    return {};
-  } catch {
-    return {};
-  }
-}
+import { parseJsonRecord, toAuditLogItem } from './audit.mapper';
+import { AUDIT_REPOSITORY, type AuditRepository } from './audit.repository';
 
 @Injectable()
-export class AuditService {
-  constructor(private readonly auditRepository: AuditRepository) {}
+export class ListAuditLogsUseCase {
+  constructor(
+    @Inject(AUDIT_REPOSITORY)
+    private readonly auditRepository: AuditRepository,
+  ) {}
 
-  async listAuditLogs(
-    request: ListAuditLogsRequest,
-  ): Promise<ListAuditLogsResponse> {
-    // Validate actor format
+  async execute(request: ListAuditLogsRequest): Promise<ListAuditLogsResponse> {
     parseVerifiedActor(request.actor);
 
     let fromDate: Date | undefined;
@@ -67,34 +52,24 @@ export class AuditService {
 
     const totalPages = Math.ceil(total / limit) || 1;
 
-    const mappedItems: AuditLogItem[] = items.map((log) => ({
-      id: log.id,
-      actorUserId: log.actor_user_id ?? undefined,
-      action: log.action,
-      entityType: log.entity_type,
-      entityId: log.entity_id ?? undefined,
-      requestId: log.request_id ?? undefined,
-      traceId: log.trace_id ?? undefined,
-      resultStatus: log.result_status ?? undefined,
-      changeSummaryJson: log.change_summary_json
-        ? JSON.stringify(log.change_summary_json)
-        : undefined,
-      metadataJson: log.metadata_json
-        ? JSON.stringify(log.metadata_json)
-        : undefined,
-      createdAt: log.created_at.toISOString(),
-    }));
-
     return {
-      items: mappedItems,
+      items: items.map(toAuditLogItem),
       total,
       page,
       limit,
       totalPages,
     };
   }
+}
 
-  async recordAuditEvent(
+@Injectable()
+export class RecordAuditEventUseCase {
+  constructor(
+    @Inject(AUDIT_REPOSITORY)
+    private readonly auditRepository: AuditRepository,
+  ) {}
+
+  async execute(
     request: RecordAuditEventRequest,
   ): Promise<RecordAuditEventResponse> {
     if (!request.action || !request.entityType) {
@@ -107,12 +82,12 @@ export class AuditService {
     const metadata = parseJsonRecord(request.metadataJson);
 
     const created = await this.auditRepository.createAuditLog({
-      actorUserId: request.actorUserId || null,
+      actorUserId: request.actorUserId || undefined,
       action: request.action,
       entityType: request.entityType,
-      entityId: request.entityId || null,
-      requestId: request.requestId || null,
-      traceId: request.traceId || null,
+      entityId: request.entityId || undefined,
+      requestId: request.requestId || undefined,
+      traceId: request.traceId || undefined,
       resultStatus: request.resultStatus || 'SUCCESS',
       changeSummaryJson: changeSummary,
       metadataJson: metadata,
@@ -120,7 +95,7 @@ export class AuditService {
 
     return {
       id: created.id,
-      createdAt: created.created_at.toISOString(),
+      createdAt: created.createdAt.toISOString(),
     };
   }
 }
