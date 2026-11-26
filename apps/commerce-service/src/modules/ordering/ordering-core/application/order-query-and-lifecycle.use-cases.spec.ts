@@ -35,6 +35,7 @@ describe('Order Query, Ring Item & Lifecycle UseCases', () => {
   };
 
   const validUserId = '11111111-1111-4111-8111-111111111111';
+  const validCustomerIdentityId = '33333333-3333-4333-8333-333333333333';
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -89,7 +90,10 @@ describe('Order Query, Ring Item & Lifecycle UseCases', () => {
       });
 
       const res = await getOrderTimelineUseCase.execute({
-        actor: { userId: validUserId },
+        actor: {
+          userId: validUserId,
+          customerIdentityId: validCustomerIdentityId,
+        },
         orderId: 'order-1',
       });
 
@@ -191,7 +195,10 @@ describe('Order Query, Ring Item & Lifecycle UseCases', () => {
       });
 
       const res = await cancelOrderUseCase.execute({
-        actor: { userId: validUserId },
+        actor: {
+          userId: validUserId,
+          customerIdentityId: validCustomerIdentityId,
+        },
         orderId: 'order-1',
         reason: 'Changed mind',
       });
@@ -209,7 +216,10 @@ describe('Order Query, Ring Item & Lifecycle UseCases', () => {
 
       await expect(
         updateCurrentRingItemVersionUseCase.execute({
-          actor: { userId: validUserId },
+          actor: {
+            userId: validUserId,
+            customerIdentityId: validCustomerIdentityId,
+          },
           orderId: 'order-1',
           ringItemId: 'item-1',
           targetSize: 13,
@@ -232,7 +242,10 @@ describe('Order Query, Ring Item & Lifecycle UseCases', () => {
       });
 
       const res = await updateCurrentRingItemVersionUseCase.execute({
-        actor: { userId: validUserId },
+        actor: {
+          userId: validUserId,
+          customerIdentityId: validCustomerIdentityId,
+        },
         orderId: 'order-1',
         ringItemId: 'item-1',
         targetSize: 13,

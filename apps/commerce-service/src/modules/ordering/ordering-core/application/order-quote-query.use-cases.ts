@@ -56,10 +56,11 @@ export class GetOrderQuoteByIdUseCase {
   async execute(request: GetOrderQuoteByIdRequest): Promise<FullQuoteDetail> {
     if (request.actor) {
       const actor = validateOrderingActor(request.actor);
-      const actorId = actor.userId ?? actor.guestSessionId!;
+      const { actorId, guestSessionId } = resolveOrderingActorId(actor);
       const order = await this.repository.findOrderById(
         request.orderId,
         actorId,
+        guestSessionId,
       );
       if (!order) {
         throw new NotFoundException(`Order ${request.orderId} not found`);
@@ -91,9 +92,13 @@ export class GetOrderFinalConfirmationsUseCase {
     request: GetOrderFinalConfirmationsRequest,
   ): Promise<GetOrderFinalConfirmationsResponse> {
     const actor = validateOrderingActor(request.actor);
-    const actorId = actor.userId ?? actor.guestSessionId!;
+    const { actorId, guestSessionId } = resolveOrderingActorId(actor);
 
-    const order = await this.repository.findOrderById(request.orderId, actorId);
+    const order = await this.repository.findOrderById(
+      request.orderId,
+      actorId,
+      guestSessionId,
+    );
     if (!order) {
       throw new NotFoundException(`Order ${request.orderId} not found`);
     }

@@ -26,7 +26,10 @@ import {
   ORDERING_REPOSITORY,
   type OrderingRepository,
 } from './ordering.repository';
-import { validateOrderingActor } from './ordering.validation';
+import {
+  resolveOrderingActorId,
+  validateOrderingActor,
+} from './ordering.validation';
 
 async function assertOrderExistsForActor(
   repository: OrderingRepository,
@@ -34,8 +37,12 @@ async function assertOrderExistsForActor(
   orderId: string,
 ): Promise<void> {
   const actor = validateOrderingActor(actorInput);
-  const actorId = actor.userId ?? actor.guestSessionId!;
-  const order = await repository.findOrderById(orderId, actorId);
+  const { actorId, guestSessionId } = resolveOrderingActorId(actor);
+  const order = await repository.findOrderById(
+    orderId,
+    actorId,
+    guestSessionId,
+  );
   if (!order) {
     throw new NotFoundException(`Order ${orderId} not found`);
   }

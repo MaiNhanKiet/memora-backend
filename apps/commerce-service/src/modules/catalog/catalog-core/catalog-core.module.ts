@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  CATALOG_CDN_BASE_URL,
+  DEFAULT_CATALOG_CDN_BASE_URL,
+} from './application/catalog.mapper';
 import { CATALOG_REPOSITORY } from './application/catalog.repository';
 import {
   CreateGemstoneOptionUseCase,
@@ -60,6 +65,13 @@ import { CatalogGrpcController } from './presentation/catalog.grpc.controller';
     GetResizePoliciesUseCase,
     UpdateResizePoliciesUseCase,
     ValidateConfigurationUseCase,
+    {
+      provide: CATALOG_CDN_BASE_URL,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService): string =>
+        configService.get<string>('commerce.catalogCdnBaseUrl') ??
+        DEFAULT_CATALOG_CDN_BASE_URL,
+    },
     { provide: CATALOG_REPOSITORY, useClass: PrismaCatalogRepository },
   ],
   exports: [CATALOG_REPOSITORY],

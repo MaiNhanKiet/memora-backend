@@ -1,37 +1,105 @@
-import { BadRequestException } from '@nestjs/common';
-import { parseVerifiedActor, type ParsedVerifiedActor } from '@app/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  parseVerifiedActor,
+  requireCustomerActor,
+  type ParsedVerifiedActor,
+} from '@app/common';
 import type { VerifiedActor } from '@app/contracts';
+import type { OrderingDraftRecord } from './ordering.repository';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export interface OrderingActor {
-  readonly userId?: string;
-  readonly guestSessionId?: string;
-}
+export type OrderingActor =
+  | {
+      readonly kind: 'USER';
+      readonly userId: string;
+      readonly customerIdentityId: string;
+    }
+  | {
+      readonly kind: 'VERIFIED_GUEST';
+      readonly customerIdentityId: string;
+    }
+  | {
+      readonly kind: 'GUEST_SESSION';
+      readonly guestSessionId: string;
+    };
 
 export function validateOrderingActor(actor?: VerifiedActor): OrderingActor {
   const parsed: ParsedVerifiedActor = parseVerifiedActor(actor);
   if (parsed.kind === 'USER') {
-    return { userId: parsed.userId };
-  }
-  if (parsed.kind === 'GUEST_SESSION') {
-    return { guestSessionId: parsed.guestSessionId };
+    const customer = requireCustomerActor(parsed);
+    return {
+      kind: 'USER',
+      userId: customer.userId,
+      customerIdentityId: customer.customerIdentityId,
+    };
   }
   if (parsed.kind === 'VERIFIED_GUEST') {
-    return { userId: parsed.customerIdentityId };
+    return {
+      kind: 'VERIFIED_GUEST',
+      customerIdentityId: parsed.customerIdentityId,
+    };
   }
-  throw new BadRequestException('Invalid actor');
+  return {
+    kind: 'GUEST_SESSION',
+    guestSessionId: parsed.guestSessionId,
+  };
 }
 
 export function resolveOrderingActorId(actor: OrderingActor): {
   readonly actorId: string;
   readonly guestSessionId?: string;
 } {
+  if (actor.kind === 'GUEST_SESSION') {
+    return {
+      actorId: actor.guestSessionId,
+      guestSessionId: actor.guestSessionId,
+    };
+  }
   return {
-    actorId: actor.userId ?? actor.guestSessionId!,
-    guestSessionId: actor.userId ? undefined : actor.guestSessionId,
+    actorId: actor.customerIdentityId,
+    guestSessionId: undefined,
   };
+}
+
+export function assertOrderingDraftsOwnedByActor(
+  drafts: readonly OrderingDraftRecord[],
+  actor: OrderingActor,
+): void {
+  for (const draft of drafts) {
+    if (actor.kind === 'USER') {
+      const draftOwnerUserId = draft.ownerUserId ?? draft.cartOwnerUserId;
+      if (draftOwnerUserId !== actor.userId) {
+        throw new ForbiddenException(
+          'You do not have permission to create an order with one or more selected drafts',
+        );
+      }
+      continue;
+    }
+
+    if (actor.kind === 'GUEST_SESSION') {
+      const hasUserOwner = Boolean(draft.ownerUserId || draft.cartOwnerUserId);
+      const draftGuestId = draft.guestSessionId ?? draft.cartGuestSessionId;
+      if (hasUserOwner || draftGuestId !== actor.guestSessionId) {
+        throw new ForbiddenException(
+          'You do not have permission to create an order with one or more selected drafts',
+        );
+      }
+      continue;
+    }
+
+    if (
+      draft.ownerUserId ||
+      draft.cartOwnerUserId ||
+      draft.guestSessionId ||
+      draft.cartGuestSessionId
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to create an order with one or more selected drafts',
+      );
+    }
+  }
 }
 
 export function validateOrderUuid(rawOrderId?: string): string {

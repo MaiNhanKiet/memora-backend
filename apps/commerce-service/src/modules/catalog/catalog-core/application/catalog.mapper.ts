@@ -16,23 +16,28 @@ import type {
   TemplateVariantRecord,
 } from './catalog.repository';
 
-function getCdnBaseUrl(): string {
-  return (
-    process.env.CATALOG_CDN_BASE_URL ?? 'https://cdn.memora.style'
-  ).replace(/\/+$/, '');
-}
+export const CATALOG_CDN_BASE_URL = Symbol('CATALOG_CDN_BASE_URL');
+export const DEFAULT_CATALOG_CDN_BASE_URL = 'https://cdn.memora.style';
 
-export function resolveGlbUrl(key: string): string {
+export function resolveGlbUrl(
+  key: string,
+  cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
+): string {
   if (!key) return '';
   if (key.startsWith('http://') || key.startsWith('https://')) {
     return key;
   }
+  const normalizedBase = (cdnBaseUrl || DEFAULT_CATALOG_CDN_BASE_URL).replace(
+    /\/+$/,
+    '',
+  );
   const cleanKey = key.replace(/^\/+/, '');
-  return `${getCdnBaseUrl()}/${cleanKey}`;
+  return `${normalizedBase}/${cleanKey}`;
 }
 
 export function toTemplateResponse(
   entity: RingTemplateRecord,
+  cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
 ): TemplateResponse {
   return {
     id: entity.id,
@@ -42,7 +47,7 @@ export function toTemplateResponse(
     gender: 'UNISEX',
     engraveSurfaceType: 'INNER_FLAT',
     model3dAssetKey: entity.glbAssetKey,
-    glbUrl: resolveGlbUrl(entity.glbAssetKey),
+    glbUrl: resolveGlbUrl(entity.glbAssetKey, cdnBaseUrl),
     mappingVersion: '1.0',
     defaultMaterialId: '',
     status: entity.status,

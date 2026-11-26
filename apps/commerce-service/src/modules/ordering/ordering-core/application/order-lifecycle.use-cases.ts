@@ -13,7 +13,10 @@ import {
   ORDERING_REPOSITORY,
   type OrderingRepository,
 } from './ordering.repository';
-import { validateOrderingActor } from './ordering.validation';
+import {
+  resolveOrderingActorId,
+  validateOrderingActor,
+} from './ordering.validation';
 
 @Injectable()
 export class UpdateOrderStatusUseCase {
@@ -59,9 +62,13 @@ export class CancelOrderUseCase {
 
   async execute(request: CancelOrderRequest): Promise<CancelOrderResponse> {
     const actor = validateOrderingActor(request.actor);
-    const actorId = actor.userId ?? actor.guestSessionId!;
+    const { actorId, guestSessionId } = resolveOrderingActorId(actor);
 
-    const order = await this.repository.findOrderById(request.orderId, actorId);
+    const order = await this.repository.findOrderById(
+      request.orderId,
+      actorId,
+      guestSessionId,
+    );
     if (!order) {
       throw new NotFoundException(`Order ${request.orderId} not found`);
     }

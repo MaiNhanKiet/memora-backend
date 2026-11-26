@@ -5,6 +5,10 @@ export const ORDERING_REPOSITORY = Symbol('ORDERING_REPOSITORY');
 export interface OrderingDraftRecord {
   readonly id: string;
   readonly cartId?: string;
+  readonly ownerUserId?: string;
+  readonly guestSessionId?: string;
+  readonly cartOwnerUserId?: string;
+  readonly cartGuestSessionId?: string;
   readonly templateVariantId: string;
   readonly templateCode: string;
   readonly templateName: string;

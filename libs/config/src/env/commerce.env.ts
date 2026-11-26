@@ -2,6 +2,7 @@ import { Expose } from 'class-transformer';
 import { registerAs } from '@nestjs/config';
 import {
   EnvHostname,
+  EnvHttpUrl,
   EnvPort,
   EnvPostgresUrl,
   EnvSecret,
@@ -58,6 +59,10 @@ export class CommerceEnvironment extends NodeEnvironment {
   @Expose()
   @EnvSecret(32)
   COMMERCE_INTERNAL_GRPC_SECRET!: string;
+
+  @Expose()
+  @EnvHttpUrl()
+  CATALOG_CDN_BASE_URL!: string;
 }
 
 export interface CommerceEnv {
@@ -68,6 +73,7 @@ export interface CommerceEnv {
   COMMERCE_HEALTH_PORT: number;
   COMMERCE_DATABASE_URL: string;
   COMMERCE_INTERNAL_GRPC_SECRET: string;
+  CATALOG_CDN_BASE_URL: string;
 }
 
 export function validateCommerceEnv(
@@ -79,6 +85,10 @@ export function validateCommerceEnv(
     COMMERCE_GRPC_PORT: defaultText(source.COMMERCE_GRPC_PORT, '50052'),
     COMMERCE_HEALTH_HOST: defaultText(source.COMMERCE_HEALTH_HOST, '127.0.0.1'),
     COMMERCE_HEALTH_PORT: defaultText(source.COMMERCE_HEALTH_PORT, '5052'),
+    CATALOG_CDN_BASE_URL: defaultText(
+      source.CATALOG_CDN_BASE_URL,
+      'https://cdn.memora.style',
+    ),
   });
   assertCommerceDatabaseUrl(
     validated.COMMERCE_DATABASE_URL,
@@ -92,6 +102,7 @@ export function validateCommerceEnv(
     COMMERCE_HEALTH_PORT: validated.COMMERCE_HEALTH_PORT,
     COMMERCE_DATABASE_URL: validated.COMMERCE_DATABASE_URL,
     COMMERCE_INTERNAL_GRPC_SECRET: validated.COMMERCE_INTERNAL_GRPC_SECRET,
+    CATALOG_CDN_BASE_URL: validated.CATALOG_CDN_BASE_URL,
   };
 }
 
@@ -110,6 +121,7 @@ export const commerceConfig = registerAs('commerce', () => {
     healthPort: env.COMMERCE_HEALTH_PORT,
     databaseUrl: env.COMMERCE_DATABASE_URL,
     internalGrpcSecret: env.COMMERCE_INTERNAL_GRPC_SECRET,
+    catalogCdnBaseUrl: env.CATALOG_CDN_BASE_URL,
   };
 });
 

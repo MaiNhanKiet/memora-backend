@@ -96,7 +96,10 @@ export class DuplicateDesignDraftUseCase {
     });
 
     const updatedCart = await this.repository.findActiveCartByActor(actor);
-    const mappedCart = mapCartResponse(updatedCart!);
+    if (!updatedCart) {
+      throw new NotFoundException('Active cart not found');
+    }
+    const mappedCart = mapCartResponse(updatedCart);
 
     return {
       draft: mapDraftItem(newDraft),

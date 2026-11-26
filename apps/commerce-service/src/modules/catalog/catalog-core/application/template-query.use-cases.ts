@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import type {
   GemstoneSlotResponse,
   GetTemplate3DAssetsRequest,
@@ -11,6 +16,8 @@ import type {
   TemplateResponse,
 } from '@app/contracts';
 import {
+  CATALOG_CDN_BASE_URL,
+  DEFAULT_CATALOG_CDN_BASE_URL,
   resolveGlbUrl,
   toAnchorNodes,
   toGemstoneSlotResponse,
@@ -42,6 +49,9 @@ export class ListTemplatesUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
+    @Optional()
+    @Inject(CATALOG_CDN_BASE_URL)
+    private readonly cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
   ) {}
 
   async execute(request: ListTemplatesRequest): Promise<ListTemplatesResponse> {
@@ -60,7 +70,7 @@ export class ListTemplatesUseCase {
     const totalPages = total <= 0 ? 0 : Math.ceil(total / limit);
 
     return {
-      data: rows.map((item) => toTemplateResponse(item)),
+      data: rows.map((item) => toTemplateResponse(item, this.cdnBaseUrl)),
       pagination: {
         page,
         limit,
@@ -76,6 +86,9 @@ export class GetTemplateByIdUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
+    @Optional()
+    @Inject(CATALOG_CDN_BASE_URL)
+    private readonly cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
   ) {}
 
   async execute(request: GetTemplateByIdRequest): Promise<TemplateResponse> {
@@ -83,7 +96,7 @@ export class GetTemplateByIdUseCase {
       this.repository,
       request.templateId,
     );
-    return toTemplateResponse(template);
+    return toTemplateResponse(template, this.cdnBaseUrl);
   }
 }
 
@@ -134,6 +147,9 @@ export class GetTemplate3DAssetsUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
+    @Optional()
+    @Inject(CATALOG_CDN_BASE_URL)
+    private readonly cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
   ) {}
 
   async execute(
@@ -151,7 +167,7 @@ export class GetTemplate3DAssetsUseCase {
     return {
       templateId: template.id,
       model3dAssetKey: template.glbAssetKey,
-      glbUrl: resolveGlbUrl(template.glbAssetKey),
+      glbUrl: resolveGlbUrl(template.glbAssetKey, this.cdnBaseUrl),
       mappingVersion: '1.0',
       anchors: toAnchorNodes(rawSlots),
     };

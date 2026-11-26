@@ -58,6 +58,7 @@ describe('Quote & Payment UseCases', () => {
   };
 
   const validUserId = '11111111-1111-4111-8111-111111111111';
+  const validCustomerIdentityId = '33333333-3333-4333-8333-333333333333';
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -112,17 +113,26 @@ describe('Quote & Payment UseCases', () => {
         quoteId: 'q-1',
         quoteNo: 'QUO-F1',
         quoteTotalAmount: 10000000,
-        confirmedByCustomerIdentityId: validUserId,
+        confirmedByCustomerIdentityId: validCustomerIdentityId,
         status: 'ACTIVE',
         confirmedAt: new Date('2026-11-25T10:00:00Z'),
         items: [],
       });
 
       const res = await confirmFinalQuoteUseCase.execute({
-        actor: { userId: validUserId },
+        actor: {
+          userId: validUserId,
+          customerIdentityId: validCustomerIdentityId,
+        },
         orderId: 'order-1',
       });
 
+      expect(mockRepository.confirmFinalQuote).toHaveBeenCalledWith(
+        'order-1',
+        'q-1',
+        validCustomerIdentityId,
+        'AWAITING_P2',
+      );
       expect(res.nextOrderStatus).toBe('AWAITING_P2');
       expect(res.confirmationId).toBe('conf-1');
     });
@@ -141,7 +151,10 @@ describe('Quote & Payment UseCases', () => {
       });
 
       const res = await acceptServiceQuoteUseCase.execute({
-        actor: { userId: validUserId },
+        actor: {
+          userId: validUserId,
+          customerIdentityId: validCustomerIdentityId,
+        },
         claimId: 'claim-1',
         quoteId: 'q-srv-1',
       });
@@ -159,7 +172,10 @@ describe('Quote & Payment UseCases', () => {
 
       await expect(
         acceptServiceQuoteUseCase.execute({
-          actor: { userId: validUserId },
+          actor: {
+            userId: validUserId,
+            customerIdentityId: validCustomerIdentityId,
+          },
           claimId: 'claim-1',
           quoteId: 'q-srv-1',
         }),
@@ -194,7 +210,10 @@ describe('Quote & Payment UseCases', () => {
       });
 
       const res = await createOrderPaymentLinkUseCase.execute({
-        actor: { userId: validUserId },
+        actor: {
+          userId: validUserId,
+          customerIdentityId: validCustomerIdentityId,
+        },
         orderId: 'order-1',
       });
 
@@ -262,7 +281,10 @@ describe('Quote & Payment UseCases', () => {
       });
 
       const res = await getOrderInvoiceUseCase.execute({
-        actor: { userId: validUserId },
+        actor: {
+          userId: validUserId,
+          customerIdentityId: validCustomerIdentityId,
+        },
         orderId: 'order-1',
       });
 

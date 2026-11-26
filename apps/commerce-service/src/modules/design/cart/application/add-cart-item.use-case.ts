@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { AddCartItemRequest, AddCartItemResponse } from '@app/contracts';
 import { EstimatePriceUseCase } from '../../../pricing/pricing-core/application/estimate-price.use-case';
 import {
@@ -51,7 +51,10 @@ export class AddCartItemUseCase {
     });
 
     const updatedCart = await this.repository.findActiveCartByActor(actor);
-    const mappedCart = mapCartResponse(updatedCart!);
+    if (!updatedCart) {
+      throw new NotFoundException('Active cart not found');
+    }
+    const mappedCart = mapCartResponse(updatedCart);
 
     return {
       item: mapDraftItem(draft),

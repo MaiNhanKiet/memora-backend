@@ -24,7 +24,10 @@ import {
   type OrderingPaymentTransactionRecord,
   type OrderingRepository,
 } from './ordering.repository';
-import { validateOrderingActor } from './ordering.validation';
+import {
+  resolveOrderingActorId,
+  validateOrderingActor,
+} from './ordering.validation';
 import {
   PAYOS_GATEWAY,
   type PayosGateway,
@@ -64,9 +67,13 @@ export class CreateOrderPaymentLinkUseCase {
     request: CreateOrderPaymentLinkRequest,
   ): Promise<PaymentLinkResponse> {
     const actor = validateOrderingActor(request.actor);
-    const actorId = actor.userId ?? actor.guestSessionId!;
+    const { actorId, guestSessionId } = resolveOrderingActorId(actor);
 
-    const order = await this.repository.findOrderById(request.orderId, actorId);
+    const order = await this.repository.findOrderById(
+      request.orderId,
+      actorId,
+      guestSessionId,
+    );
     if (!order) {
       throw new NotFoundException(`Order ${request.orderId} not found`);
     }

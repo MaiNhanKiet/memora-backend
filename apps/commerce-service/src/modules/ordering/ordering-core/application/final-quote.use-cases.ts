@@ -22,7 +22,10 @@ import {
   type OrderingQuoteRecord,
   type OrderingRepository,
 } from './ordering.repository';
-import { validateOrderingActor } from './ordering.validation';
+import {
+  resolveOrderingActorId,
+  validateOrderingActor,
+} from './ordering.validation';
 
 async function loadActiveIssuedQuote(
   repository: OrderingRepository,
@@ -170,7 +173,7 @@ export class ConfirmFinalQuoteUseCase {
     request: ConfirmFinalQuoteRequest,
   ): Promise<ConfirmFinalQuoteResponse> {
     const actor = validateOrderingActor(request.actor);
-    if (!actor.userId) {
+    if (actor.kind !== 'USER') {
       throw new ForbiddenException(
         'Only registered customers can confirm a final quote',
       );
@@ -179,7 +182,7 @@ export class ConfirmFinalQuoteUseCase {
     const { order, quote } = await loadActiveIssuedQuote(
       this.repository,
       request.orderId,
-      actor.userId,
+      actor.customerIdentityId,
       request.quoteId,
       'confirm',
     );
@@ -196,7 +199,7 @@ export class ConfirmFinalQuoteUseCase {
     const confirmation = await this.repository.confirmFinalQuote(
       request.orderId,
       quote.id,
-      actor.userId,
+      actor.customerIdentityId,
       nextOrderStatus,
     );
 
@@ -223,7 +226,7 @@ export class RejectFinalQuoteUseCase {
     request: RejectFinalQuoteRequest,
   ): Promise<RejectFinalQuoteResponse> {
     const actor = validateOrderingActor(request.actor);
-    const actorId = actor.userId ?? actor.guestSessionId!;
+    const { actorId } = resolveOrderingActorId(actor);
 
     const { quote } = await loadActiveIssuedQuote(
       this.repository,

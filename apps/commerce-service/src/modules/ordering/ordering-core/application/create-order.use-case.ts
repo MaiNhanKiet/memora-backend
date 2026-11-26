@@ -11,7 +11,9 @@ import {
   type OrderingRepository,
 } from './ordering.repository';
 import {
+  assertOrderingDraftsOwnedByActor,
   parseDeliveryAddressJson,
+  resolveOrderingActorId,
   validateOrderingActor,
 } from './ordering.validation';
 
@@ -24,7 +26,7 @@ export class CreateOrderUseCase {
 
   async execute(request: CreateOrderRequest): Promise<CreateOrderResponse> {
     const actor = validateOrderingActor(request.actor);
-    const actorId = actor.userId ?? actor.guestSessionId!;
+    const { actorId } = resolveOrderingActorId(actor);
 
     if (
       !request.selectedDraftIds ||
@@ -45,13 +47,15 @@ export class CreateOrderUseCase {
       );
     }
 
+    assertOrderingDraftsOwnedByActor(drafts, actor);
+
     const hasPersonalization = drafts.some(
       (d) =>
         d.personalizationPackage === 'FINGERPRINT' ||
         d.personalizationPackage === 'SOUNDWAVE',
     );
 
-    if (!actor.userId && hasPersonalization) {
+    if (actor.kind !== 'USER' && hasPersonalization) {
       throw new ForbiddenException(
         'Guest checkout is not permitted for personalized rings (FINGERPRINT / SOUNDWAVE). Please sign in.',
       );
@@ -105,8 +109,8 @@ export class CreateOrderUseCase {
 
     const result = await this.repository.createOrderTransaction({
       ownerCustomerIdentityId: actorId,
-      guestEmail: actor.userId ? undefined : request.recipientEmail,
-      guestPhone: actor.userId ? undefined : request.recipientPhone,
+      guestEmail: actor.kind === 'USER' ? undefined : request.recipientEmail,
+      guestPhone: actor.kind === 'USER' ? undefined : request.recipientPhone,
       createdFromCartId: drafts[0]?.cartId,
       status: initialStatus,
       sourcePlanMode: resolvedSourcePlanMode,

@@ -29,7 +29,10 @@ export class RemoveCartItemUseCase {
     await this.repository.deleteDraft(draft.id);
 
     const updatedCart = await this.repository.findActiveCartByActor(actor);
-    const mappedCart = mapCartResponse(updatedCart!);
+    if (!updatedCart) {
+      throw new NotFoundException('Active cart not found');
+    }
+    const mappedCart = mapCartResponse(updatedCart);
 
     return {
       removedDraftId: draft.id,

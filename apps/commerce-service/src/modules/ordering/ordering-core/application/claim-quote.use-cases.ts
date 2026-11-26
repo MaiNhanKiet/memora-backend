@@ -55,12 +55,12 @@ export class AcceptServiceQuoteUseCase {
     }
 
     const actor = validateOrderingActor(request.actor);
-    const customerIdentityId = actor.userId ?? actor.guestSessionId;
-    if (!customerIdentityId) {
+    if (actor.kind === 'GUEST_SESSION') {
       throw new ForbiddenException(
         'A valid customer identity is required to accept a service quote',
       );
     }
+    const customerIdentityId = actor.customerIdentityId;
 
     const quote = await this.repository.findClaimQuoteById(
       request.claimId,

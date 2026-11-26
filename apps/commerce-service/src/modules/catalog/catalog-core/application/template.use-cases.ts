@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type {
   ArchiveTemplateRequest,
@@ -12,7 +13,11 @@ import type {
   TemplateResponse,
   UpdateTemplateRequest,
 } from '@app/contracts';
-import { toTemplateResponse } from './catalog.mapper';
+import {
+  CATALOG_CDN_BASE_URL,
+  DEFAULT_CATALOG_CDN_BASE_URL,
+  toTemplateResponse,
+} from './catalog.mapper';
 import {
   CATALOG_REPOSITORY,
   type CatalogRepository,
@@ -36,6 +41,9 @@ export class CreateTemplateUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
+    @Optional()
+    @Inject(CATALOG_CDN_BASE_URL)
+    private readonly cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
   ) {}
 
   async execute(request: CreateTemplateRequest): Promise<TemplateResponse> {
@@ -58,7 +66,7 @@ export class CreateTemplateUseCase {
       createdByUserId: request.createdByUserId,
     });
 
-    return toTemplateResponse(created);
+    return toTemplateResponse(created, this.cdnBaseUrl);
   }
 }
 
@@ -67,6 +75,9 @@ export class UpdateTemplateUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
+    @Optional()
+    @Inject(CATALOG_CDN_BASE_URL)
+    private readonly cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
   ) {}
 
   async execute(request: UpdateTemplateRequest): Promise<TemplateResponse> {
@@ -101,7 +112,7 @@ export class UpdateTemplateUseCase {
       request.templateId,
       data,
     );
-    return toTemplateResponse(updated);
+    return toTemplateResponse(updated, this.cdnBaseUrl);
   }
 }
 
@@ -110,6 +121,9 @@ export class PublishTemplateUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
+    @Optional()
+    @Inject(CATALOG_CDN_BASE_URL)
+    private readonly cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
   ) {}
 
   async execute(request: PublishTemplateRequest): Promise<TemplateResponse> {
@@ -118,7 +132,7 @@ export class PublishTemplateUseCase {
       request.templateId,
     );
     if (existing.status === 'ACTIVE') {
-      return toTemplateResponse(existing);
+      return toTemplateResponse(existing, this.cdnBaseUrl);
     }
 
     const variantCount = await this.repository.countVariantsForTemplate(
@@ -133,7 +147,7 @@ export class PublishTemplateUseCase {
     const updated = await this.repository.updateTemplate(request.templateId, {
       status: 'ACTIVE',
     });
-    return toTemplateResponse(updated);
+    return toTemplateResponse(updated, this.cdnBaseUrl);
   }
 }
 
@@ -142,6 +156,9 @@ export class ArchiveTemplateUseCase {
   constructor(
     @Inject(CATALOG_REPOSITORY)
     private readonly repository: CatalogRepository,
+    @Optional()
+    @Inject(CATALOG_CDN_BASE_URL)
+    private readonly cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
   ) {}
 
   async execute(request: ArchiveTemplateRequest): Promise<TemplateResponse> {
@@ -150,6 +167,6 @@ export class ArchiveTemplateUseCase {
     const updated = await this.repository.updateTemplate(request.templateId, {
       status: 'ARCHIVED',
     });
-    return toTemplateResponse(updated);
+    return toTemplateResponse(updated, this.cdnBaseUrl);
   }
 }

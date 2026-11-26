@@ -1,5 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -13,82 +12,46 @@ import type {
   PresignedUploadResult,
 } from '../application/memory-storage.port';
 
+export interface MemoryStorageConfig {
+  readonly endpoint: string;
+  readonly publicEndpoint: string;
+  readonly region: string;
+  readonly bucket: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
+}
+
 @Injectable()
 export class MemoryStorageAdapter implements MemoryStoragePort {
   private readonly client: S3Client;
   private readonly signingClient: S3Client;
   private readonly bucket: string;
 
-  constructor(@Optional() private readonly configService?: ConfigService) {
-    const endpoint =
-      this.configService?.get<string>('experience.storage.endpoint') ??
-      this.configService?.get<string>('EXPERIENCE_OBJECT_STORAGE_ENDPOINT') ??
-      process.env.EXPERIENCE_OBJECT_STORAGE_ENDPOINT ??
-      process.env.OPERATIONS_OBJECT_STORAGE_ENDPOINT ??
-      'http://100.78.222.34:3900';
-
-    const publicEndpoint =
-      this.configService?.get<string>('experience.storage.publicEndpoint') ??
-      this.configService?.get<string>(
-        'EXPERIENCE_OBJECT_STORAGE_PUBLIC_ENDPOINT',
-      ) ??
-      process.env.EXPERIENCE_OBJECT_STORAGE_PUBLIC_ENDPOINT ??
-      endpoint;
-
-    const region =
-      this.configService?.get<string>('experience.storage.region') ??
-      this.configService?.get<string>('EXPERIENCE_OBJECT_STORAGE_REGION') ??
-      process.env.EXPERIENCE_OBJECT_STORAGE_REGION ??
-      process.env.OPERATIONS_OBJECT_STORAGE_REGION ??
-      'garage';
-
-    const accessKeyId =
-      this.configService?.get<string>('experience.storage.accessKeyId') ??
-      this.configService?.get<string>(
-        'EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID',
-      ) ??
-      process.env.EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID ??
-      process.env.OPERATIONS_OBJECT_STORAGE_ACCESS_KEY_ID ??
-      process.env.GARAGE_ACCESS_KEY_ID ??
-      'GKbae7b9cc0ee77b9a1db6b2df';
-
-    const secretAccessKey =
-      this.configService?.get<string>('experience.storage.secretAccessKey') ??
-      this.configService?.get<string>(
-        'EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY',
-      ) ??
-      process.env.EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY ??
-      process.env.OPERATIONS_OBJECT_STORAGE_SECRET_ACCESS_KEY ??
-      process.env.GARAGE_SECRET_ACCESS_KEY ??
-      '7f6c9b3a6ecbb7ea54ade3454b311dae860039bfc7bcd9177a247484cf80e21d';
-
-    this.bucket =
-      this.configService?.get<string>('experience.storage.bucket') ??
-      this.configService?.get<string>('EXPERIENCE_OBJECT_STORAGE_BUCKET') ??
-      process.env.EXPERIENCE_OBJECT_STORAGE_BUCKET ??
-      'memora-memory';
+  constructor(config: MemoryStorageConfig) {
+    this.bucket = config.bucket;
 
     this.client = new S3Client({
-      endpoint,
-      region,
+      endpoint: config.endpoint,
+      region: config.region,
       forcePathStyle: true,
       credentials: {
-        accessKeyId,
-        secretAccessKey,
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
       },
       requestChecksumCalculation: 'WHEN_REQUIRED',
       responseChecksumValidation: 'WHEN_REQUIRED',
     });
 
+    const publicEndpoint = config.publicEndpoint || config.endpoint;
     this.signingClient =
-      publicEndpoint !== endpoint
+      publicEndpoint !== config.endpoint
         ? new S3Client({
             endpoint: publicEndpoint,
-            region,
+            region: config.region,
             forcePathStyle: true,
             credentials: {
-              accessKeyId,
-              secretAccessKey,
+              accessKeyId: config.accessKeyId,
+              secretAccessKey: config.secretAccessKey,
             },
             requestChecksumCalculation: 'WHEN_REQUIRED',
             responseChecksumValidation: 'WHEN_REQUIRED',
@@ -138,18 +101,7 @@ export class MemoryStorageAdapter implements MemoryStoragePort {
         }),
       );
       return true;
-    } catch (err: unknown) {
-      if (
-        typeof err === 'object' &&
-        err !== null &&
-        'name' in err &&
-        (err.name === 'NotFound' ||
-          err.name === 'NoSuchKey' ||
-          (err as { $metadata?: { httpStatusCode?: number } }).$metadata
-            ?.httpStatusCode === 404)
-      ) {
-        return false;
-      }
+    } catch {
       return false;
     }
   }

@@ -16,10 +16,14 @@ describe('CreateOrderUseCase', () => {
   };
 
   const validUserId = '11111111-1111-4111-8111-111111111111';
+  const validCustomerIdentityId = '33333333-3333-4333-8333-333333333333';
   const validGuestId = '22222222-2222-4222-8222-222222222222';
 
   const basePayload = {
-    actor: { userId: validUserId },
+    actor: {
+      userId: validUserId,
+      customerIdentityId: validCustomerIdentityId,
+    },
     selectedDraftIds: ['draft-1'],
     fulfillmentMode: 'DELIVERY',
     recipientName: 'Nguyen Van A',
@@ -73,10 +77,34 @@ describe('CreateOrderUseCase', () => {
     );
   });
 
+  it('should throw BadRequestException if USER actor is missing customerIdentityId', async () => {
+    await expect(
+      useCase.execute({
+        ...basePayload,
+        actor: { userId: validUserId },
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should throw ForbiddenException if selected draft belongs to another user', async () => {
+    mockRepository.findDraftsByIds.mockResolvedValue([
+      {
+        id: 'draft-1',
+        ownerUserId: '99999999-9999-4999-8999-999999999999',
+        personalizationPackage: 'NONE',
+      },
+    ]);
+
+    await expect(useCase.execute(basePayload)).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
   it('should throw ForbiddenException if guest checks out personalized ring', async () => {
     mockRepository.findDraftsByIds.mockResolvedValue([
       {
         id: 'draft-1',
+        guestSessionId: validGuestId,
         personalizationPackage: 'FINGERPRINT',
       },
     ]);
@@ -93,6 +121,7 @@ describe('CreateOrderUseCase', () => {
     mockRepository.findDraftsByIds.mockResolvedValue([
       {
         id: 'draft-1',
+        ownerUserId: validUserId,
         personalizationPackage: 'SOUNDWAVE',
       },
     ]);
@@ -102,11 +131,12 @@ describe('CreateOrderUseCase', () => {
     );
   });
 
-  it('should create order successfully for personalized ring with AWAITING_P1 and 30% deposit', async () => {
+  it('should create order successfully for personalized ring with AWAITING_P1 and 30% deposit using customerIdentityId', async () => {
     mockRepository.findDraftsByIds.mockResolvedValue([
       {
         id: 'draft-1',
         cartId: 'cart-1',
+        ownerUserId: validUserId,
         templateVariantId: 'var-1',
         templateCode: 'T1',
         templateName: 'Ring 1',
@@ -139,6 +169,11 @@ describe('CreateOrderUseCase', () => {
       },
     });
 
+    expect(mockRepository.createOrderTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerCustomerIdentityId: validCustomerIdentityId,
+      }),
+    );
     expect(res.orderId).toBe('order-1');
     expect(res.status).toBe('AWAITING_P1');
     expect(res.depositAmount).toBe(3000000);
@@ -149,6 +184,7 @@ describe('CreateOrderUseCase', () => {
       {
         id: 'draft-1',
         cartId: 'cart-1',
+        cartOwnerUserId: validUserId,
         templateVariantId: 'var-1',
         templateCode: 'T1',
         templateName: 'Ring 1',

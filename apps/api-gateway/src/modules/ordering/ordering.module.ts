@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { domainGrpcClientOptions } from '../../common/grpc/domain-grpc';
 import { CheckoutOrdersController } from './checkout-orders/controllers/checkout-orders.controller';
+import { CheckoutOrderMemoryOrchestrator } from './checkout-orders/services/checkout-order-memory.orchestrator';
 import { AdminOrdersController } from './order-management/controllers/admin-orders.controller';
 import { OrderQuotesController } from './quotes/controllers/order-quotes.controller';
 import { OrderPaymentsController } from './payments/controllers/order-payments.controller';
@@ -41,7 +42,11 @@ import { MemoryCardsModule } from '../memory/cards/memory-cards.module';
     ReceiptsInvoicesController,
     ClaimQuotesController,
   ],
-  providers: [OrderingGrpcClient, PaymentEventsService],
+  providers: [
+    OrderingGrpcClient,
+    PaymentEventsService,
+    CheckoutOrderMemoryOrchestrator,
+  ],
   exports: [OrderingGrpcClient, PaymentEventsService],
 })
 export class OrderingModule {}

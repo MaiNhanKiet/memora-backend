@@ -1,51 +1,51 @@
 import { MemoryStorageAdapter } from './memory-storage.adapter';
 
-describe('Garage Storage Live Integration Test', () => {
-  let adapter: MemoryStorageAdapter;
+const hasLiveEnv =
+  process.env.MEMORA_GARAGE_TEST === '1' &&
+  Boolean(process.env.EXPERIENCE_OBJECT_STORAGE_ENDPOINT) &&
+  Boolean(process.env.EXPERIENCE_OBJECT_STORAGE_BUCKET) &&
+  Boolean(process.env.EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID) &&
+  Boolean(process.env.EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY);
 
-  beforeAll(() => {
-    adapter = new MemoryStorageAdapter();
-  });
+const describeLive = hasLiveEnv ? describe : describe.skip;
 
-  it('should perform a complete roundtrip: presign PUT -> upload -> verify exists -> presign GET -> download -> delete', async () => {
-    const testKey = `test-memories/live-test-${Date.now()}.txt`;
-    const testContent = `Hello Memora S3 Garage! Timestamp: ${new Date().toISOString()}`;
+describeLive('Garage S3 Live Upload & Verify Integration', () => {
+  it('should presign, PUT real payload to Garage S3, confirm via HeadObject, GET, and DELETE', async () => {
+    const endpoint = process.env.EXPERIENCE_OBJECT_STORAGE_ENDPOINT ?? '';
+    const adapter = new MemoryStorageAdapter({
+      endpoint,
+      publicEndpoint:
+        process.env.EXPERIENCE_OBJECT_STORAGE_PUBLIC_ENDPOINT ?? endpoint,
+      region: process.env.EXPERIENCE_OBJECT_STORAGE_REGION ?? 'garage',
+      bucket: process.env.EXPERIENCE_OBJECT_STORAGE_BUCKET ?? '',
+      accessKeyId: process.env.EXPERIENCE_OBJECT_STORAGE_ACCESS_KEY_ID ?? '',
+      secretAccessKey:
+        process.env.EXPERIENCE_OBJECT_STORAGE_SECRET_ACCESS_KEY ?? '',
+    });
 
-    // 1. Generate presigned upload URL
-    const { uploadUrl, expiresAt } = await adapter.presignUploadUrl(
+    const testKey = `memory/test-suite/live-test-${Date.now()}.txt`;
+    const bodyContent = 'MEMORA live Garage S3 verification payload';
+
+    const { uploadUrl } = await adapter.presignUploadUrl(
       testKey,
       'text/plain',
       300,
     );
-    expect(uploadUrl).toBeDefined();
-    expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
-
-    // 2. Upload file directly via HTTP PUT
     const putRes = await fetch(uploadUrl, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'text/plain',
-      },
-      body: testContent,
+      headers: { 'Content-Type': 'text/plain' },
+      body: bodyContent,
     });
     expect(putRes.ok).toBe(true);
 
-    // 3. Verify object exists via S3 HeadObject
-    const exists = await adapter.checkObjectExists(testKey);
-    expect(exists).toBe(true);
+    await expect(adapter.checkObjectExists(testKey)).resolves.toBe(true);
 
-    // 4. Generate presigned GET URL & Download file
-    const downloadUrl = await adapter.presignGetUrl(testKey, 300);
-    expect(downloadUrl).toBeDefined();
-
-    const getRes = await fetch(downloadUrl);
+    const getUrl = await adapter.presignGetUrl(testKey, 300);
+    const getRes = await fetch(getUrl);
     expect(getRes.ok).toBe(true);
-    const downloadedText = await getRes.text();
-    expect(downloadedText).toBe(testContent);
+    await expect(getRes.text()).resolves.toBe(bodyContent);
 
-    // 5. Delete test object and verify it no longer exists
     await adapter.deleteObject(testKey);
-    const existsAfterDelete = await adapter.checkObjectExists(testKey);
-    expect(existsAfterDelete).toBe(false);
+    await expect(adapter.checkObjectExists(testKey)).resolves.toBe(false);
   });
 });
