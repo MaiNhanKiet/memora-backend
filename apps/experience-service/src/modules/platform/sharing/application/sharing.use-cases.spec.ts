@@ -257,6 +257,57 @@ describe('Sharing UseCases', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    const guestLink: ShareLinkRecord = {
+      ...existingLink,
+      createdByUserId: undefined,
+      guestSessionId: sampleGuestActor.guestSessionId,
+    };
+
+    it.each([
+      { actor: sampleUserActor, link: guestLink },
+      { actor: sampleGuestActor, link: existingLink },
+      {
+        actor: sampleUserActor,
+        link: { ...existingLink, createdByUserId: undefined },
+      },
+      {
+        actor: sampleUserActor,
+        link: {
+          ...existingLink,
+          guestSessionId: sampleGuestActor.guestSessionId,
+        },
+      },
+    ])(
+      'should reject revoked access for a different or ambiguous owner',
+      async ({ actor, link }) => {
+        mockRepository.findById.mockResolvedValue(link);
+
+        await expect(
+          revokeShareLinkUseCase.execute({ actor, shareLinkId: link.id }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockRepository.revokeShareLink).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should allow the owning guest to revoke a link only once', async () => {
+      const revokedLink = {
+        ...guestLink,
+        status: 'REVOKED',
+        revokedAt: new Date(),
+      };
+      mockRepository.findById
+        .mockResolvedValueOnce(guestLink)
+        .mockResolvedValueOnce(revokedLink);
+      mockRepository.revokeShareLink.mockResolvedValue(revokedLink);
+      const request = { actor: sampleGuestActor, shareLinkId: guestLink.id };
+
+      const original = await revokeShareLinkUseCase.execute(request);
+      await expect(revokeShareLinkUseCase.execute(request)).resolves.toEqual(
+        original,
+      );
+      expect(mockRepository.revokeShareLink).toHaveBeenCalledTimes(1);
+    });
+
     it('should throw NotFoundException if link does not exist', async () => {
       mockRepository.findById.mockResolvedValue(undefined);
 

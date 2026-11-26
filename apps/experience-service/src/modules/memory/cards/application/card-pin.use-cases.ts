@@ -102,7 +102,6 @@ export class ChangePinUseCase {
     await verifyCardPinWithLockout({
       cardId: card.id,
       pinHash: card.pinHash,
-      pinFailedAttempts: card.pinFailedAttempts,
       pinLockedUntil: card.pinLockedUntil,
       inputPin: request.currentPin,
       missingPinMessage: 'Mã PIN hiện tại không chính xác.',
@@ -122,7 +121,16 @@ export class ChangePinUseCase {
     assertValidPinFormat(request.newPin, 'Mã PIN mới phải gồm 4 đến 6 chữ số');
 
     const newHash = await this.pinHasher.hash(request.newPin);
-    const updated = await this.cardRepository.updatePin(card.id, newHash);
+    const updated = await this.cardRepository.changeVerifiedPin(
+      card.id,
+      card.pinHash,
+      newHash,
+    );
+    if (!updated) {
+      throw new ForbiddenException(
+        'Trạng thái mã PIN đã thay đổi. Vui lòng thử lại.',
+      );
+    }
 
     return {
       success: true,

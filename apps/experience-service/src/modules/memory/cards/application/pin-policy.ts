@@ -15,7 +15,6 @@ export function assertValidPinFormat(pin: string, errorMessage: string): void {
 export async function verifyCardPinWithLockout(params: {
   readonly cardId: string;
   readonly pinHash: string;
-  readonly pinFailedAttempts: number;
   readonly pinLockedUntil?: Date;
   readonly inputPin?: string;
   readonly missingPinMessage: string;
@@ -44,17 +43,27 @@ export async function verifyCardPinWithLockout(params: {
     params.pinHash,
     params.inputPin ?? '',
   );
-  if (!isMatch) {
-    const attempts = params.pinFailedAttempts + 1;
-    const lockedUntil =
-      attempts >= MAX_PIN_FAILED_ATTEMPTS
-        ? new Date(now.getTime() + PIN_LOCK_DURATION_MS)
-        : undefined;
-    await params.cardRepository.recordFailedPinAttempt(
-      params.cardId,
-      attempts,
-      lockedUntil,
+  const result = await params.cardRepository.applyPinVerification({
+    cardId: params.cardId,
+    expectedPinHash: params.pinHash,
+    matches: isMatch,
+    maxFailedAttempts: MAX_PIN_FAILED_ATTEMPTS,
+    lockDurationMs: PIN_LOCK_DURATION_MS,
+  });
+  if (result.kind === 'stale') {
+    throw new ForbiddenException(
+      'Trạng thái mã PIN đã thay đổi. Vui lòng thử lại.',
     );
+  }
+  if (result.kind === 'locked') {
+    const waitMinutes = Math.max(
+      1,
+      Math.ceil((result.lockedUntil.getTime() - Date.now()) / 60000),
+    );
+    throw new ForbiddenException(params.lockedMessage(waitMinutes));
+  }
+  if (result.kind === 'invalid') {
+    const attempts = result.failedAttempts;
     throw new BadRequestException(
       attempts >= MAX_PIN_FAILED_ATTEMPTS
         ? params.wrongPinMessages.locked

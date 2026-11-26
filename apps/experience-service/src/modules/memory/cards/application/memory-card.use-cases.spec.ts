@@ -32,8 +32,8 @@ describe('MemoryCard UseCases', () => {
     provisionCard: jest.fn(),
     activateCard: jest.fn(),
     updatePin: jest.fn(),
-    recordFailedPinAttempt: jest.fn(),
-    resetFailedPinAttempts: jest.fn(),
+    changeVerifiedPin: jest.fn(),
+    applyPinVerification: jest.fn(),
   };
 
   const mockPinHasher = {
@@ -217,7 +217,10 @@ describe('MemoryCard UseCases', () => {
         ...sampleCard,
         pinHash: 'hash_1234',
       });
-      mockCardRepository.updatePin.mockResolvedValue({
+      mockCardRepository.applyPinVerification.mockResolvedValue({
+        kind: 'verified',
+      });
+      mockCardRepository.changeVerifiedPin.mockResolvedValue({
         ...sampleCard,
         pinHash: 'hash_5678',
         pinUpdatedAt: new Date(),
@@ -231,8 +234,9 @@ describe('MemoryCard UseCases', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(mockCardRepository.updatePin).toHaveBeenCalledWith(
+      expect(mockCardRepository.changeVerifiedPin).toHaveBeenCalledWith(
         sampleCard.id,
+        'hash_1234',
         'hash_5678',
       );
     });
@@ -243,6 +247,10 @@ describe('MemoryCard UseCases', () => {
         pinHash: 'hash_1234',
         pinFailedAttempts: 0,
       });
+      mockCardRepository.applyPinVerification.mockResolvedValue({
+        kind: 'invalid',
+        failedAttempts: 4,
+      });
 
       await expect(
         changePinUseCase.execute({
@@ -251,13 +259,36 @@ describe('MemoryCard UseCases', () => {
           currentPin: '0000',
           newPin: '5678',
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow('Bạn còn 1 lần thử');
 
-      expect(mockCardRepository.recordFailedPinAttempt).toHaveBeenCalledWith(
-        sampleCard.id,
-        1,
-        undefined,
-      );
+      expect(mockCardRepository.applyPinVerification).toHaveBeenCalledWith({
+        cardId: sampleCard.id,
+        expectedPinHash: 'hash_1234',
+        matches: false,
+        maxFailedAttempts: 5,
+        lockDurationMs: 15 * 60 * 1000,
+      });
+      expect(mockCardRepository.changeVerifiedPin).not.toHaveBeenCalled();
+    });
+
+    it('should reject changing the PIN after another request has changed it', async () => {
+      mockCardRepository.findById.mockResolvedValue({
+        ...sampleCard,
+        pinHash: 'hash_1234',
+      });
+      mockCardRepository.applyPinVerification.mockResolvedValue({
+        kind: 'verified',
+      });
+      mockCardRepository.changeVerifiedPin.mockResolvedValue(undefined);
+
+      await expect(
+        changePinUseCase.execute({
+          actor: sampleActor,
+          cardId: sampleCard.id,
+          currentPin: '1234',
+          newPin: '5678',
+        }),
+      ).rejects.toThrow('Trạng thái mã PIN đã thay đổi');
     });
   });
 

@@ -11,6 +11,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { MEMORY_CONTENT_TYPES, type MemoryContentType } from '@app/contracts';
 
 export class ListCardContentsQueryDto {
   @ApiPropertyOptional({
@@ -33,11 +34,11 @@ export class ContentItemInputDto {
   @ApiProperty({
     description: 'Loại nội dung (TEXT, IMAGE, AUDIO, VIDEO)',
     example: 'IMAGE',
-    enum: ['TEXT', 'IMAGE', 'AUDIO', 'VIDEO'],
+    enum: [...MEMORY_CONTENT_TYPES],
   })
   @IsNotEmpty()
-  @IsIn(['TEXT', 'IMAGE', 'AUDIO', 'VIDEO'])
-  contentType!: string;
+  @IsIn(MEMORY_CONTENT_TYPES)
+  contentType!: MemoryContentType;
 
   @ApiPropertyOptional({
     description: 'Tiêu đề kỷ niệm',

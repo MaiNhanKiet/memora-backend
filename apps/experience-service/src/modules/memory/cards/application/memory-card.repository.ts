@@ -33,6 +33,20 @@ export interface ProvisionMemoryCardInput {
   readonly ownerEmail: string;
 }
 
+export interface PinVerificationInput {
+  readonly cardId: string;
+  readonly expectedPinHash: string;
+  readonly matches: boolean;
+  readonly maxFailedAttempts: number;
+  readonly lockDurationMs: number;
+}
+
+export type PinVerificationResult =
+  | { readonly kind: 'verified' }
+  | { readonly kind: 'invalid'; readonly failedAttempts: number }
+  | { readonly kind: 'locked'; readonly lockedUntil: Date }
+  | { readonly kind: 'stale' };
+
 export interface MemoryCardRepository {
   listCardsByOwner(
     ownerCustomerIdentityId: string,
@@ -50,10 +64,12 @@ export interface MemoryCardRepository {
     initialPinHash?: string,
   ): Promise<MemoryCardRecord>;
   updatePin(cardId: string, pinHash: string): Promise<MemoryCardRecord>;
-  recordFailedPinAttempt(
+  changeVerifiedPin(
     cardId: string,
-    newFailedAttempts: number,
-    lockedUntil?: Date,
-  ): Promise<MemoryCardRecord>;
-  resetFailedPinAttempts(cardId: string): Promise<MemoryCardRecord>;
+    expectedPinHash: string,
+    newPinHash: string,
+  ): Promise<MemoryCardRecord | undefined>;
+  applyPinVerification(
+    input: PinVerificationInput,
+  ): Promise<PinVerificationResult>;
 }

@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import type {
@@ -20,16 +24,11 @@ export class PayosProvider implements PayosGateway {
   private readonly logger = new Logger(PayosProvider.name);
   private readonly credentials?: PayosCredentials;
 
-  constructor(private readonly configService: ConfigService) {
-    const clientId = this.configService.get<string>('PAYOS_CLIENT_ID');
-    const apiKey = this.configService.get<string>('PAYOS_API_KEY');
-    const checksumKey = this.configService.get<string>('PAYOS_CHECKSUM_KEY');
-
-    if (clientId && apiKey && checksumKey) {
-      this.credentials = { clientId, apiKey, checksumKey };
-    } else {
+  constructor(configService: ConfigService) {
+    this.credentials = configService.get<PayosCredentials>('commerce.payos');
+    if (!this.credentials) {
       this.logger.warn(
-        'PayOS credentials not found (PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY). Running in Mock/Simulator mode.',
+        'PayOS is unavailable because credentials are incomplete',
       );
     }
   }
@@ -44,29 +43,7 @@ export class PayosProvider implements PayosGateway {
   async createPaymentLink(
     params: PayosCreatePaymentLinkParams,
   ): Promise<PayosPaymentLinkData> {
-    const credentials = this.credentials;
-    if (!credentials) {
-      this.logger.log(
-        `[MOCK PayOS] Creating simulated payment link for orderCode: ${params.orderCode}, amount: ${params.amount}`,
-      );
-      const mockLinkId = `pl_${params.orderCode}`;
-      const checkoutUrl = `https://pay.payos.vn/web/${mockLinkId}`;
-      const qrCode = `00020101021238540010A000000727012400069704220110${params.orderCode}5303704540${params.amount}5802VN62140810${mockLinkId}6304MOCK`;
-
-      return {
-        bin: '970422',
-        accountNumber: '103870000000',
-        accountName: 'MEMORA JEWELRY',
-        amount: params.amount,
-        description: params.description,
-        orderCode: params.orderCode,
-        currency: 'VND',
-        paymentLinkId: mockLinkId,
-        status: 'PENDING',
-        checkoutUrl,
-        qrCode,
-      };
-    }
+    const credentials = this.requireCredentials();
 
     // Call live PayOS API using native fetch
     try {
@@ -109,10 +86,7 @@ export class PayosProvider implements PayosGateway {
       };
 
       if (resData.code !== '00' || !resData.data) {
-        this.logger.error(
-          `PayOS API error response: ${JSON.stringify(resData)}`,
-        );
-        throw new Error(`PayOS API error: [${resData.code}] ${resData.desc}`);
+        throw new Error('PayOS rejected the payment link request');
       }
 
       return resData.data;
@@ -126,11 +100,7 @@ export class PayosProvider implements PayosGateway {
   }
 
   verifyWebhookSignature(payload: PayosWebhookPayload): boolean {
-    const credentials = this.credentials;
-    if (!credentials) {
-      // In mock mode, if signature is "mock-signature" or any non-empty in test, accept
-      return true;
-    }
+    const credentials = this.requireCredentials();
 
     const { data, signature } = payload;
     if (!data || !signature) {
@@ -171,17 +141,7 @@ export class PayosProvider implements PayosGateway {
   async getPaymentInformation(
     orderCode: number,
   ): Promise<PayosPaymentInfo | null> {
-    const credentials = this.credentials;
-    if (!credentials) {
-      this.logger.log(
-        `[MOCK PayOS] Fetching payment info for orderCode: ${orderCode}`,
-      );
-      return {
-        status: 'PAID',
-        amount: 1000000,
-        orderCode,
-      };
-    }
+    const credentials = this.requireCredentials();
 
     try {
       const response = await fetch(
@@ -217,5 +177,12 @@ export class PayosProvider implements PayosGateway {
       );
       return null;
     }
+  }
+
+  private requireCredentials(): PayosCredentials {
+    if (!this.credentials) {
+      throw new ServiceUnavailableException('PayOS is not configured');
+    }
+    return this.credentials;
   }
 }

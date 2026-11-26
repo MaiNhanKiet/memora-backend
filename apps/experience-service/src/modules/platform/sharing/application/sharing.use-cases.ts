@@ -158,15 +158,14 @@ export class RevokeShareLinkUseCase {
       throw new NotFoundException('Share link not found');
     }
 
-    if (actor.kind === 'USER') {
-      if (link.createdByUserId && link.createdByUserId !== actor.userId) {
-        throw new ForbiddenException('You do not own this share link');
-      }
-    } else if (actor.kind === 'GUEST_SESSION') {
-      if (link.guestSessionId && link.guestSessionId !== actor.guestSessionId) {
-        throw new ForbiddenException('You do not own this share link');
-      }
-    } else {
+    const isOwner =
+      (actor.kind === 'USER' &&
+        link.createdByUserId === actor.userId &&
+        link.guestSessionId === undefined) ||
+      (actor.kind === 'GUEST_SESSION' &&
+        link.guestSessionId === actor.guestSessionId &&
+        link.createdByUserId === undefined);
+    if (!isOwner) {
       throw new ForbiddenException('You do not own this share link');
     }
 

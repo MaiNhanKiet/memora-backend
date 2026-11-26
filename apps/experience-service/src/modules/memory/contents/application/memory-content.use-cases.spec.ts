@@ -28,7 +28,7 @@ describe('MemoryContent UseCases', () => {
 
   const mockCardRepository = {
     findById: jest.fn(),
-    recordFailedPinAttempt: jest.fn(),
+    applyPinVerification: jest.fn(),
   };
 
   const mockStoragePort = {

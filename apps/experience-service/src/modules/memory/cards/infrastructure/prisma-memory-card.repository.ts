@@ -8,12 +8,29 @@ import type {
   MemoryCardRecord,
   MemoryCardRepository,
   MemoryCardWithGrantsRecord,
+  PinVerificationInput,
+  PinVerificationResult,
   ProvisionMemoryCardInput,
 } from '../application/memory-card.repository';
 
 type MemoryCardWithGrantsRow = Prisma.memory_cardsGetPayload<{
   include: { access_grants: true };
 }>;
+
+type MemoryCardPinRow = Pick<
+  memory_cards,
+  'pin_hash' | 'pin_failed_attempts' | 'pin_locked_until'
+>;
+
+function pinUpdateData(pinHash: string, now: Date) {
+  return {
+    pin_hash: pinHash,
+    pin_updated_at: now,
+    pin_failed_attempts: 0,
+    pin_locked_until: null,
+    updated_at: now,
+  };
+}
 
 function toMemoryCardRecord(row: memory_cards): MemoryCardRecord {
   return {
@@ -153,42 +170,70 @@ export class PrismaMemoryCardRepository implements MemoryCardRepository {
     const now = new Date();
     const updated = await this.prisma.memory_cards.update({
       where: { id: cardId },
-      data: {
-        pin_hash: pinHash,
-        pin_updated_at: now,
-        pin_failed_attempts: 0,
-        pin_locked_until: null,
-        updated_at: now,
-      },
+      data: pinUpdateData(pinHash, now),
     });
     return toMemoryCardRecord(updated);
   }
 
-  async recordFailedPinAttempt(
+  async changeVerifiedPin(
     cardId: string,
-    newFailedAttempts: number,
-    lockedUntil?: Date,
-  ): Promise<MemoryCardRecord> {
-    const updated = await this.prisma.memory_cards.update({
-      where: { id: cardId },
-      data: {
-        pin_failed_attempts: newFailedAttempts,
-        pin_locked_until: lockedUntil ?? null,
-        updated_at: new Date(),
+    expectedPinHash: string,
+    newPinHash: string,
+  ): Promise<MemoryCardRecord | undefined> {
+    const now = new Date();
+    const [updated] = await this.prisma.memory_cards.updateManyAndReturn({
+      where: {
+        id: cardId,
+        deleted_at: null,
+        pin_hash: expectedPinHash,
+        OR: [{ pin_locked_until: null }, { pin_locked_until: { lte: now } }],
       },
+      data: pinUpdateData(newPinHash, now),
     });
-    return toMemoryCardRecord(updated);
+    return updated ? toMemoryCardRecord(updated) : undefined;
   }
 
-  async resetFailedPinAttempts(cardId: string): Promise<MemoryCardRecord> {
-    const updated = await this.prisma.memory_cards.update({
-      where: { id: cardId },
-      data: {
-        pin_failed_attempts: 0,
-        pin_locked_until: null,
-        updated_at: new Date(),
-      },
+  async applyPinVerification(
+    input: PinVerificationInput,
+  ): Promise<PinVerificationResult> {
+    return this.prisma.$transaction(async (tx) => {
+      // Serialize attempts on this card and recheck the hash after PIN verification.
+      const [card] = await tx.$queryRaw<MemoryCardPinRow[]>`
+        SELECT pin_hash, pin_failed_attempts, pin_locked_until
+        FROM memory.memory_cards
+        WHERE id = ${input.cardId}::uuid AND deleted_at IS NULL
+        FOR UPDATE
+      `;
+      if (!card || card.pin_hash !== input.expectedPinHash) {
+        return { kind: 'stale' };
+      }
+
+      const now = new Date();
+      const currentLock = card.pin_locked_until;
+      if (currentLock && currentLock > now) {
+        return { kind: 'locked', lockedUntil: currentLock };
+      }
+
+      const failedAttempts = input.matches
+        ? 0
+        : (currentLock ? 0 : card.pin_failed_attempts) + 1;
+      const lockedUntil =
+        failedAttempts >= input.maxFailedAttempts
+          ? new Date(now.getTime() + input.lockDurationMs)
+          : null;
+      if (failedAttempts !== card.pin_failed_attempts || currentLock) {
+        await tx.memory_cards.update({
+          where: { id: input.cardId },
+          data: {
+            pin_failed_attempts: failedAttempts,
+            pin_locked_until: lockedUntil,
+            updated_at: now,
+          },
+        });
+      }
+      return input.matches
+        ? { kind: 'verified' }
+        : { kind: 'invalid', failedAttempts };
     });
-    return toMemoryCardRecord(updated);
   }
 }

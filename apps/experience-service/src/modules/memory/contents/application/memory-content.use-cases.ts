@@ -69,7 +69,6 @@ export class ListCardContentsUseCase {
       await verifyCardPinWithLockout({
         cardId: card.id,
         pinHash: card.pinHash,
-        pinFailedAttempts: card.pinFailedAttempts,
         pinLockedUntil: card.pinLockedUntil,
         inputPin: request.pin,
         missingPinMessage: 'Mã PIN là bắt buộc để mở khóa nội dung thẻ',

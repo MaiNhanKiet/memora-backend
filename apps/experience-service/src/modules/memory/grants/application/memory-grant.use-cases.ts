@@ -282,7 +282,6 @@ export class GetMemoryBySessionUseCase {
       await verifyCardPinWithLockout({
         cardId: card.id,
         pinHash: card.pinHash,
-        pinFailedAttempts: card.pinFailedAttempts,
         pinLockedUntil: card.pinLockedUntil,
         inputPin: request.pin,
         missingPinMessage: 'Mã PIN là bắt buộc để xem nội dung kỷ niệm',
