@@ -102,25 +102,32 @@ export interface CreatePricingRuleInput {
   readonly createdByUserId?: string;
 }
 
-export interface PricingRepository {
+export interface PricingEstimateReader {
   findVariantById(id: string): Promise<PricingVariantRecord | undefined>;
   findActivePriceVersionByVariantId(
     variantId: string,
+    at: Date,
   ): Promise<PriceVersionRecord | undefined>;
   findActivePriceVersionsByGemstoneOptionIds(
     gemstoneOptionIds: readonly string[],
+    at: Date,
   ): Promise<PriceVersionRecord[]>;
   findActivePriceVersionByPersonalizationPackage(
     pkg: string,
+    at: Date,
   ): Promise<PriceVersionRecord | undefined>;
   findActivePriceVersionByMaintenancePlan(
     planCode: string,
+    at: Date,
   ): Promise<PriceVersionRecord | undefined>;
   findActiveResizeRule(
     variantId: string,
     direction: 'UP' | 'DOWN',
+    at: Date,
   ): Promise<PricingRuleRecord | undefined>;
+}
 
+export interface PricingRepository extends PricingEstimateReader {
   findPriceItems(filter: {
     priceType?: string;
     status?: string;

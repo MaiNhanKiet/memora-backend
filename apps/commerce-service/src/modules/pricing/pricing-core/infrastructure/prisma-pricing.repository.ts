@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { EstimatePriceRequest } from '@app/contracts';
 import type { Prisma } from '../../../../../generated/prisma/client';
 import type {
   price_items,
@@ -7,12 +8,14 @@ import type {
   template_variants,
 } from '../../../../../generated/prisma/client';
 import { PrismaService } from '../../../../persistence/prisma/prisma.service';
+import { EstimatePriceUseCase } from '../application/estimate-price.use-case';
 import type {
   CreatePriceItemInput,
   CreatePriceVersionInput,
   CreatePricingRuleInput,
   PriceItemRecord,
   PriceVersionRecord,
+  PricingEstimateReader,
   PricingRepository,
   PricingRuleRecord,
   PricingVariantRecord,
@@ -94,23 +97,38 @@ function toPricingRuleRecord(rule: pricing_rules): PricingRuleRecord {
   };
 }
 
-@Injectable()
-export class PrismaPricingRepository implements PricingRepository {
-  constructor(private readonly prisma: PrismaService) {}
+function activeAt(at: Date) {
+  return {
+    status: 'ACTIVE',
+    AND: [
+      { OR: [{ effective_from: null }, { effective_from: { lte: at } }] },
+      { OR: [{ effective_to: null }, { effective_to: { gt: at } }] },
+    ],
+  };
+}
+
+class PrismaPricingEstimateReader implements PricingEstimateReader {
+  constructor(private readonly db: Prisma.TransactionClient) {}
 
   async findVariantById(id: string): Promise<PricingVariantRecord | undefined> {
-    const row = await this.prisma.template_variants.findUnique({
-      where: { id },
+    const row = await this.db.template_variants.findFirst({
+      where: {
+        id,
+        ring_templates: { status: 'ACTIVE' },
+        materials: { status: 'ACTIVE' },
+      },
     });
     return row ? toVariantRecord(row) : undefined;
   }
 
   async findActivePriceVersionByVariantId(
     variantId: string,
+    at: Date,
   ): Promise<PriceVersionRecord | undefined> {
-    const row = await this.prisma.price_versions.findFirst({
+    const row = await this.db.price_versions.findFirst({
       where: {
-        status: 'ACTIVE',
+        ...activeAt(at),
+        currency: 'VND',
         price_items: {
           template_variant_id: variantId,
           price_type: 'RING_BLANK',
@@ -124,13 +142,15 @@ export class PrismaPricingRepository implements PricingRepository {
 
   async findActivePriceVersionsByGemstoneOptionIds(
     gemstoneOptionIds: readonly string[],
+    at: Date,
   ): Promise<PriceVersionRecord[]> {
     if (gemstoneOptionIds.length === 0) {
       return [];
     }
-    const rows = await this.prisma.price_versions.findMany({
+    const rows = await this.db.price_versions.findMany({
       where: {
-        status: 'ACTIVE',
+        ...activeAt(at),
+        currency: 'VND',
         price_items: {
           gemstone_option_id: { in: [...gemstoneOptionIds] },
           price_type: 'GEMSTONE',
@@ -144,10 +164,12 @@ export class PrismaPricingRepository implements PricingRepository {
 
   async findActivePriceVersionByPersonalizationPackage(
     pkg: string,
+    at: Date,
   ): Promise<PriceVersionRecord | undefined> {
-    const row = await this.prisma.price_versions.findFirst({
+    const row = await this.db.price_versions.findFirst({
       where: {
-        status: 'ACTIVE',
+        ...activeAt(at),
+        currency: 'VND',
         price_items: {
           personalization_package: pkg,
           price_type: 'PERSONALIZATION',
@@ -161,10 +183,12 @@ export class PrismaPricingRepository implements PricingRepository {
 
   async findActivePriceVersionByMaintenancePlan(
     planCode: string,
+    at: Date,
   ): Promise<PriceVersionRecord | undefined> {
-    const row = await this.prisma.price_versions.findFirst({
+    const row = await this.db.price_versions.findFirst({
       where: {
-        status: 'ACTIVE',
+        ...activeAt(at),
+        currency: 'VND',
         price_items: {
           code: `PLAN_${planCode}`,
           price_type: 'MAINTENANCE_PLAN',
@@ -179,16 +203,38 @@ export class PrismaPricingRepository implements PricingRepository {
   async findActiveResizeRule(
     variantId: string,
     direction: 'UP' | 'DOWN',
+    at: Date,
   ): Promise<PricingRuleRecord | undefined> {
-    const row = await this.prisma.pricing_rules.findFirst({
+    const row = await this.db.pricing_rules.findFirst({
       where: {
         rule_type: 'RESIZE_FEE',
         template_variant_id: variantId,
         resize_direction: direction,
-        status: 'ACTIVE',
+        ...activeAt(at),
       },
     });
     return row ? toPricingRuleRecord(row) : undefined;
+  }
+}
+
+export function estimatePriceInTransaction(
+  tx: Prisma.TransactionClient,
+  request: EstimatePriceRequest,
+  at: Date,
+) {
+  const estimatePrice = new EstimatePriceUseCase(
+    new PrismaPricingEstimateReader(tx),
+  );
+  return estimatePrice.snapshot(request, at);
+}
+
+@Injectable()
+export class PrismaPricingRepository
+  extends PrismaPricingEstimateReader
+  implements PricingRepository
+{
+  constructor(private readonly prisma: PrismaService) {
+    super(prisma);
   }
 
   async findPriceItems(filter: {

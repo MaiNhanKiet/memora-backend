@@ -22,6 +22,7 @@ export async function resolveGemstoneSelections(
   db: Prisma.TransactionClient,
   variantId: string,
   selections: readonly GemstoneSelectionItem[],
+  at = new Date(),
 ): Promise<ValidatedGemstoneSelection[]> {
   if (!selections.length) return [];
 
@@ -50,12 +51,11 @@ export async function resolveGemstoneSelections(
       },
     },
   });
-  const now = new Date();
   const gems = certifiedIds.length
     ? await db.certified_gemstones.findMany({
         where: {
           id: { in: certifiedIds },
-          ...availableCertifiedGemstones(now),
+          ...availableCertifiedGemstones(at),
         },
         select: { id: true, gemstone_option_id: true },
       })
@@ -65,9 +65,9 @@ export async function resolveGemstoneSelections(
         where: {
           status: 'ACTIVE',
           currency: 'VND',
-          OR: [{ effective_from: null }, { effective_from: { lte: now } }],
+          OR: [{ effective_from: null }, { effective_from: { lte: at } }],
           AND: [
-            { OR: [{ effective_to: null }, { effective_to: { gt: now } }] },
+            { OR: [{ effective_to: null }, { effective_to: { gt: at } }] },
           ],
           price_items: {
             price_type: 'CERTIFIED_GEMSTONE',

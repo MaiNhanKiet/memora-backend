@@ -11,17 +11,23 @@ import type {
 } from '@app/contracts';
 import {
   PRICING_REPOSITORY,
-  type PricingRepository,
+  type PriceVersionRecord,
+  type PricingEstimateReader,
 } from './pricing.repository';
 
 @Injectable()
 export class EstimatePriceUseCase {
   constructor(
     @Inject(PRICING_REPOSITORY)
-    private readonly repository: PricingRepository,
+    private readonly repository: PricingEstimateReader,
   ) {}
 
   async execute(request: EstimatePriceRequest): Promise<EstimatePriceResponse> {
+    const { estimate } = await this.snapshot(request, new Date());
+    return estimate;
+  }
+
+  async snapshot(request: EstimatePriceRequest, at: Date) {
     const variant = await this.repository.findVariantById(
       request.templateVariantId,
     );
@@ -49,48 +55,73 @@ export class EstimatePriceUseCase {
     }
 
     const blankPriceVersion =
-      await this.repository.findActivePriceVersionByVariantId(variant.id);
-    const baseBlankPrice = blankPriceVersion ? blankPriceVersion.amount : 0;
+      await this.repository.findActivePriceVersionByVariantId(variant.id, at);
+    if (!blankPriceVersion) {
+      throw new NotFoundException('No effective ring blank price is available');
+    }
+    const baseBlankPrice = blankPriceVersion.amount;
 
     const gemstoneOptionIds = request.gemstoneOptionIds || [];
     const gemstonePriceVersions =
       await this.repository.findActivePriceVersionsByGemstoneOptionIds(
         gemstoneOptionIds,
+        at,
       );
 
-    const priceMap = new Map<string, number>();
+    const priceMap = new Map<string, PriceVersionRecord>();
     for (const pv of gemstonePriceVersions) {
       if (pv.gemstoneOptionId) {
-        priceMap.set(pv.gemstoneOptionId, pv.amount);
+        priceMap.set(pv.gemstoneOptionId, pv);
       }
     }
 
-    const gemstoneLineItems: GemstonePriceLineItem[] = [];
-    let gemstonesPrice = 0;
-    for (const optId of gemstoneOptionIds) {
-      const price = priceMap.get(optId) ?? 0;
-      gemstoneLineItems.push({ gemstoneOptionId: optId, price });
-      gemstonesPrice += price;
-    }
+    const gemstones = gemstoneOptionIds.map((optId) => {
+      const price = priceMap.get(optId);
+      if (!price) {
+        throw new NotFoundException(
+          `No effective price is available for gemstone option ${optId}`,
+        );
+      }
+      return {
+        gemstoneOptionId: optId,
+        price: price.amount,
+        priceVersionId: price.id,
+      };
+    });
+    const gemstonesPrice = gemstones.reduce(
+      (total, gem) => total + gem.price,
+      0,
+    );
+    const gemstoneLineItems: GemstonePriceLineItem[] = gemstones.map(
+      ({ gemstoneOptionId, price }) => ({ gemstoneOptionId, price }),
+    );
 
     let personalizationFee = 0;
+    let personalizationPriceVersionId: string | undefined;
     const pkg = request.personalizationPackage || 'NONE';
     if (pkg !== 'NONE') {
       const pkgPriceVersion =
         await this.repository.findActivePriceVersionByPersonalizationPackage(
           pkg,
+          at,
         );
-      if (pkgPriceVersion) {
-        personalizationFee = pkgPriceVersion.amount;
+      if (!pkgPriceVersion) {
+        throw new NotFoundException(
+          `No effective price is available for personalization package ${pkg}`,
+        );
       }
+      personalizationFee = pkgPriceVersion.amount;
+      personalizationPriceVersionId = pkgPriceVersion.id;
     }
 
     let resizeFee = 0;
+    let resizeRuleId: string | undefined;
     if (delta !== 0) {
       const direction = delta > 0 ? 'UP' : 'DOWN';
       const rule = await this.repository.findActiveResizeRule(
         variant.id,
         direction,
+        at,
       );
       if (rule && rule.configJson && typeof rule.configJson === 'object') {
         const config = rule.configJson as Record<string, unknown>;
@@ -99,19 +130,23 @@ export class EstimatePriceUseCase {
           config.fee_per_unit_delta ?? config.feePerStep ?? 0,
         );
         resizeFee = baseFee + Math.abs(delta) * feePerUnit;
+        resizeRuleId = rule.id;
       }
     }
 
     let maintenancePlanFee = 0;
+    let maintenancePlanPriceVersionId: string | undefined;
     const plan = request.maintenancePlan || 'NONE';
     if (plan !== 'NONE') {
       const planPriceVersion =
-        await this.repository.findActivePriceVersionByMaintenancePlan(plan);
-      if (planPriceVersion) {
-        maintenancePlanFee = planPriceVersion.amount;
-      } else if (plan === 'LIFETIME_POLISHING') {
-        maintenancePlanFee = 500000;
+        await this.repository.findActivePriceVersionByMaintenancePlan(plan, at);
+      if (!planPriceVersion) {
+        throw new NotFoundException(
+          `No effective price is available for maintenance plan ${plan}`,
+        );
       }
+      maintenancePlanFee = planPriceVersion.amount;
+      maintenancePlanPriceVersionId = planPriceVersion.id;
     }
 
     const estimatedTotal =
@@ -121,10 +156,10 @@ export class EstimatePriceUseCase {
       resizeFee +
       maintenancePlanFee;
 
-    return {
+    const estimate = {
       estimatedTotal,
       currency: 'VND',
-      estimatedAt: new Date().toISOString(),
+      estimatedAt: at.toISOString(),
       breakdown: {
         baseBlankPrice,
         gemstonesPrice,
@@ -133,6 +168,14 @@ export class EstimatePriceUseCase {
         maintenancePlanFee,
       },
       gemstoneLineItems,
+    } satisfies EstimatePriceResponse;
+    return {
+      estimate,
+      blankPriceVersionId: blankPriceVersion.id,
+      gemstones,
+      personalizationPriceVersionId,
+      resizeRuleId,
+      maintenancePlanPriceVersionId,
     };
   }
 }

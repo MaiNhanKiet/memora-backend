@@ -66,7 +66,7 @@ export function ApiCreateOrderDocs() {
     ApiResponse({
       status: 409,
       description:
-        'A selected draft changed, or a certified gemstone became unavailable or changed price',
+        'A selected draft changed, a selected price changed or is no longer available, or a certified gemstone became unavailable. Review the cart before placing the order again.',
     }),
   );
 }

@@ -125,7 +125,57 @@ describe('Pricing Use Cases', () => {
       ).rejects.toThrow(UnprocessableEntityException);
     });
 
-    it('should calculate complete estimated price with blank, gemstones, personalization and resize fee', async () => {
+    it('distinguishes a missing effective price from an explicitly configured zero price', async () => {
+      mockRepository.findVariantById.mockResolvedValue({
+        id: 'v-1',
+        standardSize: 12,
+        status: 'ACTIVE',
+      });
+      mockRepository.findActivePriceVersionsByGemstoneOptionIds.mockResolvedValue(
+        [],
+      );
+      const request = {
+        templateVariantId: 'v-1',
+        targetSize: 12,
+        gemstoneOptionIds: [],
+        personalizationPackage: 'NONE',
+      };
+      mockRepository.findActivePriceVersionByVariantId
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({ amount: 0 });
+      await expect(estimateUseCase.execute(request)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(estimateUseCase.execute(request)).resolves.toMatchObject({
+        estimatedTotal: 0,
+      });
+    });
+
+    it('rejects a selected gemstone without an effective price', async () => {
+      mockRepository.findVariantById.mockResolvedValue({
+        id: 'v-1',
+        standardSize: 12,
+        status: 'ACTIVE',
+      });
+      mockRepository.findActivePriceVersionByVariantId.mockResolvedValue({
+        id: 'pv-1',
+        amount: 8000000,
+      });
+      mockRepository.findActivePriceVersionsByGemstoneOptionIds.mockResolvedValue(
+        [],
+      );
+
+      await expect(
+        estimateUseCase.execute({
+          templateVariantId: 'v-1',
+          targetSize: 12,
+          gemstoneOptionIds: ['g-1'],
+          personalizationPackage: 'NONE',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('calculates the estimate and records its price sources at one time', async () => {
       mockRepository.findVariantById.mockResolvedValue({
         id: 'v-1',
         standardSize: 12.0,
@@ -148,15 +198,41 @@ describe('Pricing Use Cases', () => {
         configJson: { base_fee: 100000, fee_per_unit_delta: 150000 },
       });
 
-      const res = await estimateUseCase.execute({
-        templateVariantId: 'v-1',
-        targetSize: 13.0,
-        gemstoneOptionIds: ['g-1'],
-        personalizationPackage: 'FINGERPRINT',
+      mockRepository.findActivePriceVersionByMaintenancePlan.mockResolvedValue({
+        id: 'pv-plan-1',
+        amount: 550000,
       });
+      const at = new Date('2026-11-28T00:00:00Z');
+      const result = await estimateUseCase.snapshot(
+        {
+          templateVariantId: 'v-1',
+          targetSize: 13.0,
+          gemstoneOptionIds: ['g-1'],
+          personalizationPackage: 'FINGERPRINT',
+          maintenancePlan: 'LIFETIME_POLISHING',
+        },
+        at,
+      );
 
-      expect(res.estimatedTotal).toBe(15550000);
-      expect(res.breakdown.resizeFee).toBe(250000);
+      expect(result).toMatchObject({
+        estimate: {
+          estimatedTotal: 16100000,
+          breakdown: { resizeFee: 250000 },
+        },
+        blankPriceVersionId: 'pv-1',
+        gemstones: [{ gemstoneOptionId: 'g-1', priceVersionId: 'pv-gem-1' }],
+        personalizationPriceVersionId: 'pv-pkg-1',
+        resizeRuleId: 'rule-1',
+        maintenancePlanPriceVersionId: 'pv-plan-1',
+      });
+      expect(mockRepository.findActiveResizeRule).toHaveBeenCalledWith(
+        'v-1',
+        'UP',
+        at,
+      );
+      expect(
+        mockRepository.findActivePriceVersionByMaintenancePlan,
+      ).toHaveBeenCalledWith('LIFETIME_POLISHING', at);
     });
   });
 

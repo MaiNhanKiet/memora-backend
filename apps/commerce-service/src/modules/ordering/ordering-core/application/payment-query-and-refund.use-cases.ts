@@ -178,7 +178,7 @@ export class GetOrderInvoiceUseCase {
     );
     if (!orderDetails) {
       throw new NotFoundException(
-        `Invoice details not found for order ${request.orderId}`,
+        `No issued invoice found for order ${request.orderId}`,
       );
     }
 

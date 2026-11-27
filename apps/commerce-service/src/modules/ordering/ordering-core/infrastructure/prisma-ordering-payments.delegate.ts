@@ -101,33 +101,25 @@ export class PrismaOrderingPaymentsDelegate {
   async findOrderInvoice(
     orderId: string,
   ): Promise<OrderingInvoiceRecord | undefined> {
-    const order = await this.prisma.orders.findUnique({
-      where: { id: orderId },
+    const order = await this.prisma.orders.findFirst({
+      where: {
+        id: orderId,
+        invoice_no: { not: null },
+        invoice_issued_at: { not: null },
+        invoice_asset_key: { not: null },
+      },
       include: {
         quotes_orders_current_quote_idToquotes: {
           include: { quote_items: { orderBy: { created_at: 'asc' } } },
         },
         payment_transactions: {
-          where: { status: 'SUCCEEDED' },
+          where: { status: 'SUCCEEDED', transaction_type: 'PAYMENT' },
           orderBy: { completed_at: 'asc' },
         },
       },
     });
-    if (!order) {
+    if (order?.quotes_orders_current_quote_idToquotes?.quote_type !== 'FINAL') {
       return undefined;
-    }
-
-    if (!order.invoice_no) {
-      const invoiceNo = `INV-${order.order_no}`;
-      const now = new Date();
-
-      await this.prisma.orders.update({
-        where: { id: order.id },
-        data: { invoice_no: invoiceNo, invoice_issued_at: now },
-      });
-
-      order.invoice_no = invoiceNo;
-      order.invoice_issued_at = now;
     }
 
     return toOrderInvoiceRecord(order);

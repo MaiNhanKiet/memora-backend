@@ -318,19 +318,36 @@ describe('Quote & Payment UseCases', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('should calculate invoice totals and remaining amount', async () => {
+    it('returns 404 until an invoice has been issued', async () => {
+      mockRepository.findOrderById.mockResolvedValue({ id: 'order-1' });
+      mockRepository.findOrderInvoice.mockResolvedValue(undefined);
+
+      await expect(
+        getOrderInvoiceUseCase.execute({
+          actor: {
+            userId: validUserId,
+            customerIdentityId: validCustomerIdentityId,
+          },
+          orderId: 'order-1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return totals for an issued invoice', async () => {
       mockRepository.findOrderById.mockResolvedValue({ id: 'order-1' });
       mockRepository.findOrderInvoice.mockResolvedValue({
         id: 'order-1',
         orderNo: 'ORD-001',
-        status: 'AWAITING_P2',
+        status: 'COMPLETED',
+        invoiceNo: 'INV-ORD-001',
+        invoiceIssuedAt: new Date('2026-11-25T10:00:00Z'),
         quoteCurrency: 'VND',
         quoteTotalAmount: 10000000,
         quoteItems: [],
         paymentTransactions: [
           {
-            paymentStage: 'DEPOSIT_P1',
-            amount: 3000000,
+            paymentStage: 'FINAL_PAYMENT',
+            amount: 10000000,
             requestedAt: new Date('2026-11-25T10:00:00Z'),
           },
         ],
@@ -344,9 +361,10 @@ describe('Quote & Payment UseCases', () => {
         orderId: 'order-1',
       });
 
+      expect(res.invoiceNo).toBe('INV-ORD-001');
       expect(res.totalAmount).toBe(10000000);
-      expect(res.totalPaidAmount).toBe(3000000);
-      expect(res.remainingAmount).toBe(7000000);
+      expect(res.totalPaidAmount).toBe(10000000);
+      expect(res.remainingAmount).toBe(0);
     });
 
     it('should throw NotFoundException if refund target transaction missing', async () => {

@@ -97,6 +97,13 @@ export class ValidateCheckoutUseCase {
           );
         }
         totalEstimatedPrice += pricing.total;
+        if (Number(pricing.total.toFixed(2)) !== draft.estimatedPrice) {
+          issues.push({
+            draftId,
+            code: 'PRICE_CHANGED',
+            message: 'Update your cart item before placing the order',
+          });
+        }
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : 'Validation failed';

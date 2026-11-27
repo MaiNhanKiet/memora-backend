@@ -12,6 +12,7 @@ import {
   releaseCertifiedGemstoneAssignments,
   setCertifiedGemstoneAssignments,
 } from '../../../inventory/inventory-core/infrastructure/prisma-certified-gemstone-allocations';
+import { estimatePriceInTransaction } from '../../../pricing/pricing-core/infrastructure/prisma-pricing.repository';
 import type {
   CreateOrderTransactionInput,
   CreateOrderTransactionResult,
@@ -31,6 +32,110 @@ import {
   toOrderListItemRecord,
   toPaymentTransactionRecord,
 } from './prisma-ordering.mappers';
+
+type ProvisionalQuoteLine = Pick<
+  Prisma.quote_itemsCreateManyInput,
+  | 'component_type'
+  | 'description'
+  | 'price_version_id'
+  | 'pricing_rule_id'
+  | 'metadata_json'
+> & { amount: Prisma.Decimal };
+
+async function priceDraftForCheckout(
+  tx: Prisma.TransactionClient,
+  draft: OrderingDraftRecord,
+  at: Date,
+) {
+  const maintenancePlan = extractMaintenancePlan(draft.gemstoneConfigJson);
+  const selections = await resolveGemstoneSelections(
+    tx,
+    draft.templateVariantId,
+    parseGemstoneSelections(draft.gemstoneConfigJson),
+    at,
+  );
+  const certified = selections.flatMap((selection) =>
+    selection.certifiedGemstoneId ? [selection] : [],
+  );
+  const storedPriceIds = extractCertifiedPriceVersionIds(
+    draft.gemstoneConfigJson,
+  );
+  if (
+    storedPriceIds.join(',') !==
+    certified.map(({ priceVersionId }) => priceVersionId).join(',')
+  ) {
+    throw new ConflictException(
+      'Certified gemstone price changed. Update your cart item before placing the order',
+    );
+  }
+
+  const pricing = await estimatePriceInTransaction(
+    tx,
+    {
+      templateVariantId: draft.templateVariantId,
+      targetSize: draft.targetSize,
+      personalizationPackage: draft.personalizationPackage,
+      maintenancePlan,
+      gemstoneOptionIds: selections
+        .filter(({ certifiedGemstoneId }) => !certifiedGemstoneId)
+        .map(({ optionId }) => optionId),
+    },
+    at,
+  );
+  const { breakdown } = pricing.estimate;
+  const quoteLines: ProvisionalQuoteLine[] = [
+    {
+      component_type: 'RING_BLANK',
+      description: `${draft.templateName} - ${draft.materialName}`,
+      amount: new Prisma.Decimal(breakdown.baseBlankPrice),
+      price_version_id: pricing.blankPriceVersionId,
+    },
+    ...pricing.gemstones.map(({ priceVersionId, price }) => ({
+      component_type: 'GEMSTONE',
+      amount: new Prisma.Decimal(price),
+      price_version_id: priceVersionId,
+    })),
+    ...certified.map((gemstone) => ({
+      component_type: 'GEMSTONE',
+      amount: new Prisma.Decimal(gemstone.certifiedPrice),
+      price_version_id: gemstone.priceVersionId,
+      metadata_json: { certifiedGemstoneId: gemstone.certifiedGemstoneId },
+    })),
+  ];
+  if (pricing.resizeRuleId) {
+    quoteLines.push({
+      component_type: 'RESIZE',
+      amount: new Prisma.Decimal(breakdown.resizeFee).toDecimalPlaces(2),
+      pricing_rule_id: pricing.resizeRuleId,
+    });
+  }
+  if (pricing.personalizationPriceVersionId) {
+    quoteLines.push({
+      component_type: 'PERSONALIZATION',
+      amount: new Prisma.Decimal(breakdown.personalizationFee),
+      price_version_id: pricing.personalizationPriceVersionId,
+    });
+  }
+  if (pricing.maintenancePlanPriceVersionId) {
+    quoteLines.push({
+      component_type: 'MAINTENANCE_PLAN',
+      description: maintenancePlan,
+      amount: new Prisma.Decimal(breakdown.maintenancePlanFee),
+      price_version_id: pricing.maintenancePlanPriceVersionId,
+    });
+  }
+  const total = quoteLines.reduce(
+    (sum, line) => sum.add(line.amount),
+    new Prisma.Decimal(0),
+  );
+  if (!total.equals(draft.estimatedPrice)) {
+    throw new ConflictException(
+      `The price for draft ${draft.id} changed. Update your cart item before placing the order`,
+    );
+  }
+
+  return { draft, maintenancePlan, selections, certified, quoteLines, total };
+}
 
 export class PrismaOrderingOrdersDelegate {
   constructor(private readonly prisma: PrismaService) {}
@@ -90,7 +195,13 @@ export class PrismaOrderingOrdersDelegate {
     const orderNo = `ORD-${timestamp}-${randomSuffix}`;
     const quoteNo = `QUO-${timestamp}-${randomSuffix}`;
 
-    return this.prisma.$transaction(async (tx) => {
+    const createOrder = async (tx: Prisma.TransactionClient) => {
+      const pricedAt = new Date();
+      const pricedDrafts = await Promise.all(
+        params.selectedDrafts.map((draft) =>
+          priceDraftForCheckout(tx, draft, pricedAt),
+        ),
+      );
       const converted = await tx.ring_design_drafts.updateMany({
         where: {
           status: 'IN_CART',
@@ -107,11 +218,10 @@ export class PrismaOrderingOrdersDelegate {
         );
       }
 
-      let subtotal = new Prisma.Decimal(0);
-      for (const draft of params.selectedDrafts) {
-        subtotal = subtotal.add(new Prisma.Decimal(draft.estimatedPrice));
-      }
-      const totalAmount = subtotal;
+      const totalAmount = pricedDrafts.reduce(
+        (sum, pricedDraft) => sum.add(pricedDraft.total),
+        new Prisma.Decimal(0),
+      );
 
       const order = await tx.orders.create({
         data: {
@@ -144,7 +254,7 @@ export class PrismaOrderingOrdersDelegate {
           quote_type: 'PROVISIONAL',
           version_no: 1,
           status: 'ISSUED',
-          subtotal_amount: subtotal,
+          subtotal_amount: totalAmount,
           delivery_amount: new Prisma.Decimal(0),
           adjustment_amount: new Prisma.Decimal(0),
           total_amount: totalAmount,
@@ -160,7 +270,13 @@ export class PrismaOrderingOrdersDelegate {
         certifiedGemstoneId: string;
         gemstoneOptionId: string;
       }[] = [];
-      for (const draft of params.selectedDrafts) {
+      for (const {
+        draft,
+        maintenancePlan,
+        selections,
+        certified,
+        quoteLines,
+      } of pricedDrafts) {
         const ringItem = await tx.ring_items.create({
           data: {
             order_id: order.id,
@@ -168,27 +284,6 @@ export class PrismaOrderingOrdersDelegate {
             source_ring_design_draft_id: draft.id,
           },
         });
-
-        const maintenancePlan = extractMaintenancePlan(
-          draft.gemstoneConfigJson,
-        );
-        const selections = await resolveGemstoneSelections(
-          tx,
-          draft.templateVariantId,
-          parseGemstoneSelections(draft.gemstoneConfigJson),
-        );
-        const certified = selections.flatMap((selection) =>
-          selection.certifiedGemstoneId ? [selection] : [],
-        );
-        if (
-          extractCertifiedPriceVersionIds(draft.gemstoneConfigJson).join(
-            ',',
-          ) !== certified.map(({ priceVersionId }) => priceVersionId).join(',')
-        ) {
-          throw new ConflictException(
-            'Certified gemstone price changed. Update your cart item before placing the order',
-          );
-        }
 
         const ringItemVersion = await tx.ring_item_versions.create({
           data: {
@@ -231,62 +326,20 @@ export class PrismaOrderingOrdersDelegate {
             certifiedGemstoneId: gemstone.certifiedGemstoneId,
             gemstoneOptionId: gemstone.optionId,
           });
-          await tx.quote_items.create({
-            data: {
-              quote_id: quote.id,
-              ring_item_id: ringItem.id,
-              component_type: 'GEMSTONE',
-              quantity: new Prisma.Decimal(1),
-              unit_amount: new Prisma.Decimal(gemstone.certifiedPrice),
-              line_amount: new Prisma.Decimal(gemstone.certifiedPrice),
-              price_source_type: 'PRICE_VERSION',
-              price_version_id: gemstone.priceVersionId,
-              metadata_json: {
-                certifiedGemstoneId: gemstone.certifiedGemstoneId,
-              },
-            },
-          });
         }
-
-        const maintenanceAmount =
-          maintenancePlan === 'LIFETIME_POLISHING' ? 500000 : 0;
-        const ringBlankAmount = Math.max(
-          0,
-          draft.estimatedPrice -
-            maintenanceAmount -
-            certified.reduce(
-              (total, gemstone) => total + gemstone.certifiedPrice,
-              0,
-            ),
-        );
-
-        await tx.quote_items.create({
-          data: {
+        await tx.quote_items.createMany({
+          data: quoteLines.map(({ amount, ...line }) => ({
+            ...line,
             quote_id: quote.id,
             ring_item_id: ringItem.id,
-            component_type: 'RING_BLANK',
-            description: `${draft.templateName} - ${draft.materialName}`,
-            quantity: new Prisma.Decimal(1),
-            unit_amount: new Prisma.Decimal(ringBlankAmount),
-            line_amount: new Prisma.Decimal(ringBlankAmount),
-            price_source_type: 'MANUAL',
-          },
+            quantity: 1,
+            unit_amount: amount,
+            line_amount: amount,
+            price_source_type: line.pricing_rule_id
+              ? 'PRICING_RULE'
+              : 'PRICE_VERSION',
+          })),
         });
-
-        if (maintenancePlan === 'LIFETIME_POLISHING') {
-          await tx.quote_items.create({
-            data: {
-              quote_id: quote.id,
-              ring_item_id: ringItem.id,
-              component_type: 'MAINTENANCE_PLAN',
-              description: 'Gói bảo dưỡng trọn đời - Đánh bóng và xi mới',
-              quantity: new Prisma.Decimal(1),
-              unit_amount: new Prisma.Decimal(500000),
-              line_amount: new Prisma.Decimal(500000),
-              price_source_type: 'MANUAL',
-            },
-          });
-        }
 
         createdItems.push({
           id: ringItem.id,
@@ -333,7 +386,28 @@ export class PrismaOrderingOrdersDelegate {
         totalAmount: Number(totalAmount),
         items: createdItems,
       };
-    });
+    };
+
+    try {
+      return await this.prisma.$transaction(createOrder, {
+        isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new ConflictException(
+          'A selected draft no longer has valid pricing. Review your cart before placing the order',
+        );
+      }
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      ) {
+        throw new ConflictException(
+          'A selected draft or its inventory changed. Refresh your cart before placing the order',
+        );
+      }
+      throw error;
+    }
   }
 
   async listOrders(
