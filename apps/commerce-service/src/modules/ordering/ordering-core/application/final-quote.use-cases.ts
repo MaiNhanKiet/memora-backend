@@ -193,8 +193,12 @@ export class ConfirmFinalQuoteUseCase {
       );
     }
 
-    const nextOrderStatus =
-      order.sourcePlanMode === 'NONE' ? 'PRODUCTION_AUTHORIZED' : 'AWAITING_P2';
+    const hasPersonalization = order.ringItems.some(
+      ({ personalizationPackage }) =>
+        personalizationPackage === 'FINGERPRINT' ||
+        personalizationPackage === 'SOUNDWAVE',
+    );
+    const nextOrderStatus = hasPersonalization ? 'AWAITING_P2' : order.status;
 
     const confirmation = await this.repository.confirmFinalQuote(
       request.orderId,

@@ -4,7 +4,7 @@ import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 export class UpdateOrderStatusBodyDto {
   @ApiProperty({
     description:
-      'Target status (e.g. PENDING_FINAL_QUOTE, AWAITING_CUSTOMER_CONFIRMATION, CANCELLED)',
+      'Target status (e.g. PENDING_FINAL_QUOTE, AWAITING_FINAL_CONFIRMATION, CANCELLED)',
     example: 'CANCELLED',
   })
   @IsString()

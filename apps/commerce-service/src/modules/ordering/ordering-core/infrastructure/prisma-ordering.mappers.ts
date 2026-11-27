@@ -60,6 +60,7 @@ export function toQuoteSummaryRecord(q: quotes): OrderingQuoteSummaryRecord {
     totalAmount: Number(q.total_amount),
     currency: q.currency.trim(),
     status: q.status,
+    validUntil: q.valid_until ?? undefined,
   };
 }
 
@@ -200,6 +201,7 @@ export function toPaymentTransactionRecord(
 ): OrderingPaymentTransactionRecord {
   return {
     id: p.id,
+    quoteId: p.quote_id ?? undefined,
     orderId: p.order_id ?? undefined,
     orderNo: p.orders?.order_no,
     orderStatus: p.orders?.status,

@@ -4,6 +4,7 @@ export interface PayosCreatePaymentLinkParams {
   readonly description: string;
   readonly returnUrl: string;
   readonly cancelUrl: string;
+  readonly expiredAt?: number;
   readonly items?: ReadonlyArray<{
     readonly name: string;
     readonly quantity: number;
@@ -42,14 +43,17 @@ export interface PayosWebhookPayload {
   readonly code: string;
   readonly desc: string;
   readonly success: boolean;
-  readonly data: PayosWebhookData;
+  readonly data: Record<string, unknown>;
   readonly signature: string;
 }
 
 export interface PayosPaymentInfo {
   readonly status: string;
   readonly amount: number;
+  readonly amountPaid: number;
+  readonly amountRemaining: number;
   readonly orderCode: number;
+  readonly id: string;
 }
 
 export interface PayosGateway {

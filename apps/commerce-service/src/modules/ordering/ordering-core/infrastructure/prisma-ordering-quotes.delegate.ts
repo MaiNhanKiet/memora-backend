@@ -207,7 +207,7 @@ export class PrismaOrderingQuotesDelegate {
         where: { id: orderId },
         data: {
           current_quote_id: quoteId,
-          status: 'AWAITING_CUSTOMER_CONFIRMATION',
+          status: 'AWAITING_FINAL_CONFIRMATION',
         },
       });
 

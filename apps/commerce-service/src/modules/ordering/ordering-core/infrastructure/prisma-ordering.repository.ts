@@ -340,6 +340,19 @@ export class PrismaOrderingRepository implements OrderingRepository {
     return this.payments.createPaymentTransaction(params);
   }
 
+  beginOrderPaymentAttempt(
+    params: Parameters<OrderingRepository['beginOrderPaymentAttempt']>[0],
+  ): ReturnType<OrderingRepository['beginOrderPaymentAttempt']> {
+    return this.payments.beginOrderPaymentAttempt(params);
+  }
+
+  saveOrderPaymentLink(
+    transactionId: string,
+    metadata: Record<string, string>,
+  ): Promise<OrderingPaymentTransactionRecord> {
+    return this.payments.saveOrderPaymentLink(transactionId, metadata);
+  }
+
   findTransactionByOrderCode(
     orderCode: bigint,
   ): Promise<OrderingPaymentTransactionRecord | undefined> {
@@ -350,9 +363,8 @@ export class PrismaOrderingRepository implements OrderingRepository {
     transactionId: string;
     providerTransactionId?: string;
     providerReference?: string;
-    completedAt?: Date;
-    nextOrderStatus?: string;
-  }): Promise<OrderingPaymentTransactionRecord> {
+    completedAt: Date;
+  }): ReturnType<OrderingRepository['markPaymentTransactionSucceeded']> {
     return this.payments.markPaymentTransactionSucceeded(params);
   }
 }

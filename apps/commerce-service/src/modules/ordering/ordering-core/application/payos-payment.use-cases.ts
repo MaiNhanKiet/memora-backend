@@ -1,9 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import type {
   CreateClaimPaymentLinkRequest,
@@ -14,10 +16,6 @@ import type {
   PayosWebhookResponse,
   ReconcilePaymentTransactionRequest,
 } from '@app/contracts';
-import {
-  resolveNextOrderStatusAfterPayment,
-  resolvePaymentStageForOrderStatus,
-} from './ordering-state';
 import { mapPaymentTransactionDetail } from './ordering.mapper';
 import {
   ORDERING_REPOSITORY,
@@ -32,13 +30,40 @@ import {
   PAYOS_GATEWAY,
   type PayosGateway,
   type PayosPaymentLinkData,
-  type PayosWebhookData,
 } from './payos.gateway';
+
+function readPaymentLinkId(metadata: unknown): string | undefined {
+  if (
+    typeof metadata === 'object' &&
+    metadata !== null &&
+    'paymentLinkId' in metadata &&
+    typeof metadata.paymentLinkId === 'string'
+  ) {
+    return metadata.paymentLinkId;
+  }
+  return undefined;
+}
+
+function readStoredLink(
+  metadata: unknown,
+): Pick<PayosPaymentLinkData, 'checkoutUrl' | 'qrCode'> | undefined {
+  if (
+    typeof metadata !== 'object' ||
+    metadata === null ||
+    !('checkoutUrl' in metadata) ||
+    !('qrCode' in metadata) ||
+    typeof metadata.checkoutUrl !== 'string' ||
+    typeof metadata.qrCode !== 'string'
+  ) {
+    return undefined;
+  }
+  return { checkoutUrl: metadata.checkoutUrl, qrCode: metadata.qrCode };
+}
 
 function toPaymentLinkResponse(
   tx: OrderingPaymentTransactionRecord,
   orderCode: number,
-  paymentLink: PayosPaymentLinkData,
+  paymentLink: Pick<PayosPaymentLinkData, 'checkoutUrl' | 'qrCode'>,
   paymentStage: string,
 ): PaymentLinkResponse {
   return {
@@ -78,65 +103,49 @@ export class CreateOrderPaymentLinkUseCase {
       throw new NotFoundException(`Order ${request.orderId} not found`);
     }
 
-    const stage = resolvePaymentStageForOrderStatus(
-      order.status,
-      request.paymentStage,
-    );
-
-    const currentQuote = order.currentQuote;
-    const totalAmount = currentQuote?.totalAmount ?? 0;
-    const currency = currentQuote?.currency || 'VND';
-
-    let amount = totalAmount;
-    if (stage === 'DEPOSIT_P1') {
-      amount = Math.round(totalAmount * 0.3);
-    } else if (stage === 'MILESTONE_P2') {
-      amount = Math.round(totalAmount * 0.4);
-    } else if (stage === 'FINAL_P3') {
-      const existingPayments = await this.repository.findOrderPayments(
-        order.id,
-      );
-      const paid = existingPayments
-        .filter(
-          (p) => p.status === 'SUCCEEDED' && p.transactionType === 'PAYMENT',
-        )
-        .reduce((sum, p) => sum + p.amount, 0);
-      amount = Math.max(0, totalAmount - paid);
+    const { transaction, created } =
+      await this.repository.beginOrderPaymentAttempt({
+        orderId: order.id,
+        paymentStage: request.paymentStage,
+        providerOrderCode: BigInt(this.payosGateway.generateOrderCode()),
+      });
+    const orderCode = Number(transaction.providerOrderCode);
+    const stage = transaction.paymentStage;
+    if (!created) {
+      const link = readStoredLink(transaction.metadataJson);
+      if (!link) {
+        throw new ConflictException('Link đang được tạo, vui lòng thử lại');
+      }
+      return toPaymentLinkResponse(transaction, orderCode, link, stage);
     }
-
-    if (amount <= 0) {
-      throw new BadRequestException('Payment amount must be greater than 0');
-    }
-
-    const orderCode = this.payosGateway.generateOrderCode();
-    const returnUrl =
-      request.returnUrl || `https://memora.vn/orders/${order.id}`;
-    const cancelUrl =
-      request.cancelUrl || `https://memora.vn/orders/${order.id}`;
 
     const paymentLink = await this.payosGateway.createPaymentLink({
       orderCode,
-      amount,
+      amount: transaction.amount,
       description: `MEMORA ${order.orderNo} ${stage}`,
-      returnUrl,
-      cancelUrl,
+      returnUrl: request.returnUrl || `https://memora.vn/orders/${order.id}`,
+      cancelUrl: request.cancelUrl || `https://memora.vn/orders/${order.id}`,
+      expiredAt: transaction.expiresAt
+        ? Math.floor(transaction.expiresAt.getTime() / 1000)
+        : undefined,
     });
-
-    const tx = await this.repository.createPaymentTransaction({
-      orderId: order.id,
-      paymentStage: stage,
-      providerOrderCode: BigInt(orderCode),
-      amount,
-      currency,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      metadata: {
-        paymentLinkId: paymentLink.paymentLinkId,
-        checkoutUrl: paymentLink.checkoutUrl,
-        qrCode: paymentLink.qrCode,
-      },
+    if (
+      paymentLink.orderCode !== orderCode ||
+      paymentLink.amount !== transaction.amount ||
+      paymentLink.currency !== transaction.currency ||
+      !paymentLink.paymentLinkId ||
+      !paymentLink.checkoutUrl
+    ) {
+      throw new ServiceUnavailableException(
+        'PayOS returned a mismatched payment link',
+      );
+    }
+    const saved = await this.repository.saveOrderPaymentLink(transaction.id, {
+      paymentLinkId: paymentLink.paymentLinkId,
+      checkoutUrl: paymentLink.checkoutUrl,
+      qrCode: paymentLink.qrCode,
     });
-
-    return toPaymentLinkResponse(tx, orderCode, paymentLink, stage);
+    return toPaymentLinkResponse(saved, orderCode, paymentLink, stage);
   }
 }
 
@@ -150,16 +159,20 @@ export class ProcessPayosWebhookUseCase {
   ) {}
 
   async execute(request: PayosWebhookRequest): Promise<PayosWebhookResponse> {
-    let payloadData: PayosWebhookData;
+    let payload: unknown;
     try {
-      const parsed: unknown =
-        typeof request.dataJson === 'string'
-          ? (JSON.parse(request.dataJson) as unknown)
-          : request.dataJson;
-      payloadData = parsed as PayosWebhookData;
+      payload = JSON.parse(request.dataJson);
     } catch {
       throw new BadRequestException('Invalid dataJson in PayOS webhook');
     }
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      Array.isArray(payload)
+    ) {
+      throw new BadRequestException('Invalid dataJson in PayOS webhook');
+    }
+    const payloadData = payload as Record<string, unknown>;
 
     const isValid = this.payosGateway.verifyWebhookSignature({
       code: request.code,
@@ -173,7 +186,37 @@ export class ProcessPayosWebhookUseCase {
       throw new ForbiddenException('Invalid PayOS webhook signature');
     }
 
-    const orderCode = BigInt(payloadData.orderCode);
+    if (
+      request.success !== true ||
+      request.code !== '00' ||
+      payloadData.code !== '00'
+    ) {
+      return { success: false, message: 'PayOS did not confirm payment' };
+    }
+
+    const {
+      orderCode: providerCode,
+      amount,
+      currency,
+      paymentLinkId,
+      reference,
+    } = payloadData;
+    if (
+      typeof providerCode !== 'number' ||
+      !Number.isSafeInteger(providerCode) ||
+      providerCode <= 0 ||
+      typeof amount !== 'number' ||
+      !Number.isSafeInteger(amount) ||
+      amount <= 0 ||
+      typeof currency !== 'string' ||
+      typeof paymentLinkId !== 'string' ||
+      !paymentLinkId ||
+      typeof reference !== 'string' ||
+      !reference
+    ) {
+      throw new BadRequestException('Incomplete payment data from PayOS');
+    }
+    const orderCode = BigInt(providerCode);
     const tx = await this.repository.findTransactionByOrderCode(orderCode);
     if (!tx) {
       return {
@@ -182,34 +225,34 @@ export class ProcessPayosWebhookUseCase {
       };
     }
 
-    if (tx.status === 'SUCCEEDED') {
+    const storedLinkId = readPaymentLinkId(tx.metadataJson);
+    if (
+      tx.transactionType !== 'PAYMENT' ||
+      tx.provider !== 'PAYOS' ||
+      tx.amount !== amount ||
+      tx.currency !== currency ||
+      (storedLinkId && storedLinkId !== paymentLinkId)
+    ) {
       return {
-        success: true,
-        message: 'Transaction already processed',
-        transactionId: tx.id,
-        status: tx.status,
-        orderId: tx.orderId,
+        success: false,
+        message: 'PayOS payment requires reconciliation',
       };
     }
 
-    const nextOrderStatus = resolveNextOrderStatusAfterPayment(
-      tx.paymentStage,
-      tx.orderStatus,
-    );
-
-    const updated = await this.repository.markPaymentTransactionSucceeded({
-      transactionId: tx.id,
-      providerTransactionId: payloadData.reference || payloadData.paymentLinkId,
-      providerReference: payloadData.reference,
-      completedAt: payloadData.transactionDateTime
-        ? new Date(payloadData.transactionDateTime)
-        : new Date(),
-      nextOrderStatus,
-    });
+    const { transaction: updated, applied } =
+      await this.repository.markPaymentTransactionSucceeded({
+        transactionId: tx.id,
+        providerTransactionId: reference,
+        providerReference: reference,
+        completedAt: new Date(),
+      });
 
     return {
-      success: true,
-      message: 'Payment processed successfully',
+      success: updated.status === 'SUCCEEDED',
+      applied,
+      message: applied
+        ? 'Payment processed successfully'
+        : 'Payment already recorded or requires reconciliation',
       transactionId: updated.id,
       status: updated.status,
       orderId: tx.orderId,
@@ -238,8 +281,17 @@ export class ReconcilePaymentTransactionUseCase {
       );
     }
 
+    if (tx.provider !== 'PAYOS' || tx.transactionType !== 'PAYMENT') {
+      throw new BadRequestException('Only PayOS payments can be reconciled');
+    }
+
     if (tx.status === 'SUCCEEDED') {
-      return mapPaymentTransactionDetail(tx);
+      const { transaction } =
+        await this.repository.markPaymentTransactionSucceeded({
+          transactionId: tx.id,
+          completedAt: tx.completedAt ?? new Date(),
+        });
+      return mapPaymentTransactionDetail(transaction);
     }
 
     if (!tx.providerOrderCode) {
@@ -252,19 +304,21 @@ export class ReconcilePaymentTransactionUseCase {
       Number(tx.providerOrderCode),
     );
 
-    if (info && info.status === 'PAID') {
-      const nextOrderStatus = resolveNextOrderStatusAfterPayment(
-        tx.paymentStage,
-        tx.orderStatus,
-      );
-
-      const updated = await this.repository.markPaymentTransactionSucceeded({
-        transactionId: tx.id,
-        completedAt: new Date(),
-        nextOrderStatus,
-      });
-
-      return mapPaymentTransactionDetail(updated);
+    const storedLinkId = readPaymentLinkId(tx.metadataJson);
+    if (
+      info?.status === 'PAID' &&
+      info.orderCode === Number(tx.providerOrderCode) &&
+      info.amount === tx.amount &&
+      info.amountPaid === tx.amount &&
+      info.amountRemaining === 0 &&
+      (!storedLinkId || info.id === storedLinkId)
+    ) {
+      const { transaction } =
+        await this.repository.markPaymentTransactionSucceeded({
+          transactionId: tx.id,
+          completedAt: new Date(),
+        });
+      return mapPaymentTransactionDetail(transaction);
     }
 
     return mapPaymentTransactionDetail(tx);

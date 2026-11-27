@@ -11,6 +11,7 @@ import {
   AdminOrderDetailsResponseDto,
   AdminOrderSummaryDto,
   CancelOrderResponseDto,
+  OrderDetailsResponseDto,
   RingItemDetailResponseDto,
   RingItemVersionSummaryDto,
   UpdateCurrentRingItemVersionResponseDto,
@@ -98,7 +99,7 @@ export function ApiGetOrderByIdDocs() {
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({
-      type: AdminOrderDetailsResponseDto,
+      type: OrderDetailsResponseDto,
       description: 'Order details returned successfully',
     }),
     unauthorized,
@@ -214,7 +215,7 @@ export function ApiCancelOrderDocs() {
     ApiOperation({
       summary: '[ORDER-005] Customer cancels order',
       description:
-        'Cancels order if in cancellable status (AWAITING_P1, PENDING_FINAL_QUOTE, AWAITING_CUSTOMER_CONFIRMATION) and releases inventory allocations.',
+        'Cancels order if in cancellable status (AWAITING_P1, PENDING_FINAL_QUOTE, AWAITING_FINAL_CONFIRMATION) and releases inventory allocations.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({

@@ -1,10 +1,19 @@
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '../../../../../generated/prisma/client';
 import type { PrismaService } from '../../../../persistence/prisma/prisma.service';
 import type {
   OrderingInvoiceRecord,
   OrderingPaymentTransactionRecord,
+  OrderingRepository,
 } from '../application/ordering.repository';
+import { resolveOrderNextPayment } from '../application/ordering-state';
 import {
+  ORDER_WITH_RELATIONS_INCLUDE,
+  toOrderDetailRecord,
   toOrderInvoiceRecord,
   toPaymentTransactionRecord,
 } from './prisma-ordering.mappers';
@@ -160,6 +169,97 @@ export class PrismaOrderingPaymentsDelegate {
     return refund ? toPaymentTransactionRecord(refund) : undefined;
   }
 
+  async beginOrderPaymentAttempt(
+    params: Parameters<OrderingRepository['beginOrderPaymentAttempt']>[0],
+  ): ReturnType<OrderingRepository['beginOrderPaymentAttempt']> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id FROM ordering.orders WHERE id = ${params.orderId}::uuid FOR UPDATE
+      `;
+      const order = await tx.orders.findUnique({
+        where: { id: params.orderId },
+        include: ORDER_WITH_RELATIONS_INCLUDE,
+      });
+      if (!order) throw new NotFoundException('Order not found');
+
+      const payments = await tx.payment_transactions.findMany({
+        where: { order_id: order.id },
+        orderBy: { requested_at: 'desc' },
+      });
+      const now = new Date();
+      const payment = resolveOrderNextPayment(
+        toOrderDetailRecord(order),
+        payments.map((row) => toPaymentTransactionRecord(row)),
+        now,
+      );
+      if (
+        !payment?.canPay ||
+        (params.paymentStage && payment.stage !== params.paymentStage)
+      ) {
+        throw new BadRequestException(
+          'No payment is due for the requested stage',
+        );
+      }
+      const pending = payments.find(
+        ({ id }) => id === payment.pendingAttempt?.transactionId,
+      );
+      if (pending) {
+        return {
+          transaction: toPaymentTransactionRecord(pending),
+          created: false,
+        };
+      }
+
+      const staleLinkIsStillOpen = payments.some(
+        (row) =>
+          row.provider === 'PAYOS' &&
+          row.transaction_type === 'PAYMENT' &&
+          row.status === 'PENDING' &&
+          row.expires_at !== null &&
+          row.expires_at > now,
+      );
+      if (staleLinkIsStillOpen) {
+        throw new ConflictException('Hãy chờ link thanh toán trước hết hạn');
+      }
+
+      const created = await tx.payment_transactions.create({
+        data: {
+          order_id: order.id,
+          quote_id: order.current_quote_id,
+          payment_stage: payment.stage,
+          transaction_type: 'PAYMENT',
+          payment_method: 'PAYOS',
+          provider: 'PAYOS',
+          provider_order_code: params.providerOrderCode,
+          amount: new Prisma.Decimal(payment.amountDue),
+          currency: payment.currency,
+          expires_at: new Date(
+            Math.min(
+              now.getTime() + 15 * 60 * 1000,
+              payment.expiresAt ? Date.parse(payment.expiresAt) : Infinity,
+            ),
+          ),
+          status: 'PENDING',
+        },
+      });
+      return {
+        transaction: toPaymentTransactionRecord(created),
+        created: true,
+      };
+    });
+  }
+
+  async saveOrderPaymentLink(
+    transactionId: string,
+    metadata: Record<string, string>,
+  ): Promise<OrderingPaymentTransactionRecord> {
+    const updated = await this.prisma.payment_transactions.update({
+      where: { id: transactionId },
+      data: { metadata_json: metadata },
+    });
+    return toPaymentTransactionRecord(updated);
+  }
+
   async createPaymentTransaction(params: {
     orderId?: string;
     claimId?: string;
@@ -195,41 +295,100 @@ export class PrismaOrderingPaymentsDelegate {
     orderCode: bigint,
   ): Promise<OrderingPaymentTransactionRecord | undefined> {
     const row = await this.prisma.payment_transactions.findFirst({
-      where: { provider_order_code: orderCode },
+      where: { provider: 'PAYOS', provider_order_code: orderCode },
       include: { orders: true, quotes: true },
     });
     return row ? toPaymentTransactionRecord(row) : undefined;
   }
 
-  async markPaymentTransactionSucceeded(params: {
-    transactionId: string;
-    providerTransactionId?: string;
-    providerReference?: string;
-    completedAt?: Date;
-    nextOrderStatus?: string;
-  }): Promise<OrderingPaymentTransactionRecord> {
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const updatedTx = await tx.payment_transactions.update({
+  async markPaymentTransactionSucceeded(
+    params: Parameters<
+      OrderingRepository['markPaymentTransactionSucceeded']
+    >[0],
+  ): ReturnType<OrderingRepository['markPaymentTransactionSucceeded']> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.payment_transactions.findUnique({
         where: { id: params.transactionId },
+      });
+      if (!existing)
+        throw new NotFoundException('Payment transaction not found');
+
+      if (existing.order_id) {
+        await tx.$queryRaw`
+          SELECT id FROM ordering.orders WHERE id = ${existing.order_id}::uuid FOR UPDATE
+        `;
+      }
+
+      const updated = await tx.payment_transactions.updateMany({
+        where: {
+          id: params.transactionId,
+          provider: 'PAYOS',
+          transaction_type: 'PAYMENT',
+          status: 'PENDING',
+        },
         data: {
           status: 'SUCCEEDED',
-          completed_at: params.completedAt ?? new Date(),
-          provider_transaction_id: params.providerTransactionId ?? null,
-          provider_reference: params.providerReference ?? null,
+          completed_at: params.completedAt,
+          provider_transaction_id: params.providerTransactionId,
+          provider_reference: params.providerReference,
         },
+      });
+      const payment = await tx.payment_transactions.findUniqueOrThrow({
+        where: { id: params.transactionId },
         include: { orders: true, quotes: true },
       });
 
-      if (updatedTx.order_id && params.nextOrderStatus) {
-        await tx.orders.update({
-          where: { id: updatedTx.order_id },
-          data: { status: params.nextOrderStatus },
-        });
+      if (
+        payment.status === 'SUCCEEDED' &&
+        payment.order_id &&
+        payment.payment_stage === 'DEPOSIT_P1'
+      ) {
+        await this.advancePaidDeposit(tx, payment.order_id);
       }
 
-      return updatedTx;
+      return {
+        transaction: toPaymentTransactionRecord(payment),
+        applied: updated.count === 1,
+      };
     });
+  }
 
-    return toPaymentTransactionRecord(updated);
+  private async advancePaidDeposit(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<void> {
+    const order = await tx.orders.findUnique({
+      where: { id: orderId },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
+    });
+    if (!order || order.status !== 'AWAITING_P1') return;
+
+    const payments = await tx.payment_transactions.findMany({
+      where: { order_id: orderId },
+    });
+    const nextPayment = resolveOrderNextPayment(
+      toOrderDetailRecord(order),
+      payments.map((row) => toPaymentTransactionRecord(row)),
+    );
+    if (nextPayment?.stage !== 'DEPOSIT_P1' || nextPayment.amountDue !== 0)
+      return;
+
+    const certifiedSelection = await tx.ring_item_version_gemstones.findFirst({
+      where: {
+        ring_item_version_id: {
+          in: order.ring_items.flatMap((item) =>
+            item.current_version_id ? [item.current_version_id] : [],
+          ),
+        },
+        gemstone_options: { certified_required: true },
+      },
+      select: { id: true },
+    });
+    if (certifiedSelection) return;
+
+    await tx.orders.updateMany({
+      where: { id: orderId, status: 'AWAITING_P1' },
+      data: { status: 'DESIGN_IN_PROGRESS' },
+    });
   }
 }

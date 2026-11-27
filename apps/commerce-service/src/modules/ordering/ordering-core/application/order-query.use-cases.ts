@@ -14,7 +14,10 @@ import type {
   ListOrdersResponse,
   TimelineEventItem,
 } from '@app/contracts';
-import { resolveOrderStageGates } from './ordering-state';
+import {
+  resolveOrderNextPayment,
+  resolveOrderStageGates,
+} from './ordering-state';
 import {
   mapAdminOrderDetail,
   mapAdminOrderSummary,
@@ -82,7 +85,11 @@ export class GetOrderByIdUseCase {
       throw new NotFoundException('Order not found or access denied');
     }
 
-    return mapOrderDetail(order);
+    const payments = await this.repository.findOrderPayments(order.id);
+    return {
+      ...mapOrderDetail(order),
+      nextPayment: resolveOrderNextPayment(order, payments),
+    };
   }
 }
 
@@ -148,6 +155,11 @@ export class GetOrderTimelineUseCase {
       stageGates: resolveOrderStageGates(
         order.status,
         order.createdAt.toISOString(),
+        order.ringItems.some(
+          ({ personalizationPackage }) =>
+            personalizationPackage === 'FINGERPRINT' ||
+            personalizationPackage === 'SOUNDWAVE',
+        ),
       ),
     };
   }

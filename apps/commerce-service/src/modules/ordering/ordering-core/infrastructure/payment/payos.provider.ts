@@ -62,6 +62,7 @@ export class PayosProvider implements PayosGateway {
         description,
         returnUrl: params.returnUrl,
         cancelUrl: params.cancelUrl,
+        expiredAt: params.expiredAt,
         items: params.items || [],
         signature,
       };
@@ -158,11 +159,7 @@ export class PayosProvider implements PayosGateway {
       const resData = (await response.json()) as {
         code: string;
         desc: string;
-        data?: {
-          status: string;
-          amount: number;
-          orderCode: number;
-        };
+        data?: PayosPaymentInfo;
       };
 
       if (resData.code !== '00' || !resData.data) {

@@ -128,6 +128,22 @@ message RingItemSummary {
   bool memory_enabled = 12;
 }
 
+message PendingOrderPayment {
+  string transaction_id = 1;
+  optional string expires_at = 2;
+}
+
+message OrderNextPayment {
+  string stage = 1;
+  double amount_due = 2;
+  double paid_amount = 3;
+  double order_total = 4;
+  string currency = 5;
+  bool can_pay = 6;
+  PendingOrderPayment pending_attempt = 7;
+  optional string expires_at = 8;
+}
+
 message GetOrderByIdResponse {
   string id = 1;
   string order_no = 2;
@@ -142,6 +158,7 @@ message GetOrderByIdResponse {
   repeated RingItemSummary items = 11;
   string created_at = 12;
   string updated_at = 13;
+  OrderNextPayment next_payment = 14;
 }
 
 message GetOrderTimelineRequest {
@@ -746,6 +763,7 @@ message PayosWebhookResponse {
   string transaction_id = 3;
   string status = 4;
   string order_id = 5;
+  bool applied = 6;
 }
 
 message ReconcilePaymentTransactionRequest {

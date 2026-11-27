@@ -61,6 +61,7 @@ export interface OrderingQuoteSummaryRecord {
   readonly totalAmount: number;
   readonly currency: string;
   readonly status: string;
+  readonly validUntil?: Date;
 }
 
 export interface OrderingListItemRecord {
@@ -218,6 +219,7 @@ export interface OrderingFinalConfirmationRecord {
 
 export interface OrderingPaymentTransactionRecord {
   readonly id: string;
+  readonly quoteId?: string;
   readonly orderId?: string;
   readonly orderNo?: string;
   readonly orderStatus?: string;
@@ -461,6 +463,18 @@ export interface OrderingRepository {
     expiresAt: Date;
     metadata: Record<string, unknown>;
   }): Promise<OrderingPaymentTransactionRecord>;
+  beginOrderPaymentAttempt(params: {
+    orderId: string;
+    paymentStage?: string;
+    providerOrderCode: bigint;
+  }): Promise<{
+    transaction: OrderingPaymentTransactionRecord;
+    created: boolean;
+  }>;
+  saveOrderPaymentLink(
+    transactionId: string,
+    metadata: Record<string, string>,
+  ): Promise<OrderingPaymentTransactionRecord>;
   findTransactionByOrderCode(
     orderCode: bigint,
   ): Promise<OrderingPaymentTransactionRecord | undefined>;
@@ -469,6 +483,8 @@ export interface OrderingRepository {
     providerTransactionId?: string;
     providerReference?: string;
     completedAt: Date;
-    nextOrderStatus?: string;
-  }): Promise<OrderingPaymentTransactionRecord>;
+  }): Promise<{
+    transaction: OrderingPaymentTransactionRecord;
+    applied: boolean;
+  }>;
 }

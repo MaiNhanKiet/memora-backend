@@ -46,6 +46,8 @@ describe('Quote & Payment UseCases', () => {
     findClaimQuoteById: jest.fn(),
     acceptClaimQuote: jest.fn(),
     createPaymentTransaction: jest.fn(),
+    beginOrderPaymentAttempt: jest.fn(),
+    saveOrderPaymentLink: jest.fn(),
     findTransactionByOrderCode: jest.fn(),
     markPaymentTransactionSucceeded: jest.fn(),
   };
@@ -101,6 +103,7 @@ describe('Quote & Payment UseCases', () => {
         id: 'order-1',
         currentQuoteId: 'q-1',
         sourcePlanMode: 'SHARED',
+        ringItems: [{ personalizationPackage: 'FINGERPRINT' }],
       });
       mockRepository.findQuoteById.mockResolvedValue({
         id: 'q-1',
@@ -198,16 +201,26 @@ describe('Quote & Payment UseCases', () => {
       mockPayosGateway.generateOrderCode.mockReturnValue(987654);
       mockPayosGateway.createPaymentLink.mockResolvedValue({
         paymentLinkId: 'pl_987654',
+        orderCode: 987654,
+        amount: 4500000,
+        currency: 'VND',
         checkoutUrl: 'https://pay.payos.vn/web/pl_987654',
         qrCode: 'QR_MOCK',
       });
-      mockRepository.createPaymentTransaction.mockResolvedValue({
+      const transaction = {
         id: 'tx-1',
         amount: 4500000,
+        paymentStage: 'DEPOSIT_P1',
+        providerOrderCode: 987654n,
         currency: 'VND',
         status: 'PENDING',
-        expiresAt: new Date('2026-11-26T10:00:00Z'),
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      };
+      mockRepository.beginOrderPaymentAttempt.mockResolvedValue({
+        transaction,
+        created: true,
       });
+      mockRepository.saveOrderPaymentLink.mockResolvedValue(transaction);
 
       const res = await createOrderPaymentLinkUseCase.execute({
         actor: {
@@ -244,22 +257,65 @@ describe('Quote & Payment UseCases', () => {
         orderStatus: 'AWAITING_P1',
         paymentStage: 'DEPOSIT_P1',
         status: 'PENDING',
+        transactionType: 'PAYMENT',
+        provider: 'PAYOS',
+        currency: 'VND',
+        amount: 4500000,
       });
       mockRepository.markPaymentTransactionSucceeded.mockResolvedValue({
-        id: 'tx-1',
-        status: 'SUCCEEDED',
+        transaction: { id: 'tx-1', status: 'SUCCEEDED' },
+        applied: true,
       });
 
       const res = await processPayosWebhookUseCase.execute({
         code: '00',
         desc: 'success',
         success: true,
-        dataJson: JSON.stringify({ orderCode: 123, reference: 'REF-1' }),
+        dataJson: JSON.stringify({
+          orderCode: 123,
+          reference: 'REF-1',
+          paymentLinkId: 'pl-1',
+          amount: 4500000,
+          currency: 'VND',
+          code: '00',
+        }),
         signature: 'good-sig',
       });
 
       expect(res.success).toBe(true);
       expect(res.status).toBe('SUCCEEDED');
+    });
+
+    it('does not record a signed webhook when the amount is different', async () => {
+      mockPayosGateway.verifyWebhookSignature.mockReturnValue(true);
+      mockRepository.findTransactionByOrderCode.mockResolvedValue({
+        id: 'tx-1',
+        provider: 'PAYOS',
+        transactionType: 'PAYMENT',
+        status: 'PENDING',
+        amount: 4500000,
+        currency: 'VND',
+      });
+
+      const response = await processPayosWebhookUseCase.execute({
+        code: '00',
+        desc: 'success',
+        success: true,
+        dataJson: JSON.stringify({
+          code: '00',
+          orderCode: 123,
+          amount: 1000,
+          currency: 'VND',
+          reference: 'REF-1',
+          paymentLinkId: 'pl-1',
+        }),
+        signature: 'test-signature',
+      });
+
+      expect(response.success).toBe(false);
+      expect(
+        mockRepository.markPaymentTransactionSucceeded,
+      ).not.toHaveBeenCalled();
     });
 
     it('should calculate invoice totals and remaining amount', async () => {

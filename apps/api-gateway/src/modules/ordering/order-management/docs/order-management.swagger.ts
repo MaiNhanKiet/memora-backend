@@ -145,7 +145,7 @@ export function ApiPublishFinalQuoteDocs() {
     ApiOperation({
       summary: '[ORDER-013 Part A] Publish Final Quote to Customer (Staff)',
       description:
-        'Transitions quote status from DRAFT to ISSUED, locks items, and advances order to AWAITING_CUSTOMER_CONFIRMATION.',
+        'Transitions quote status from DRAFT to ISSUED, and advances order to AWAITING_FINAL_CONFIRMATION.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiParam({ name: 'quoteId', description: 'Quote UUID', type: String }),

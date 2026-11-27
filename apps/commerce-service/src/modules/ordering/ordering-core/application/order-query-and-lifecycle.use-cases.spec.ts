@@ -171,15 +171,15 @@ describe('Order Query, Ring Item & Lifecycle UseCases', () => {
       mockRepository.updateOrderStatus.mockResolvedValue({
         id: 'order-1',
         orderNo: 'ORD-001',
-        status: 'PENDING_FINAL_QUOTE',
+        status: 'CANCELLED',
         updatedAt: new Date('2026-11-25T10:00:00Z'),
       });
 
       const res = await updateOrderStatusUseCase.execute({
         orderId: 'order-1',
-        targetStatus: 'PENDING_FINAL_QUOTE',
+        targetStatus: 'CANCELLED',
       });
-      expect(res.currentStatus).toBe('PENDING_FINAL_QUOTE');
+      expect(res.currentStatus).toBe('CANCELLED');
     });
 
     it('should cancel pre-production order successfully', async () => {

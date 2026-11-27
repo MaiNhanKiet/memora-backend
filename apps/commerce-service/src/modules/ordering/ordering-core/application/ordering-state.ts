@@ -1,11 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
-import type { StageGateItem } from '@app/contracts';
+import type { OrderNextPayment, StageGateItem } from '@app/contracts';
+import type {
+  OrderingDetailRecord,
+  OrderingPaymentTransactionRecord,
+} from './ordering.repository';
 
 export const ORDER_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
-  AWAITING_P1: ['PENDING_FINAL_QUOTE', 'CANCELLED'],
-  PENDING_FINAL_QUOTE: ['AWAITING_CUSTOMER_CONFIRMATION', 'CANCELLED'],
-  AWAITING_CUSTOMER_CONFIRMATION: ['AWAITING_P2', 'CANCELLED'],
-  AWAITING_P2: ['MANUFACTURING', 'CANCELLED'],
+  AWAITING_P1: ['CANCELLED'],
+  DESIGN_IN_PROGRESS: ['CANCELLED'],
+  PENDING_FINAL_QUOTE: ['CANCELLED'],
+  AWAITING_FINAL_CONFIRMATION: ['CANCELLED'],
+  AWAITING_P2: ['CANCELLED'],
   MANUFACTURING: ['COMPLETED_MANUFACTURING', 'READY_FOR_DELIVERY', 'CANCELLED'],
   COMPLETED_MANUFACTURING: ['READY_FOR_DELIVERY', 'CANCELLED'],
   READY_FOR_DELIVERY: ['DELIVERED', 'CANCELLED'],
@@ -16,7 +21,7 @@ export const ORDER_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
 export const CANCELLABLE_ORDER_STATUSES: readonly string[] = [
   'AWAITING_P1',
   'PENDING_FINAL_QUOTE',
-  'AWAITING_CUSTOMER_CONFIRMATION',
+  'AWAITING_FINAL_CONFIRMATION',
 ];
 
 export function assertValidOrderStatusTransition(
@@ -42,8 +47,9 @@ export function assertOrderCancellable(status: string): void {
 export function resolveOrderStageGates(
   orderStatus: string,
   createdAtIso: string,
+  hasPersonalization: boolean,
 ): StageGateItem[] {
-  const isAllNone = orderStatus === 'PENDING_FINAL_QUOTE';
+  const isAllNone = !hasPersonalization;
 
   return [
     {
@@ -68,21 +74,30 @@ export function resolveOrderStageGates(
       stageName: 'Thu thập dữ liệu cá nhân hóa',
       status: isAllNone
         ? 'SKIPPED'
-        : orderStatus === 'COLLECTING_SOURCE'
+        : orderStatus === 'DESIGN_IN_PROGRESS'
           ? 'ACTIVE'
           : 'PENDING',
-      isCurrent: orderStatus === 'COLLECTING_SOURCE',
+      isCurrent: orderStatus === 'DESIGN_IN_PROGRESS',
     },
     {
       stageCode: 'FINAL_QUOTE_APPROVAL',
       stageName: 'Thẩm định báo giá & Chốt thiết kế',
       status:
-        orderStatus === 'PENDING_FINAL_QUOTE'
+        orderStatus === 'PENDING_FINAL_QUOTE' ||
+        orderStatus === 'AWAITING_FINAL_CONFIRMATION'
           ? 'ACTIVE'
-          : orderStatus === 'FINAL_QUOTE_ACCEPTED'
+          : [
+                'AWAITING_P2',
+                'PRODUCTION_AUTHORIZED',
+                'IN_PRODUCTION',
+                'READY_FOR_HANDOVER',
+                'COMPLETED',
+              ].includes(orderStatus)
             ? 'COMPLETED'
             : 'PENDING',
-      isCurrent: orderStatus === 'PENDING_FINAL_QUOTE',
+      isCurrent:
+        orderStatus === 'PENDING_FINAL_QUOTE' ||
+        orderStatus === 'AWAITING_FINAL_CONFIRMATION',
     },
     {
       stageCode: 'PRODUCTION',
@@ -94,49 +109,117 @@ export function resolveOrderStageGates(
       stageCode: 'FULFILLMENT',
       stageName: 'Bàn giao / Giao hàng',
       status: orderStatus === 'COMPLETED' ? 'COMPLETED' : 'PENDING',
-      isCurrent: orderStatus === 'DELIVERING',
+      isCurrent: orderStatus === 'READY_FOR_HANDOVER',
     },
   ];
 }
 
-export function resolvePaymentStageForOrderStatus(
-  orderStatus: string,
-  requestedStage?: string,
-): string {
-  if (requestedStage) {
-    return requestedStage;
+export function resolveOrderNextPayment(
+  order: OrderingDetailRecord,
+  payments: readonly OrderingPaymentTransactionRecord[],
+  now = new Date(),
+): OrderNextPayment | undefined {
+  const quote = order.currentQuote;
+  if (!quote || quote.totalAmount <= 0 || quote.currency !== 'VND') {
+    return undefined;
   }
-  if (orderStatus === 'AWAITING_P1') {
-    return 'DEPOSIT_P1';
-  }
-  if (orderStatus === 'AWAITING_P2') {
-    return 'MILESTONE_P2';
-  }
-  if (orderStatus === 'AWAITING_P3' || orderStatus === 'READY_FOR_DELIVERY') {
-    return 'FINAL_P3';
-  }
-  if (orderStatus === 'PENDING_FINAL_QUOTE') {
-    return 'FULL_PAYMENT';
-  }
-  throw new BadRequestException(
-    `Cannot create payment link for order in status '${orderStatus}'`,
-  );
-}
 
-export function resolveNextOrderStatusAfterPayment(
-  paymentStage: string,
-  currentOrderStatus?: string,
-): string | undefined {
-  if (paymentStage === 'DEPOSIT_P1') {
-    return 'PENDING_FINAL_QUOTE';
+  const hasPersonalization = order.ringItems.some(
+    ({ personalizationPackage }) =>
+      personalizationPackage === 'FINGERPRINT' ||
+      personalizationPackage === 'SOUNDWAVE',
+  );
+  let stage: string;
+  let target: number;
+  if (
+    order.status === 'AWAITING_P1' &&
+    hasPersonalization &&
+    quote.quoteType === 'PROVISIONAL' &&
+    quote.status === 'ISSUED' &&
+    (!quote.validUntil || quote.validUntil > now)
+  ) {
+    stage = 'DEPOSIT_P1';
+    target = Math.round(quote.totalAmount * 0.3);
+  } else if (quote.quoteType === 'FINAL' && quote.status === 'ACCEPTED') {
+    if (order.status === 'AWAITING_P2' && hasPersonalization) {
+      stage = 'MILESTONE_P2';
+      target = Math.ceil(quote.totalAmount * 0.7);
+    } else if (order.status === 'READY_FOR_HANDOVER') {
+      stage = hasPersonalization ? 'FINAL_P3' : 'FULL_PAYMENT';
+      target = Math.round(quote.totalAmount);
+    } else {
+      return undefined;
+    }
+  } else {
+    return undefined;
   }
-  if (paymentStage === 'MILESTONE_P2') {
-    return 'MANUFACTURING';
-  }
-  if (paymentStage === 'FINAL_P3' || paymentStage === 'FULL_PAYMENT') {
-    return currentOrderStatus === 'READY_FOR_DELIVERY'
-      ? 'DELIVERING'
+
+  const creditedStages = new Set(
+    stage === 'DEPOSIT_P1'
+      ? ['DEPOSIT_P1']
+      : ['DEPOSIT_P1', 'MILESTONE_P2', 'FINAL_P3', 'FULL_PAYMENT'],
+  );
+  const succeeded = payments.filter(
+    (item) => item.status === 'SUCCEEDED' && item.currency === quote.currency,
+  );
+  const eligiblePayments = succeeded.filter(
+    (item) =>
+      item.transactionType === 'PAYMENT' &&
+      creditedStages.has(item.paymentStage) &&
+      (stage !== 'DEPOSIT_P1' || item.quoteId === quote.id),
+  );
+  const paymentIds = new Set(eligiblePayments.map(({ id }) => id));
+  const refundedAmount = succeeded
+    .filter(
+      (item) =>
+        item.transactionType === 'REFUND' &&
+        item.relatedTransactionId &&
+        paymentIds.has(item.relatedTransactionId),
+    )
+    .reduce((total, item) => total + item.amount, 0);
+  const paidAmount = Math.max(
+    0,
+    eligiblePayments.reduce((total, item) => total + item.amount, 0) -
+      refundedAmount,
+  );
+  const amountDue = Math.max(0, target - paidAmount);
+  const expiresAt =
+    stage === 'DEPOSIT_P1'
+      ? new Date(
+          Math.min(
+            order.createdAt.getTime() + 24 * 60 * 60 * 1000,
+            quote.validUntil?.getTime() ?? Infinity,
+          ),
+        )
       : undefined;
-  }
-  return undefined;
+  const canPay = amountDue > 0 && (!expiresAt || expiresAt > now);
+  const pending = payments.find(
+    (item) =>
+      canPay &&
+      item.transactionType === 'PAYMENT' &&
+      item.provider === 'PAYOS' &&
+      item.status === 'PENDING' &&
+      item.paymentStage === stage &&
+      item.quoteId === quote.id &&
+      item.currency === quote.currency &&
+      item.amount === amountDue &&
+      item.expiresAt &&
+      item.expiresAt > now,
+  );
+
+  return {
+    stage,
+    amountDue,
+    paidAmount,
+    orderTotal: quote.totalAmount,
+    currency: quote.currency,
+    canPay,
+    expiresAt: expiresAt?.toISOString(),
+    pendingAttempt: pending
+      ? {
+          transactionId: pending.id,
+          expiresAt: pending.expiresAt?.toISOString(),
+        }
+      : undefined,
+  };
 }

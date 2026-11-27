@@ -96,7 +96,22 @@ export interface RingItemSummary {
   memoryEnabled: boolean;
 }
 
+export interface OrderNextPayment {
+  stage: string;
+  amountDue: number;
+  paidAmount: number;
+  orderTotal: number;
+  currency: string;
+  canPay: boolean;
+  expiresAt?: string;
+  pendingAttempt?: {
+    transactionId: string;
+    expiresAt?: string;
+  };
+}
+
 export interface GetOrderByIdResponse {
+  nextPayment?: OrderNextPayment;
   id: string;
   orderNo: string;
   status: string;
@@ -665,6 +680,7 @@ export interface PayosWebhookRequest {
 
 export interface PayosWebhookResponse {
   success: boolean;
+  applied?: boolean;
   message: string;
   transactionId?: string;
   status?: string;
