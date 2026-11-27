@@ -160,12 +160,6 @@ export class ResetPinUseCase {
       'Only the card owner can reset PIN',
     );
 
-    if (!request.verificationCode || request.verificationCode.length < 6) {
-      throw new BadRequestException(
-        'Mã xác thực OTP không hợp lệ hoặc đã hết hạn',
-      );
-    }
-
     assertValidPinFormat(request.newPin, 'Mã PIN mới phải gồm 4 đến 6 chữ số');
 
     const newHash = await this.pinHasher.hash(request.newPin);

@@ -22,6 +22,7 @@ import {
 } from '../../cards/application/memory-card.repository';
 import { PinHasher } from '../../cards/application/pin-hasher';
 import { verifyCardPinWithLockout } from '../../cards/application/pin-policy';
+import { isMemoryAssetKey } from './memory-asset-key.policy';
 import {
   mapContentsWithPresignedUrls,
   toMemoryContentItem,
@@ -107,6 +108,8 @@ export class UpdateCardContentsUseCase {
     private readonly contentRepository: MemoryContentRepository,
     @Inject(MEMORY_CARD_REPOSITORY)
     private readonly cardRepository: MemoryCardRepository,
+    @Inject(MEMORY_STORAGE_PORT)
+    private readonly storagePort: MemoryStoragePort,
   ) {}
 
   async execute(
@@ -141,6 +144,16 @@ export class UpdateCardContentsUseCase {
         throw new BadRequestException(
           `Asset key is required for ${item.contentType} item`,
         );
+      }
+      if (item.assetKey) {
+        if (!isMemoryAssetKey(item.assetKey, card.id)) {
+          throw new BadRequestException(
+            'Media asset does not belong to this card',
+          );
+        }
+        if (!(await this.storagePort.checkObjectExists(item.assetKey))) {
+          throw new BadRequestException('Media asset has not been uploaded');
+        }
       }
       if (item.sortOrder < 0) {
         throw new BadRequestException('Sort order must be non-negative');

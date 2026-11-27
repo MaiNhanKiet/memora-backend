@@ -33,6 +33,9 @@ export interface MemoryGrantRepository {
   findGrantById(
     grantId: string,
   ): Promise<MemoryAccessGrantWithCardRecord | undefined>;
+  findSessionByHash(
+    sessionHash: string,
+  ): Promise<MemoryAccessGrantWithCardRecord | undefined>;
   findByTokenHash(
     tokenHash: string,
   ): Promise<MemoryAccessGrantWithCardRecord | undefined>;
@@ -42,7 +45,8 @@ export interface MemoryGrantRepository {
   ): Promise<MemoryAccessGrantRecord>;
   markAccepted(
     grantId: string,
-    userId?: string,
-  ): Promise<MemoryAccessGrantRecord>;
-  updateLastAccessed(grantId: string): Promise<MemoryAccessGrantRecord>;
+    tokenHash: string,
+    sessionHash: string,
+  ): Promise<MemoryAccessGrantRecord | undefined>;
+  updateLastAccessed(grantId: string): Promise<boolean>;
 }

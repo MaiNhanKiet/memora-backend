@@ -21,6 +21,7 @@ model access_grants {
   grantee_email         String       @db.Citext
   status                String       @default("PENDING") @db.VarChar(20)
   invitation_token_hash String?      @db.VarChar(128)
+  session_token_hash    String?      @unique(map: "memory_access_grants_session_token_hash_uq") @db.VarChar(64)
   invite_expires_at     DateTime?    @db.Timestamptz(6)
   accepted_at           DateTime?    @db.Timestamptz(6)
   linked_to_account_at  DateTime?    @db.Timestamptz(6)

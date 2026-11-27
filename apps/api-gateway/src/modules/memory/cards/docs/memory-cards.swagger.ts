@@ -125,8 +125,7 @@ export function ApiResetPinDocs() {
     ApiBearerAuth(),
     ApiOperation({
       summary: '[MEMOR-006] Đặt lại mã PIN khi quên',
-      description:
-        'Đặt lại mã PIN bằng mã xác thực OTP gửi về email của chủ sở hữu.',
+      description: 'Chủ thẻ đã đăng nhập đặt lại mã PIN của mình.',
     }),
     ApiParam({
       name: 'cardId',

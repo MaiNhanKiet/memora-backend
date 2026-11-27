@@ -104,6 +104,16 @@ export class PrismaMemoryGrantRepository implements MemoryGrantRepository {
     return row ? toMemoryAccessGrantWithCardRecord(row) : undefined;
   }
 
+  async findSessionByHash(
+    sessionHash: string,
+  ): Promise<MemoryAccessGrantWithCardRecord | undefined> {
+    const row = await this.prisma.access_grants.findUnique({
+      where: { session_token_hash: sessionHash },
+      include: { memory_cards: true },
+    });
+    return row ? toMemoryAccessGrantWithCardRecord(row) : undefined;
+  }
+
   async findByTokenHash(
     tokenHash: string,
   ): Promise<MemoryAccessGrantWithCardRecord | undefined> {
@@ -122,44 +132,50 @@ export class PrismaMemoryGrantRepository implements MemoryGrantRepository {
     grantId: string,
     revokedByUserId?: string,
   ): Promise<MemoryAccessGrantRecord> {
-    const updated = await this.prisma.access_grants.update({
-      where: { id: grantId },
+    const [updated] = await this.prisma.access_grants.updateManyAndReturn({
+      where: { id: grantId, status: { not: 'REVOKED' } },
       data: {
         status: 'REVOKED',
         revoked_at: new Date(),
         revoked_by_user_id: revokedByUserId ?? null,
       },
     });
-    return toMemoryAccessGrantRecord(updated);
+    const grant =
+      updated ??
+      (await this.prisma.access_grants.findUniqueOrThrow({
+        where: { id: grantId },
+      }));
+    return toMemoryAccessGrantRecord(grant);
   }
 
   async markAccepted(
     grantId: string,
-    userId?: string,
-  ): Promise<MemoryAccessGrantRecord> {
-    const updated = await this.prisma.access_grants.update({
-      where: { id: grantId },
+    tokenHash: string,
+    sessionHash: string,
+  ): Promise<MemoryAccessGrantRecord | undefined> {
+    const now = new Date();
+    const [updated] = await this.prisma.access_grants.updateManyAndReturn({
+      where: {
+        id: grantId,
+        status: 'PENDING',
+        invitation_token_hash: tokenHash,
+        invite_expires_at: { gt: now },
+        memory_cards: { deleted_at: null },
+      },
       data: {
         status: 'ACTIVE',
-        accepted_at: new Date(),
-        ...(userId
-          ? {
-              grantee_user_id: userId,
-              linked_to_account_at: new Date(),
-            }
-          : {}),
+        accepted_at: now,
+        session_token_hash: sessionHash,
       },
     });
-    return toMemoryAccessGrantRecord(updated);
+    return updated ? toMemoryAccessGrantRecord(updated) : undefined;
   }
 
-  async updateLastAccessed(grantId: string): Promise<MemoryAccessGrantRecord> {
-    const updated = await this.prisma.access_grants.update({
-      where: { id: grantId },
-      data: {
-        last_accessed_at: new Date(),
-      },
+  async updateLastAccessed(grantId: string): Promise<boolean> {
+    const result = await this.prisma.access_grants.updateMany({
+      where: { id: grantId, status: 'ACTIVE' },
+      data: { last_accessed_at: new Date() },
     });
-    return toMemoryAccessGrantRecord(updated);
+    return result.count === 1;
   }
 }

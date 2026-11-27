@@ -135,7 +135,6 @@ export interface ResetPinRequest {
   actor: VerifiedActor;
   cardId: string;
   newPin: string;
-  verificationCode: string;
 }
 
 export interface ResetPinResponse {
@@ -268,7 +267,6 @@ export interface RedeemInvitationRequest {
 export interface RedeemInvitationResponse {
   accessSessionId: string;
   memoryCardId: string;
-  expiresAt: string;
   requiresPin: boolean;
 }
 

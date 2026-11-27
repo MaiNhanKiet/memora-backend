@@ -1,10 +1,18 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   ActivateCardUseCase,
   ProvisionMemoryCardUseCase,
 } from './card-lifecycle.use-cases';
-import { ChangePinUseCase, SetupPinUseCase } from './card-pin.use-cases';
+import {
+  ChangePinUseCase,
+  ResetPinUseCase,
+  SetupPinUseCase,
+} from './card-pin.use-cases';
 import {
   GetCardByRingItemIdUseCase,
   GetCardDetailUseCase,
@@ -24,6 +32,7 @@ describe('MemoryCard UseCases', () => {
   let getCardByRingItemIdUseCase: GetCardByRingItemIdUseCase;
   let setupPinUseCase: SetupPinUseCase;
   let changePinUseCase: ChangePinUseCase;
+  let resetPinUseCase: ResetPinUseCase;
 
   const mockCardRepository = {
     listCardsByOwner: jest.fn(),
@@ -76,6 +85,7 @@ describe('MemoryCard UseCases', () => {
         GetCardByRingItemIdUseCase,
         SetupPinUseCase,
         ChangePinUseCase,
+        ResetPinUseCase,
         { provide: MEMORY_CARD_REPOSITORY, useValue: mockCardRepository },
         { provide: PinHasher, useValue: mockPinHasher },
       ],
@@ -93,6 +103,44 @@ describe('MemoryCard UseCases', () => {
     );
     setupPinUseCase = module.get<SetupPinUseCase>(SetupPinUseCase);
     changePinUseCase = module.get<ChangePinUseCase>(ChangePinUseCase);
+    resetPinUseCase = module.get<ResetPinUseCase>(ResetPinUseCase);
+  });
+
+  describe('ResetPinUseCase', () => {
+    it('resets PIN for the verified owner with only the new PIN', async () => {
+      mockCardRepository.findById.mockResolvedValue(sampleCard);
+      mockCardRepository.updatePin.mockResolvedValue(sampleCard);
+
+      await expect(
+        resetPinUseCase.execute({
+          actor: sampleActor,
+          cardId: sampleCard.id,
+          newPin: '987654',
+        }),
+      ).resolves.toMatchObject({ success: true });
+
+      expect(mockCardRepository.updatePin).toHaveBeenCalledWith(
+        sampleCard.id,
+        'hash_987654',
+      );
+    });
+
+    it('does not let a different customer reset the PIN', async () => {
+      mockCardRepository.findById.mockResolvedValue(sampleCard);
+
+      await expect(
+        resetPinUseCase.execute({
+          actor: {
+            ...sampleActor,
+            customerIdentityId: '55555555-5555-4555-8555-555555555555',
+          },
+          cardId: sampleCard.id,
+          newPin: '987654',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockCardRepository.updatePin).not.toHaveBeenCalled();
+    });
   });
 
   describe('ListMyCardsUseCase', () => {

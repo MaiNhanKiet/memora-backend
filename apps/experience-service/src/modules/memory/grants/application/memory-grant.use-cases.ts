@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { parseVerifiedActor, requireCustomerIdentity } from '@app/common';
 import type {
   CreateAccessGrantRequest,
@@ -85,7 +85,10 @@ export class CreateAccessGrantUseCase {
       throw new BadRequestException('Email người nhận không hợp lệ');
     }
 
-    const ttlDays = Math.max(1, Math.min(30, request.ttlDays ?? 7));
+    const ttlDays = request.ttlDays ?? 7;
+    if (!Number.isInteger(ttlDays) || ttlDays < 1 || ttlDays > 30) {
+      throw new BadRequestException('Thời hạn lời mời phải từ 1 đến 30 ngày');
+    }
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
     const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
@@ -205,34 +208,34 @@ export class RedeemInvitationUseCase {
       throw new ForbiddenException('Lời mời này đã bị chủ sở hữu thu hồi');
     }
 
-    const now = new Date();
-    if (grant.inviteExpiresAt && grant.inviteExpiresAt < now) {
+    if (grant.status !== 'PENDING') {
+      throw new ForbiddenException('Lời mời này đã được sử dụng');
+    }
+
+    if (
+      !grant.inviteExpiresAt ||
+      grant.inviteExpiresAt.getTime() <= Date.now()
+    ) {
       throw new BadRequestException('Lời mời này đã hết hạn sử dụng');
     }
 
-    let userId: string | undefined;
-    if (request.actor) {
-      const parsed = parseVerifiedActor(request.actor);
-      if (parsed.kind === 'USER') {
-        userId = parsed.userId;
-      }
-    }
-
+    const accessSessionId = randomUUID();
+    const sessionHash = createHash('sha256')
+      .update(accessSessionId)
+      .digest('hex');
     const updatedGrant = await this.grantRepository.markAccepted(
       grant.id,
-      userId,
+      tokenHash,
+      sessionHash,
     );
-
-    const requiresPin = Boolean(grant.card?.pinHash);
-    const sessionExpiresAt = new Date(
-      Date.now() + 30 * 24 * 60 * 60 * 1000,
-    ).toISOString();
+    if (!updatedGrant) {
+      throw new ForbiddenException('Lời mời không còn có thể sử dụng');
+    }
 
     return {
-      accessSessionId: updatedGrant.id,
+      accessSessionId,
       memoryCardId: updatedGrant.memoryCardId,
-      expiresAt: sessionExpiresAt,
-      requiresPin,
+      requiresPin: Boolean(grant.card?.pinHash),
     };
   }
 }
@@ -258,9 +261,10 @@ export class GetMemoryBySessionUseCase {
       throw new BadRequestException('Mã phiên truy cập không hợp lệ');
     }
 
-    const grant = await this.grantRepository.findGrantById(
-      request.accessSessionId,
-    );
+    const sessionHash = createHash('sha256')
+      .update(request.accessSessionId)
+      .digest('hex');
+    const grant = await this.grantRepository.findSessionByHash(sessionHash);
     if (!grant) {
       throw new NotFoundException('Phiên truy cập không tồn tại');
     }
@@ -270,8 +274,6 @@ export class GetMemoryBySessionUseCase {
         `Quyền truy cập không hợp lệ (trạng thái: ${grant.status})`,
       );
     }
-
-    await this.grantRepository.updateLastAccessed(grant.id);
 
     const card = grant.card;
     if (!card || card.deletedAt !== undefined) {
@@ -296,6 +298,10 @@ export class GetMemoryBySessionUseCase {
         pinHasher: this.pinHasher,
         cardRepository: this.cardRepository,
       });
+    }
+
+    if (!(await this.grantRepository.updateLastAccessed(grant.id))) {
+      throw new ForbiddenException('Quyền truy cập đã bị chủ sở hữu thu hồi');
     }
 
     const rawContents = await this.contentRepository.listContentsByCardId(

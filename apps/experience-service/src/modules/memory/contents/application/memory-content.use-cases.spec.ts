@@ -70,7 +70,7 @@ describe('MemoryContent UseCases', () => {
     memoryCardId: sampleCard.id,
     contentType: 'IMAGE',
     title: 'Our Trip',
-    assetKey: 'memories/sample.jpg',
+    assetKey: `memories/${sampleCard.id}/sample.jpg`,
     sortOrder: 0,
     status: 'ACTIVE',
     createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -78,6 +78,7 @@ describe('MemoryContent UseCases', () => {
   };
 
   beforeEach(async () => {
+    mockStoragePort.checkObjectExists.mockResolvedValue(true);
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -141,6 +142,26 @@ describe('MemoryContent UseCases', () => {
   });
 
   describe('UpdateCardContentsUseCase', () => {
+    it('rejects a key issued for another Memory Card', async () => {
+      mockCardRepository.findById.mockResolvedValue(sampleCard);
+
+      await expect(
+        updateCardContentsUseCase.execute({
+          actor: sampleActor,
+          cardId: sampleCard.id,
+          items: [
+            {
+              contentType: 'IMAGE',
+              assetKey: 'memories/other-card/sample.jpg',
+              sortOrder: 0,
+            },
+          ],
+        }),
+      ).rejects.toThrow('Media asset does not belong to this card');
+
+      expect(mockContentRepository.replaceContents).not.toHaveBeenCalled();
+    });
+
     it('should replace contents when owner submits valid items', async () => {
       mockCardRepository.findById.mockResolvedValue(sampleCard);
       mockContentRepository.replaceContents.mockResolvedValue([sampleContent]);
@@ -152,7 +173,7 @@ describe('MemoryContent UseCases', () => {
           {
             contentType: 'IMAGE',
             title: 'Our Trip',
-            assetKey: 'memories/sample.jpg',
+            assetKey: `memories/${sampleCard.id}/sample.jpg`,
             sortOrder: 0,
           },
         ],

@@ -30,6 +30,7 @@ describe('MemoryGrant UseCases', () => {
     listGrantsByCardId: jest.fn(),
     findGrantById: jest.fn(),
     findByTokenHash: jest.fn(),
+    findSessionByHash: jest.fn(),
     revokeGrant: jest.fn(),
     markAccepted: jest.fn(),
     updateLastAccessed: jest.fn(),
@@ -156,29 +157,67 @@ describe('MemoryGrant UseCases', () => {
         actor: sampleActor,
       });
 
-      expect(res.accessSessionId).toBe(sampleGrant.id);
+      expect(res.accessSessionId).not.toBe(sampleGrant.id);
+      expect(res).not.toHaveProperty('expiresAt');
       expect(res.requiresPin).toBe(false);
       expect(mockGrantRepository.markAccepted).toHaveBeenCalledWith(
         sampleGrant.id,
-        sampleActor.userId,
+        expect.stringMatching(/^[a-f0-9]{64}$/),
+        expect.stringMatching(/^[a-f0-9]{64}$/),
       );
     });
   });
 
+  it('rejects an invitation once it has been used', async () => {
+    mockGrantRepository.findByTokenHash.mockResolvedValue({
+      ...sampleGrant,
+      status: 'ACTIVE',
+    });
+
+    await expect(
+      redeemInvitationUseCase.execute({ invitationToken: 'test-token' }),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(mockGrantRepository.markAccepted).not.toHaveBeenCalled();
+  });
+
+  it('rejects redemption when another request claims the pending grant first', async () => {
+    mockGrantRepository.findByTokenHash.mockResolvedValue(sampleGrant);
+    mockGrantRepository.markAccepted.mockResolvedValue(undefined);
+
+    await expect(
+      redeemInvitationUseCase.execute({ invitationToken: 'test-token' }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
   describe('GetMemoryBySessionUseCase', () => {
-    it('should return memory contents for active session', async () => {
-      mockGrantRepository.findGrantById.mockResolvedValue({
+    it('denies a session after its grant has been revoked', async () => {
+      mockGrantRepository.findSessionByHash.mockResolvedValue({
+        ...sampleGrant,
+        status: 'REVOKED',
+      });
+
+      await expect(
+        getMemoryBySessionUseCase.execute({ accessSessionId: sampleGrant.id }),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockContentRepository.listContentsByCardId).not.toHaveBeenCalled();
+    });
+
+    it('can open an active session even after the invitation expires', async () => {
+      mockGrantRepository.findSessionByHash.mockResolvedValue({
         ...sampleGrant,
         status: 'ACTIVE',
+        inviteExpiresAt: new Date(Date.now() - 31 * 86400000),
       });
-      mockGrantRepository.updateLastAccessed.mockResolvedValue(sampleGrant);
+      mockGrantRepository.updateLastAccessed.mockResolvedValue(true);
 
       const contentRecord: MemoryContentRecord = {
         id: '66666666-6666-4666-8666-666666666666',
         memoryCardId: sampleCard.id,
         contentType: 'IMAGE',
         title: 'Our Trip',
-        assetKey: 'memories/sample.jpg',
+        assetKey: `memories/${sampleCard.id}/sample.jpg`,
         sortOrder: 0,
         status: 'ACTIVE',
         createdAt: new Date('2026-01-01T00:00:00Z'),

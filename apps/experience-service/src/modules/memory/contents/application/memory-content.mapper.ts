@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { MemoryContentItem, MemoryContentType } from '@app/contracts';
+import { isMemoryAssetKey } from './memory-asset-key.policy';
 import type { MemoryContentRecord } from './memory-content.repository';
 import type { MemoryStoragePort } from './memory-storage.port';
 
@@ -34,7 +35,10 @@ export async function mapContentsWithPresignedUrls(
   return Promise.all(
     contents.map(async (content) => {
       let assetUrl: string | undefined;
-      if (content.assetKey) {
+      if (
+        content.assetKey &&
+        isMemoryAssetKey(content.assetKey, content.memoryCardId)
+      ) {
         try {
           assetUrl = await storagePort.presignGetUrl(content.assetKey, 3600);
         } catch (err: unknown) {
@@ -45,7 +49,10 @@ export async function mapContentsWithPresignedUrls(
           assetUrl = undefined;
         }
       }
-      return toMemoryContentItem(content, assetUrl);
+      return toMemoryContentItem(
+        assetUrl ? content : { ...content, assetKey: undefined },
+        assetUrl,
+      );
     }),
   );
 }
