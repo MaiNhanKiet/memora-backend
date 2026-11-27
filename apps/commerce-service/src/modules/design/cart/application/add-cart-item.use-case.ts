@@ -11,7 +11,7 @@ import {
   ensureActiveCart,
   type CartRepository,
 } from './cart.repository';
-import { validateCartActor } from './cart.validation';
+import { priceCartSelections, validateCartActor } from './cart.validation';
 
 @Injectable()
 export class AddCartItemUseCase {
@@ -27,15 +27,18 @@ export class AddCartItemUseCase {
 
     const maintenancePlan = request.maintenancePlan || 'NONE';
     const selections = request.gemstoneSelections || [];
-    const gemstoneOptionIds = selections.map((g) => g.gemstoneOptionId);
 
-    const pricing = await this.estimatePriceUseCase.execute({
-      templateVariantId: request.templateVariantId,
-      targetSize: request.targetSize,
-      gemstoneOptionIds,
-      personalizationPackage: request.personalizationPackage || 'NONE',
-      maintenancePlan,
-    });
+    const pricing = await priceCartSelections(
+      this.repository,
+      this.estimatePriceUseCase,
+      {
+        templateVariantId: request.templateVariantId,
+        targetSize: request.targetSize,
+        personalizationPackage: request.personalizationPackage || 'NONE',
+        maintenancePlan,
+      },
+      selections,
+    );
 
     const draft = await this.repository.createDraft({
       cartId: cart.id,
@@ -43,10 +46,14 @@ export class AddCartItemUseCase {
       guestSessionId: actor.guestSessionId,
       templateVariantId: request.templateVariantId,
       targetSize: request.targetSize,
-      gemstoneConfigJson: buildGemstoneConfigJson(selections, maintenancePlan),
+      gemstoneConfigJson: buildGemstoneConfigJson(
+        selections,
+        maintenancePlan,
+        pricing.certifiedPriceVersionIds,
+      ),
       personalizationPackage: request.personalizationPackage || 'NONE',
       memoryEnabled: request.memoryEnabled ?? false,
-      estimatedPrice: pricing.estimatedTotal,
+      estimatedPrice: pricing.total,
       currency: pricing.currency,
     });
 

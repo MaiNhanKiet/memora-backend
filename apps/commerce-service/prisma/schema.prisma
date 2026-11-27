@@ -239,6 +239,7 @@ model certified_gemstones {
   allocations               allocations[]
   gemstone_options          gemstone_options      @relation(fields: [gemstone_option_id], references: [id], onUpdate: Restrict, map: "inventory_certified_gemstones_gemstone_option_id_fk")
   inventory_movements       inventory_movements[]
+  ring_item_version_gemstones ring_item_version_gemstones[]
   price_items               price_items?
 
   @@unique([certificate_provider, certificate_number], map: "inventory_certified_gemstones_certificate_provider_c_4247bcd7")
@@ -439,6 +440,8 @@ model ring_item_version_gemstones {
   ring_item_version_id String             @db.Uuid
   gemstone_slot_id     String             @db.Uuid
   gemstone_option_id   String             @db.Uuid
+  certified_gemstone_id String?             @db.Uuid
+  certified_gemstone   certified_gemstones? @relation(fields: [certified_gemstone_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ordering_ring_item_version_gemstones_certified_gemstone_id_fk")
   created_at           DateTime           @default(now()) @db.Timestamptz(6)
   gemstone_options     gemstone_options   @relation(fields: [gemstone_option_id], references: [id], onUpdate: Restrict, map: "ordering_ring_item_version_gemstones_gemstone_option_id_fk")
   gemstone_slots       gemstone_slots     @relation(fields: [gemstone_slot_id], references: [id], onUpdate: Restrict, map: "ordering_ring_item_version_gemstones_gemstone_slot_id_fk")

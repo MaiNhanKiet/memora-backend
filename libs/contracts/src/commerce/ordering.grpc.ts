@@ -218,6 +218,7 @@ export interface AdminCustomerInfo {
 }
 
 export interface GetAdminOrderDetailsResponse {
+  attentionReason?: 'CERTIFIED_GEMSTONE_RESERVATION_REQUIRED';
   id: string;
   orderNo: string;
   status: string;

@@ -16,6 +16,14 @@ import type {
   StockLotRecord,
 } from '../application/inventory.repository';
 
+import {
+  availableCertifiedGemstones,
+  lockAllocationGemstone,
+  recordCertifiedRelease,
+  restoreCertifiedAvailability,
+  setCertifiedGemstoneAssignments,
+} from './prisma-certified-gemstone-allocations';
+
 function toStockLotRecord(lot: stock_lots): StockLotRecord {
   return {
     id: lot.id,
@@ -262,7 +270,11 @@ export class PrismaInventoryRepository implements InventoryRepository {
       ...(filter.gemstoneOptionId
         ? { gemstone_option_id: filter.gemstoneOptionId }
         : {}),
-      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.status === 'AVAILABLE'
+        ? availableCertifiedGemstones(new Date())
+        : filter.status
+          ? { status: filter.status }
+          : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -275,7 +287,14 @@ export class PrismaInventoryRepository implements InventoryRepository {
       this.prisma.certified_gemstones.count({ where }),
     ]);
 
-    return { items: items.map((g) => toCertifiedGemstoneRecord(g)), total };
+    return {
+      items: items.map((g) =>
+        toCertifiedGemstoneRecord(
+          filter.status === 'AVAILABLE' ? { ...g, status: 'AVAILABLE' } : g,
+        ),
+      ),
+      total,
+    };
   }
 
   async findCertifiedGemstoneByCode(
@@ -445,18 +464,30 @@ export class PrismaInventoryRepository implements InventoryRepository {
       }
 
       if (params.certifiedGemstoneId) {
-        const gem = await tx.certified_gemstones.findUnique({
-          where: { id: params.certifiedGemstoneId },
-        });
-        if (!gem) throw new Error('CERTIFIED_GEMSTONE_NOT_FOUND');
-        if (gem.status !== 'AVAILABLE') {
-          throw new Error('GEMSTONE_NOT_AVAILABLE');
+        if (params.stockLotId || params.quantity !== 1) {
+          throw new Error('INVALID_CERTIFIED_ALLOCATION');
         }
-
-        await tx.certified_gemstones.update({
-          where: { id: params.certifiedGemstoneId },
-          data: { status: 'RESERVED', updated_at: new Date() },
-        });
+        const [allocation] =
+          (await setCertifiedGemstoneAssignments(
+            tx,
+            [
+              {
+                ringItemId: params.ringItemId,
+                certifiedGemstoneId: params.certifiedGemstoneId.toLowerCase(),
+              },
+            ],
+            'HOLD',
+            { userId: params.allocatedByUserId, expiresAt: params.expiresAt },
+          )) ?? [];
+        if (!allocation) {
+          const gem = await tx.certified_gemstones.findUnique({
+            where: { id: params.certifiedGemstoneId },
+          });
+          throw new Error(
+            gem ? 'GEMSTONE_NOT_AVAILABLE' : 'CERTIFIED_GEMSTONE_NOT_FOUND',
+          );
+        }
+        return allocation;
       }
 
       return tx.allocations.create({
@@ -480,12 +511,34 @@ export class PrismaInventoryRepository implements InventoryRepository {
     allocatedByUserId: string;
   }): Promise<AllocationRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockAllocationGemstone(tx, params.allocationId);
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
       });
       if (!allocation) throw new Error('ALLOCATION_NOT_FOUND');
       if (allocation.status !== 'HOLD') {
         throw new Error('INVALID_ALLOCATION_STATUS');
+      }
+      if (allocation.certified_gemstone_id) {
+        if (!allocation.expires_at || allocation.expires_at <= new Date())
+          throw new Error('INVALID_ALLOCATION_STATUS');
+        const [reserved] =
+          (await setCertifiedGemstoneAssignments(
+            tx,
+            [
+              {
+                ringItemId: allocation.ring_item_id,
+                certifiedGemstoneId: allocation.certified_gemstone_id,
+              },
+            ],
+            'RESERVED',
+          )) ?? [];
+        if (!reserved || reserved.id !== allocation.id)
+          throw new Error('INVALID_ALLOCATION_STATUS');
+        return tx.allocations.update({
+          where: { id: reserved.id },
+          data: { allocated_by_user_id: params.allocatedByUserId },
+        });
       }
 
       return tx.allocations.update({
@@ -508,11 +561,23 @@ export class PrismaInventoryRepository implements InventoryRepository {
     allocatedByUserId: string;
   }): Promise<AllocationRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockAllocationGemstone(tx, params.allocationId);
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
       });
       if (!allocation) throw new Error('ALLOCATION_NOT_FOUND');
-      if (allocation.status !== 'RESERVED' && allocation.status !== 'HOLD') {
+      if (allocation.certified_gemstone_id) {
+        if (allocation.status !== 'RESERVED')
+          throw new Error('INVALID_ALLOCATION_STATUS');
+        const gemstone = await tx.certified_gemstones.updateMany({
+          where: { id: allocation.certified_gemstone_id, status: 'RESERVED' },
+          data: { status: 'ALLOCATED', updated_at: new Date() },
+        });
+        if (!gemstone.count) throw new Error('INVALID_ALLOCATION_STATUS');
+      } else if (
+        allocation.status !== 'RESERVED' &&
+        allocation.status !== 'HOLD'
+      ) {
         throw new Error('INVALID_ALLOCATION_STATUS');
       }
 
@@ -535,6 +600,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
     allocatedByUserId: string;
   }): Promise<AllocationRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockAllocationGemstone(tx, params.allocationId);
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
         include: { stock_lots: true, certified_gemstones: true },
@@ -579,7 +645,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
         const gem = allocation.certified_gemstones;
         await tx.certified_gemstones.update({
           where: { id: allocation.certified_gemstone_id },
-          data: { status: 'MOUNTED', updated_at: now },
+          data: { status: 'USED', updated_at: now },
         });
 
         await tx.inventory_movements.create({
@@ -613,6 +679,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
     allocatedByUserId: string;
   }): Promise<AllocationRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockAllocationGemstone(tx, params.allocationId);
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
         include: { stock_lots: true, certified_gemstones: true },
@@ -620,7 +687,8 @@ export class PrismaInventoryRepository implements InventoryRepository {
       if (!allocation) throw new Error('ALLOCATION_NOT_FOUND');
       if (
         allocation.status === 'CONSUMED' ||
-        allocation.status === 'RELEASED'
+        allocation.status === 'RELEASED' ||
+        allocation.status === 'EXPIRED'
       ) {
         throw new Error('INVALID_ALLOCATION_STATUS');
       }
@@ -640,17 +708,21 @@ export class PrismaInventoryRepository implements InventoryRepository {
         });
       }
 
-      if (allocation.certified_gemstone_id) {
-        await tx.certified_gemstones.update({
-          where: { id: allocation.certified_gemstone_id },
-          data: { status: 'AVAILABLE', updated_at: now },
-        });
-      }
-
-      return tx.allocations.update({
+      const released = await tx.allocations.update({
         where: { id: params.allocationId },
         data: { status: 'RELEASED', updated_at: now },
       });
+      if (allocation.certified_gemstone_id) {
+        await restoreCertifiedAvailability(tx, allocation, now);
+        await recordCertifiedRelease(
+          tx,
+          allocation,
+          params.reason ?? 'Certified gemstone released',
+          now,
+          params.allocatedByUserId,
+        );
+      }
+      return released;
     });
 
     return toAllocationRecord(row);

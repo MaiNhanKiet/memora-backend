@@ -146,7 +146,7 @@ describe('CreateOrderUseCase', () => {
         memoryEnabled: true,
         gemstoneConfigJson: [],
         estimatedPrice: 10000000,
-        ringTemplateId: 'tpl-1',
+        updatedAt: new Date(),
       },
     ]);
     mockRepository.createOrderTransaction.mockResolvedValue({
@@ -194,7 +194,7 @@ describe('CreateOrderUseCase', () => {
         memoryEnabled: false,
         gemstoneConfigJson: [],
         estimatedPrice: 5000000,
-        ringTemplateId: 'tpl-1',
+        updatedAt: new Date(),
       },
     ]);
     mockRepository.createOrderTransaction.mockResolvedValue({

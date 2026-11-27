@@ -1,6 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import type { GemstoneSelectionItem } from '@app/contracts';
 import type { Prisma } from '../../../../../generated/prisma/client';
 import { PrismaService } from '../../../../persistence/prisma/prisma.service';
+import { availableCertifiedGemstones } from '../../../inventory/inventory-core/infrastructure/prisma-certified-gemstone-allocations';
 import type {
   CartActor,
   CartDraftRecord,
@@ -9,7 +15,125 @@ import type {
   CreateCartDraftInput,
   DesignShareCodeRecord,
   UpdateCartDraftInput,
+  ValidatedGemstoneSelection,
 } from '../application/cart.repository';
+
+export async function resolveGemstoneSelections(
+  db: Prisma.TransactionClient,
+  variantId: string,
+  selections: readonly GemstoneSelectionItem[],
+): Promise<ValidatedGemstoneSelection[]> {
+  if (!selections.length) return [];
+
+  const optionIds = selections.map(({ gemstoneOptionId }) =>
+    gemstoneOptionId.toLowerCase(),
+  );
+  const certifiedIds = selections.flatMap(({ certifiedGemstoneId }) =>
+    certifiedGemstoneId ? [certifiedGemstoneId.toLowerCase()] : [],
+  );
+  if (new Set(certifiedIds).size !== certifiedIds.length) {
+    throw new BadRequestException(
+      'A certified gemstone can only be selected once',
+    );
+  }
+  const compatibilities = await db.template_compatibilities.findMany({
+    where: {
+      template_variant_id: variantId,
+      gemstone_option_id: { in: optionIds },
+      gemstone_options: { status: 'ACTIVE' },
+    },
+    select: {
+      gemstone_option_id: true,
+      gemstone_options: { select: { certified_required: true } },
+      gemstone_groups: {
+        select: { gemstone_slots: { select: { id: true, slot_index: true } } },
+      },
+    },
+  });
+  const now = new Date();
+  const gems = certifiedIds.length
+    ? await db.certified_gemstones.findMany({
+        where: {
+          id: { in: certifiedIds },
+          ...availableCertifiedGemstones(now),
+        },
+        select: { id: true, gemstone_option_id: true },
+      })
+    : [];
+  const prices = certifiedIds.length
+    ? await db.price_versions.findMany({
+        where: {
+          status: 'ACTIVE',
+          currency: 'VND',
+          OR: [{ effective_from: null }, { effective_from: { lte: now } }],
+          AND: [
+            { OR: [{ effective_to: null }, { effective_to: { gt: now } }] },
+          ],
+          price_items: {
+            price_type: 'CERTIFIED_GEMSTONE',
+            certified_gemstone_id: { in: certifiedIds },
+            status: 'ACTIVE',
+          },
+        },
+        select: {
+          id: true,
+          amount: true,
+          price_items: { select: { certified_gemstone_id: true } },
+        },
+      })
+    : [];
+
+  const usedSlots = new Set<string>();
+  return selections.map(
+    ({ slotNumber, gemstoneOptionId, certifiedGemstoneId }) => {
+      const optionId = gemstoneOptionId.toLowerCase();
+      const matches = compatibilities
+        .filter(({ gemstone_option_id }) => gemstone_option_id === optionId)
+        .flatMap(({ gemstone_options, gemstone_groups }) =>
+          gemstone_groups.gemstone_slots
+            .filter(({ slot_index }) => slot_index === slotNumber)
+            .map(({ id }) => ({
+              id,
+              certifiedRequired: gemstone_options.certified_required,
+            })),
+        );
+      const slot = matches.length === 1 ? matches[0] : undefined;
+      if (!slot || usedSlots.has(slot.id)) {
+        throw new BadRequestException(
+          'Gemstone option does not match a unique template slot',
+        );
+      }
+      usedSlots.add(slot.id);
+      if (slot.certifiedRequired !== Boolean(certifiedGemstoneId)) {
+        throw new BadRequestException(
+          'Select an exact inventory gemstone only for a certified option',
+        );
+      }
+      if (!certifiedGemstoneId) return { slotId: slot.id, optionId };
+      const certifiedId = certifiedGemstoneId.toLowerCase();
+      const gem = gems.find(({ id }) => id === certifiedId);
+      if (!gem || gem.gemstone_option_id !== optionId) {
+        throw new ConflictException(
+          'Selected certified gemstone is unavailable or does not match the option',
+        );
+      }
+      const price = prices.find(
+        ({ price_items }) => price_items.certified_gemstone_id === certifiedId,
+      );
+      if (!price)
+        throw new ConflictException(
+          'Selected certified gemstone has no active price',
+        );
+      return {
+        slotId: slot.id,
+        optionId,
+        certifiedGemstoneId: certifiedId,
+        priceVersionId: price.id,
+        certifiedPrice: Number(price.amount),
+      };
+    },
+  );
+}
 
 const VARIANT_INCLUDE = {
   include: {
@@ -81,6 +205,13 @@ function toCartRecord(row: CartRow): CartRecord {
 @Injectable()
 export class PrismaCartRepository implements CartRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  validateGemstoneSelections(
+    variantId: string,
+    selections: readonly GemstoneSelectionItem[],
+  ): Promise<ValidatedGemstoneSelection[]> {
+    return resolveGemstoneSelections(this.prisma, variantId, selections);
+  }
 
   async findActiveCartByActor(
     actor: CartActor,
@@ -175,8 +306,9 @@ export class PrismaCartRepository implements CartRepository {
     data: UpdateCartDraftInput,
   ): Promise<CartDraftRecord> {
     const row = await this.prisma.ring_design_drafts.update({
-      where: { id: draftId },
+      where: { id: draftId, status: 'IN_CART' },
       data: {
+        updated_at: new Date(),
         ...(data.targetSize !== undefined
           ? { target_size: data.targetSize }
           : {}),

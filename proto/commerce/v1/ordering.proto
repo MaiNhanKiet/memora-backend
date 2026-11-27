@@ -292,6 +292,7 @@ message GetAdminOrderDetailsResponse {
   string cancellation_reason = 15;
   string created_at = 16;
   string updated_at = 17;
+  optional string attention_reason = 18;
 }
 
 message UpdateOrderStatusRequest {

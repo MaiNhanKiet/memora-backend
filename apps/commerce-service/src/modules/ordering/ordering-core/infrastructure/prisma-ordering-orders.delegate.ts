@@ -1,6 +1,17 @@
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { RingItemSummary } from '@app/contracts';
 import { Prisma } from '../../../../../generated/prisma/client';
 import type { PrismaService } from '../../../../persistence/prisma/prisma.service';
+import {
+  extractCertifiedPriceVersionIds,
+  extractMaintenancePlan,
+  parseGemstoneSelections,
+} from '../../../design/cart/application/cart.mapper';
+import { resolveGemstoneSelections } from '../../../design/cart/infrastructure/prisma-cart.repository';
+import {
+  releaseCertifiedGemstoneAssignments,
+  setCertifiedGemstoneAssignments,
+} from '../../../inventory/inventory-core/infrastructure/prisma-certified-gemstone-allocations';
 import type {
   CreateOrderTransactionInput,
   CreateOrderTransactionResult,
@@ -10,9 +21,15 @@ import type {
   OrderingPersonalizationContextRecord,
 } from '../application/ordering.repository';
 import {
+  assertOrderCancellable,
+  assertValidOrderStatusTransition,
+  resolvePaymentCredit,
+} from '../application/ordering-state';
+import {
   ORDER_WITH_RELATIONS_INCLUDE,
   toOrderDetailRecord,
   toOrderListItemRecord,
+  toPaymentTransactionRecord,
 } from './prisma-ordering.mappers';
 
 export class PrismaOrderingOrdersDelegate {
@@ -57,8 +74,8 @@ export class PrismaOrderingOrdersDelegate {
       personalizationPackage: d.personalization_package,
       memoryEnabled: d.memory_enabled,
       gemstoneConfigJson: d.gemstone_config_json,
+      updatedAt: d.updated_at,
       estimatedPrice: d.estimated_price ? Number(d.estimated_price) : 0,
-      ringTemplateId: d.template_variants.ring_template_id,
     }));
   }
 
@@ -74,6 +91,22 @@ export class PrismaOrderingOrdersDelegate {
     const quoteNo = `QUO-${timestamp}-${randomSuffix}`;
 
     return this.prisma.$transaction(async (tx) => {
+      const converted = await tx.ring_design_drafts.updateMany({
+        where: {
+          status: 'IN_CART',
+          OR: params.selectedDrafts.map((draft) => ({
+            id: draft.id,
+            updated_at: draft.updatedAt,
+          })),
+        },
+        data: { status: 'CONVERTED', cart_id: null, updated_at: new Date() },
+      });
+      if (converted.count !== params.selectedDrafts.length) {
+        throw new ConflictException(
+          'A selected draft has changed or is no longer in the cart',
+        );
+      }
+
       let subtotal = new Prisma.Decimal(0);
       for (const draft of params.selectedDrafts) {
         subtotal = subtotal.add(new Prisma.Decimal(draft.estimatedPrice));
@@ -122,6 +155,11 @@ export class PrismaOrderingOrdersDelegate {
 
       let itemNumber = 1;
       const createdItems: RingItemSummary[] = [];
+      const certifiedAssignments: {
+        ringItemId: string;
+        certifiedGemstoneId: string;
+        gemstoneOptionId: string;
+      }[] = [];
       for (const draft of params.selectedDrafts) {
         const ringItem = await tx.ring_items.create({
           data: {
@@ -131,30 +169,26 @@ export class PrismaOrderingOrdersDelegate {
           },
         });
 
-        const draftConfig = draft.gemstoneConfigJson as
-          | Array<{
-              slotNumber?: number;
-              slot_number?: number;
-              gemstoneOptionId?: string;
-              gemstone_option_id?: string;
-            }>
-          | {
-              selections?: Array<{
-                slotNumber?: number;
-                slot_number?: number;
-                gemstoneOptionId?: string;
-                gemstone_option_id?: string;
-              }>;
-              maintenancePlan?: string;
-            };
-
-        const rawSelections = Array.isArray(draftConfig)
-          ? draftConfig
-          : (draftConfig?.selections ?? []);
-        const maintenancePlan =
-          !Array.isArray(draftConfig) && draftConfig?.maintenancePlan
-            ? draftConfig.maintenancePlan
-            : undefined;
+        const maintenancePlan = extractMaintenancePlan(
+          draft.gemstoneConfigJson,
+        );
+        const selections = await resolveGemstoneSelections(
+          tx,
+          draft.templateVariantId,
+          parseGemstoneSelections(draft.gemstoneConfigJson),
+        );
+        const certified = selections.flatMap((selection) =>
+          selection.certifiedGemstoneId ? [selection] : [],
+        );
+        if (
+          extractCertifiedPriceVersionIds(draft.gemstoneConfigJson).join(
+            ',',
+          ) !== certified.map(({ priceVersionId }) => priceVersionId).join(',')
+        ) {
+          throw new ConflictException(
+            'Certified gemstone price changed. Update your cart item before placing the order',
+          );
+        }
 
         const ringItemVersion = await tx.ring_item_versions.create({
           data: {
@@ -167,7 +201,10 @@ export class PrismaOrderingOrdersDelegate {
             preview_snapshot_json: maintenancePlan
               ? { maintenancePlan }
               : Prisma.JsonNull,
-            status: 'DRAFT',
+            status:
+              draft.personalizationPackage === 'NONE'
+                ? 'REVIEW_NOT_REQUIRED'
+                : 'DRAFT',
             change_reason: 'INITIAL_SNAPSHOT',
             created_by_customer_identity_id: params.ownerCustomerIdentityId,
           },
@@ -178,39 +215,49 @@ export class PrismaOrderingOrdersDelegate {
           data: { current_version_id: ringItemVersion.id },
         });
 
-        if (rawSelections.length > 0) {
-          const slots = await tx.gemstone_slots.findMany({
-            where: {
-              gemstone_groups: {
-                ring_template_id: draft.ringTemplateId,
+        for (const selection of selections) {
+          await tx.ring_item_version_gemstones.create({
+            data: {
+              ring_item_version_id: ringItemVersion.id,
+              gemstone_slot_id: selection.slotId,
+              gemstone_option_id: selection.optionId,
+              certified_gemstone_id: selection.certifiedGemstoneId,
+            },
+          });
+        }
+        for (const gemstone of certified) {
+          certifiedAssignments.push({
+            ringItemId: ringItem.id,
+            certifiedGemstoneId: gemstone.certifiedGemstoneId,
+            gemstoneOptionId: gemstone.optionId,
+          });
+          await tx.quote_items.create({
+            data: {
+              quote_id: quote.id,
+              ring_item_id: ringItem.id,
+              component_type: 'GEMSTONE',
+              quantity: new Prisma.Decimal(1),
+              unit_amount: new Prisma.Decimal(gemstone.certifiedPrice),
+              line_amount: new Prisma.Decimal(gemstone.certifiedPrice),
+              price_source_type: 'PRICE_VERSION',
+              price_version_id: gemstone.priceVersionId,
+              metadata_json: {
+                certifiedGemstoneId: gemstone.certifiedGemstoneId,
               },
             },
-            orderBy: { slot_index: 'asc' },
           });
-
-          for (const item of rawSelections) {
-            const slotIdx = item.slotNumber ?? item.slot_number ?? 1;
-            const optId = item.gemstoneOptionId ?? item.gemstone_option_id;
-            const matchedSlot =
-              slots.find((s) => s.slot_index === slotIdx) ?? slots[0];
-
-            if (matchedSlot && optId) {
-              await tx.ring_item_version_gemstones.create({
-                data: {
-                  ring_item_version_id: ringItemVersion.id,
-                  gemstone_slot_id: matchedSlot.id,
-                  gemstone_option_id: optId,
-                },
-              });
-            }
-          }
         }
 
         const maintenanceAmount =
           maintenancePlan === 'LIFETIME_POLISHING' ? 500000 : 0;
         const ringBlankAmount = Math.max(
           0,
-          draft.estimatedPrice - maintenanceAmount,
+          draft.estimatedPrice -
+            maintenanceAmount -
+            certified.reduce(
+              (total, gemstone) => total + gemstone.certifiedPrice,
+              0,
+            ),
         );
 
         await tx.quote_items.create({
@@ -264,14 +311,17 @@ export class PrismaOrderingOrdersDelegate {
         data: { current_quote_id: quote.id },
       });
 
-      await tx.ring_design_drafts.updateMany({
-        where: { id: { in: params.selectedDrafts.map((d) => d.id) } },
-        data: {
-          status: 'CONVERTED',
-          cart_id: null,
-          updated_at: new Date(),
-        },
-      });
+      if (
+        !(await setCertifiedGemstoneAssignments(
+          tx,
+          certifiedAssignments,
+          'HOLD',
+        ))
+      ) {
+        throw new ConflictException(
+          'One or more certified gemstones are no longer available',
+        );
+      }
 
       return {
         orderId: updatedOrder.id,
@@ -424,9 +474,13 @@ export class PrismaOrderingOrdersDelegate {
       data.cancellation_reason = params.reason || 'Admin cancelled';
     }
 
-    const updated = await this.prisma.orders.update({
-      where: { id: params.orderId },
-      data,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const current = await this.lockOrder(tx, params.orderId);
+      assertValidOrderStatusTransition(current.status, params.targetStatus);
+      if (params.targetStatus === 'CANCELLED') {
+        await this.releaseOrderAllocations(tx, params.orderId);
+      }
+      return tx.orders.update({ where: { id: params.orderId }, data });
     });
 
     return {
@@ -447,12 +501,12 @@ export class PrismaOrderingOrdersDelegate {
         owner_customer_identity_id: true,
         status: true,
         source_plan_mode: true,
-        payment_transactions: {
-          where: {
-            payment_stage: 'P1',
-            status: { in: ['SUCCEEDED', 'COMPLETED'] },
-          },
-          select: { id: true },
+        payment_transactions: { where: { status: 'SUCCEEDED' } },
+        quotes_quotes_order_idToorders: {
+          where: { quote_type: 'PROVISIONAL' },
+          orderBy: { version_no: 'desc' },
+          take: 1,
+          select: { id: true, currency: true, total_amount: true },
         },
         ring_items: {
           orderBy: { item_no: 'asc' },
@@ -477,12 +531,29 @@ export class PrismaOrderingOrdersDelegate {
       return undefined;
     }
 
+    const [depositQuote] = order.quotes_quotes_order_idToorders;
+    const depositTarget = depositQuote
+      ? Math.round(Number(depositQuote.total_amount) * 0.3)
+      : 0;
+    const p1Paid =
+      depositQuote &&
+      depositTarget > 0 &&
+      !['AWAITING_P1', 'CANCELLED', 'EXPIRED_UNPAID'].includes(order.status) &&
+      resolvePaymentCredit(
+        order.payment_transactions.map((row) =>
+          toPaymentTransactionRecord(row),
+        ),
+        depositQuote,
+        new Set(['DEPOSIT_P1']),
+        true,
+      ) >= depositTarget;
+
     return {
       id: order.id,
       ownerCustomerIdentityId: order.owner_customer_identity_id,
       status: order.status,
       sourcePlanMode: order.source_plan_mode,
-      p1Paid: order.payment_transactions.length > 0,
+      p1Paid: p1Paid === true,
       ringItems: order.ring_items.map((item) => {
         const ver =
           item.ring_item_versions_ring_items_current_version_idToring_item_versions;
@@ -497,6 +568,42 @@ export class PrismaOrderingOrdersDelegate {
     };
   }
 
+  private async lockOrder(tx: Prisma.TransactionClient, orderId: string) {
+    await tx.$queryRaw`SELECT id FROM ordering.orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+    const order = await tx.orders.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
+
+  private async releaseOrderAllocations(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<void> {
+    const items = await tx.ring_items.findMany({
+      where: { order_id: orderId },
+      select: { id: true },
+    });
+    const ringItemIds = items.map(({ id }) => id);
+    if (!ringItemIds.length) return;
+    await releaseCertifiedGemstoneAssignments(
+      tx,
+      ringItemIds,
+      ['HOLD', 'RESERVED'],
+      'Order cancelled',
+    );
+    await tx.allocations.updateMany({
+      where: {
+        ring_item_id: { in: ringItemIds },
+        certified_gemstone_id: null,
+        status: { in: ['HOLD', 'RESERVED'] },
+      },
+      data: { status: 'RELEASED' },
+    });
+  }
+
   async cancelOrder(
     orderId: string,
     reason?: string,
@@ -507,22 +614,21 @@ export class PrismaOrderingOrdersDelegate {
     cancellationReason?: string;
   }> {
     const updated = await this.prisma.$transaction(async (tx) => {
-      const ringItems = await tx.ring_items.findMany({
-        where: { order_id: orderId },
+      const order = await this.lockOrder(tx, orderId);
+      assertOrderCancellable(order.status);
+      const payment = await tx.payment_transactions.findFirst({
+        where: {
+          order_id: orderId,
+          transaction_type: 'PAYMENT',
+          status: 'SUCCEEDED',
+        },
         select: { id: true },
       });
-
-      const ringItemIds = ringItems.map((r) => r.id);
-      if (ringItemIds.length > 0) {
-        await tx.allocations.updateMany({
-          where: {
-            ring_item_id: { in: ringItemIds },
-            status: { in: ['HOLD', 'RESERVED'] },
-          },
-          data: { status: 'RELEASED' },
-        });
-      }
-
+      if (payment)
+        throw new ConflictException(
+          'Contact support to cancel an order with a confirmed payment',
+        );
+      await this.releaseOrderAllocations(tx, orderId);
       return tx.orders.update({
         where: { id: orderId },
         data: {

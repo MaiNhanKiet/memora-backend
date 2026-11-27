@@ -1,3 +1,5 @@
+import type { GemstoneSelectionItem } from '@app/contracts';
+
 export const CART_REPOSITORY = Symbol('CART_REPOSITORY');
 
 export interface CartActor {
@@ -70,7 +72,23 @@ export interface UpdateCartDraftInput {
   readonly gemstoneConfigJson?: object;
 }
 
+export type ValidatedGemstoneSelection = {
+  readonly slotId: string;
+  readonly optionId: string;
+} & (
+  | { readonly certifiedGemstoneId?: undefined }
+  | {
+      readonly certifiedGemstoneId: string;
+      readonly priceVersionId: string;
+      readonly certifiedPrice: number;
+    }
+);
+
 export interface CartRepository {
+  validateGemstoneSelections(
+    variantId: string,
+    selections: readonly GemstoneSelectionItem[],
+  ): Promise<ValidatedGemstoneSelection[]>;
   findActiveCartByActor(actor: CartActor): Promise<CartRecord | undefined>;
   createActiveCart(data: {
     userId?: string;

@@ -1,4 +1,6 @@
 import {
+  buildGemstoneConfigJson,
+  extractCertifiedPriceVersionIds,
   extractMaintenancePlan,
   mapCartResponse,
   parseGemstoneSelections,
@@ -12,7 +14,10 @@ describe('cart.mapper', () => {
         { gemstoneOptionId: 'gem-2', slotIndex: 1 },
       ];
 
-      expect(parseGemstoneSelections(input)).toEqual(input);
+      expect(parseGemstoneSelections(input)).toEqual([
+        { gemstoneOptionId: 'gem-1', slotNumber: 0 },
+        { gemstoneOptionId: 'gem-2', slotNumber: 1 },
+      ]);
     });
 
     it('should parse valid object wrapper with selections array', () => {
@@ -22,7 +27,7 @@ describe('cart.mapper', () => {
       };
 
       expect(parseGemstoneSelections(input)).toEqual([
-        { gemstoneOptionId: 'gem-1', slotIndex: 0 },
+        { gemstoneOptionId: 'gem-1', slotNumber: 0 },
       ]);
     });
 
@@ -39,8 +44,26 @@ describe('cart.mapper', () => {
           null,
           { gemstoneOptionId: 'gem-bad-slot', slotIndex: '0' },
         ]),
-      ).toEqual([{ gemstoneOptionId: 'gem-valid', slotIndex: 0 }]);
+      ).toEqual([{ gemstoneOptionId: 'gem-valid', slotNumber: 0 }]);
     });
+  });
+
+  it('round-trips an exact certified gemstone, together with its pinned price version', () => {
+    const selections = [
+      {
+        gemstoneOptionId: 'gem-1',
+        slotNumber: 1,
+        certifiedGemstoneId: 'cert-1',
+      },
+    ];
+    const config = buildGemstoneConfigJson(selections, 'NONE', [
+      'price-version-1',
+    ]);
+
+    expect(parseGemstoneSelections(config)).toEqual(selections);
+    expect(extractCertifiedPriceVersionIds(config)).toEqual([
+      'price-version-1',
+    ]);
   });
 
   describe('extractMaintenancePlan', () => {
@@ -76,7 +99,7 @@ describe('cart.mapper', () => {
       expect(result.itemsCount).toBe(1);
       expect(result.totalEstimatedPrice).toBe(1500000);
       expect(result.items[0].gemstoneSelections).toEqual([
-        { gemstoneOptionId: 'gem-1', slotIndex: 0 },
+        { gemstoneOptionId: 'gem-1', slotNumber: 0 },
       ]);
     });
   });

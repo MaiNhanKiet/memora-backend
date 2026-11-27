@@ -1,7 +1,49 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { parseVerifiedActor, type ParsedVerifiedActor } from '@app/common';
-import type { VerifiedActor } from '@app/contracts';
-import type { CartActor, CartDraftRecord } from './cart.repository';
+import type {
+  EstimatePriceRequest,
+  GemstoneSelectionItem,
+  VerifiedActor,
+} from '@app/contracts';
+import type { EstimatePriceUseCase } from '../../../pricing/pricing-core/application/estimate-price.use-case';
+import type {
+  CartActor,
+  CartDraftRecord,
+  CartRepository,
+} from './cart.repository';
+
+export async function priceCartSelections(
+  repository: CartRepository,
+  estimatePrice: EstimatePriceUseCase,
+  request: Omit<EstimatePriceRequest, 'gemstoneOptionIds'>,
+  selections: readonly GemstoneSelectionItem[],
+): Promise<{
+  total: number;
+  currency: string;
+  certifiedPriceVersionIds: string[];
+}> {
+  const validated = await repository.validateGemstoneSelections(
+    request.templateVariantId,
+    selections,
+  );
+  const base = await estimatePrice.execute({
+    ...request,
+    gemstoneOptionIds: validated
+      .filter(({ certifiedGemstoneId }) => !certifiedGemstoneId)
+      .map(({ optionId }) => optionId),
+  });
+  return {
+    total: validated.reduce(
+      (total, selection) =>
+        total + (selection.certifiedGemstoneId ? selection.certifiedPrice : 0),
+      base.estimatedTotal,
+    ),
+    currency: base.currency,
+    certifiedPriceVersionIds: validated.flatMap((selection) =>
+      selection.certifiedGemstoneId ? [selection.priceVersionId] : [],
+    ),
+  };
+}
 
 export function validateCartActor(actor?: VerifiedActor): CartActor {
   const parsed: ParsedVerifiedActor = parseVerifiedActor(actor);

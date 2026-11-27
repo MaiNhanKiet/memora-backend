@@ -69,6 +69,11 @@ export class HoldInventoryUseCase {
       return toAllocationResponse(created);
     } catch (error) {
       if (error instanceof Error) {
+        if (error.message === 'INVALID_CERTIFIED_ALLOCATION') {
+          throw new BadRequestException(
+            'An exact gemstone requires quantity 1 and cannot use a stock lot',
+          );
+        }
         if (
           error.message === 'STOCK_LOT_NOT_FOUND' ||
           error.message === 'CERTIFIED_GEMSTONE_NOT_FOUND'

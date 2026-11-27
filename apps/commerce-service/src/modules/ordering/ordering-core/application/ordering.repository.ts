@@ -18,7 +18,7 @@ export interface OrderingDraftRecord {
   readonly memoryEnabled: boolean;
   readonly gemstoneConfigJson: unknown;
   readonly estimatedPrice: number;
-  readonly ringTemplateId: string;
+  readonly updatedAt: Date;
 }
 
 export interface CreateOrderTransactionInput {

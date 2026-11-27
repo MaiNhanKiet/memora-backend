@@ -5,41 +5,66 @@ import type {
 } from '@app/contracts';
 import type { CartDraftRecord, CartRecord } from './cart.repository';
 
-function isGemstoneSelectionItem(item: unknown): item is GemstoneSelectionItem {
-  if (!item || typeof item !== 'object' || Array.isArray(item)) {
-    return false;
-  }
+function parseGemstoneSelection(
+  item: unknown,
+): GemstoneSelectionItem | undefined {
+  if (!item || typeof item !== 'object' || Array.isArray(item))
+    return undefined;
+
+  const optionId =
+    'gemstoneOptionId' in item
+      ? item.gemstoneOptionId
+      : 'gemstone_option_id' in item
+        ? item.gemstone_option_id
+        : undefined;
+  const slot =
+    'slotNumber' in item
+      ? item.slotNumber
+      : 'slot_number' in item
+        ? item.slot_number
+        : 'slotIndex' in item
+          ? item.slotIndex
+          : undefined;
+  const certifiedId =
+    'certifiedGemstoneId' in item ? item.certifiedGemstoneId : undefined;
   if (
-    !('gemstoneOptionId' in item) ||
-    typeof item.gemstoneOptionId !== 'string'
+    typeof optionId !== 'string' ||
+    typeof slot !== 'number' ||
+    !Number.isInteger(slot) ||
+    (certifiedId !== undefined && typeof certifiedId !== 'string')
   ) {
-    return false;
+    return undefined;
   }
-  if (
-    'slotIndex' in item &&
-    item.slotIndex !== undefined &&
-    typeof item.slotIndex !== 'number'
-  ) {
-    return false;
-  }
-  return true;
+  return {
+    gemstoneOptionId: optionId,
+    slotNumber: slot,
+    ...(certifiedId ? { certifiedGemstoneId: certifiedId } : {}),
+  };
 }
 
 export function parseGemstoneSelections(
   json: unknown,
 ): GemstoneSelectionItem[] {
-  if (Array.isArray(json)) {
-    return json.filter(isGemstoneSelectionItem);
-  }
-  if (
-    json &&
-    typeof json === 'object' &&
-    'selections' in json &&
-    Array.isArray(json.selections)
-  ) {
-    return json.selections.filter(isGemstoneSelectionItem);
-  }
-  return [];
+  const selections: unknown = Array.isArray(json)
+    ? json
+    : json && typeof json === 'object' && 'selections' in json
+      ? json.selections
+      : undefined;
+  if (!Array.isArray(selections)) return [];
+  return selections.flatMap((item: unknown) => {
+    const selection = parseGemstoneSelection(item);
+    return selection ? [selection] : [];
+  });
+}
+
+export function extractCertifiedPriceVersionIds(json: unknown): string[] {
+  const ids: unknown =
+    json && typeof json === 'object' && 'certifiedPriceVersionIds' in json
+      ? json.certifiedPriceVersionIds
+      : undefined;
+  return Array.isArray(ids)
+    ? ids.filter((id: unknown): id is string => typeof id === 'string')
+    : [];
 }
 
 export function extractMaintenancePlan(json: unknown): string | undefined {
@@ -58,9 +83,10 @@ export function extractMaintenancePlan(json: unknown): string | undefined {
 export function buildGemstoneConfigJson(
   selections: GemstoneSelectionItem[],
   maintenancePlan: string,
+  certifiedPriceVersionIds: string[] = [],
 ): object {
-  return maintenancePlan !== 'NONE'
-    ? { selections, maintenancePlan }
+  return maintenancePlan !== 'NONE' || certifiedPriceVersionIds.length > 0
+    ? { selections, maintenancePlan, certifiedPriceVersionIds }
     : selections;
 }
 

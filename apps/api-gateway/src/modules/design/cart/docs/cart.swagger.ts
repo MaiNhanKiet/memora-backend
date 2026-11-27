@@ -43,7 +43,7 @@ export function ApiAddCartItemDocs() {
     ApiOperation({
       summary: '[DESIG-002] Add configured ring draft to cart',
       description:
-        'Adds a validated ring configuration into active cart. Calculates real-time estimated price.',
+        'Adds a ring configuration to the cart. Select the exact certifiedGemstoneId from Inventory for each certified option. The estimate uses the price of that specific gemstone.',
     }),
     GUEST_HEADER_DOC,
     ApiSuccessResponse({
@@ -52,7 +52,15 @@ export function ApiAddCartItemDocs() {
       description: 'Draft added to cart',
     }),
     ApiResponse({ status: 401, description: 'Missing actor identity' }),
+    ApiResponse({
+      status: 400,
+      description: 'Invalid or incompatible gemstone selection',
+    }),
     ApiResponse({ status: 404, description: 'Template variant not found' }),
+    ApiResponse({
+      status: 409,
+      description: 'Certified gemstone unavailable or missing an active price',
+    }),
     ApiResponse({ status: 422, description: 'Target size out of bounds' }),
   );
 }
@@ -62,7 +70,7 @@ export function ApiUpdateCartItemDocs() {
     ApiOperation({
       summary: '[DESIG-003] Update cart draft options',
       description:
-        'Updates size, personalization package, or memory toggle on an un-ordered ring draft.',
+        'Updates a ring draft and replaces gemstone selections when gemstoneSelections is provided. An empty array clears selections.',
     }),
     GUEST_HEADER_DOC,
     ApiParam({
@@ -76,7 +84,15 @@ export function ApiUpdateCartItemDocs() {
       description: 'Draft updated successfully',
     }),
     ApiResponse({ status: 401, description: 'Missing actor identity' }),
+    ApiResponse({
+      status: 400,
+      description: 'Invalid or incompatible gemstone selection',
+    }),
     ApiResponse({ status: 404, description: 'Draft not found in active cart' }),
+    ApiResponse({
+      status: 409,
+      description: 'Certified gemstone unavailable or missing an active price',
+    }),
     ApiResponse({ status: 422, description: 'Size out of resize bounds' }),
   );
 }

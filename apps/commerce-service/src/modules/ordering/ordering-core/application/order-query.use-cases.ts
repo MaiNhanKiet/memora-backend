@@ -209,7 +209,21 @@ export class GetAdminOrderDetailsUseCase {
     if (!order) {
       throw new NotFoundException(`Order ${request.orderId} not found`);
     }
-    return mapAdminOrderDetail(order);
+    const detail = mapAdminOrderDetail(order);
+    if (order.status !== 'AWAITING_P1') return detail;
+
+    const nextPayment = resolveOrderNextPayment(
+      order,
+      await this.repository.findOrderPayments(order.id),
+    );
+    if (
+      nextPayment?.stage === 'DEPOSIT_P1' &&
+      nextPayment.amountDue === 0 &&
+      nextPayment.paidAmount > 0
+    ) {
+      detail.attentionReason = 'CERTIFIED_GEMSTONE_RESERVATION_REQUIRED';
+    }
+    return detail;
   }
 }
 

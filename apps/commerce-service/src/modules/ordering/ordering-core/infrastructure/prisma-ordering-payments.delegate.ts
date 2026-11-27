@@ -5,6 +5,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../../../../../generated/prisma/client';
 import type { PrismaService } from '../../../../persistence/prisma/prisma.service';
+import {
+  findCertifiedGemstoneAssignments,
+  setCertifiedGemstoneAssignments,
+} from '../../../inventory/inventory-core/infrastructure/prisma-certified-gemstone-allocations';
 import type {
   OrderingInvoiceRecord,
   OrderingPaymentTransactionRecord,
@@ -222,6 +226,26 @@ export class PrismaOrderingPaymentsDelegate {
         throw new ConflictException('Hãy chờ link thanh toán trước hết hạn');
       }
 
+      let holdExpiration = Infinity;
+      if (payment.stage === 'DEPOSIT_P1') {
+        const assignments = await findCertifiedGemstoneAssignments(
+          tx,
+          order.ring_items.flatMap(({ current_version_id }) =>
+            current_version_id ? [current_version_id] : [],
+          ),
+        );
+        const holds =
+          assignments &&
+          (await setCertifiedGemstoneAssignments(tx, assignments, 'HOLD'));
+        if (!holds)
+          throw new ConflictException(
+            'One or more certified gemstones are no longer available',
+          );
+        holdExpiration = Math.min(
+          ...holds.map(({ expires_at }) => expires_at?.getTime() ?? Infinity),
+        );
+      }
+
       const created = await tx.payment_transactions.create({
         data: {
           order_id: order.id,
@@ -236,6 +260,7 @@ export class PrismaOrderingPaymentsDelegate {
           expires_at: new Date(
             Math.min(
               now.getTime() + 15 * 60 * 1000,
+              holdExpiration,
               payment.expiresAt ? Date.parse(payment.expiresAt) : Infinity,
             ),
           ),
@@ -373,18 +398,17 @@ export class PrismaOrderingPaymentsDelegate {
     if (nextPayment?.stage !== 'DEPOSIT_P1' || nextPayment.amountDue !== 0)
       return;
 
-    const certifiedSelection = await tx.ring_item_version_gemstones.findFirst({
-      where: {
-        ring_item_version_id: {
-          in: order.ring_items.flatMap((item) =>
-            item.current_version_id ? [item.current_version_id] : [],
-          ),
-        },
-        gemstone_options: { certified_required: true },
-      },
-      select: { id: true },
-    });
-    if (certifiedSelection) return;
+    const assignments = await findCertifiedGemstoneAssignments(
+      tx,
+      order.ring_items.flatMap(({ current_version_id }) =>
+        current_version_id ? [current_version_id] : [],
+      ),
+    );
+    if (
+      !assignments ||
+      !(await setCertifiedGemstoneAssignments(tx, assignments, 'RESERVED'))
+    )
+      return;
 
     await tx.orders.updateMany({
       where: { id: orderId, status: 'AWAITING_P1' },

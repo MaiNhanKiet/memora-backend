@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import type { OrderNextPayment, StageGateItem } from '@app/contracts';
 import type {
   OrderingDetailRecord,
+  OrderingQuoteSummaryRecord,
   OrderingPaymentTransactionRecord,
 } from './ordering.repository';
 
@@ -114,6 +115,37 @@ export function resolveOrderStageGates(
   ];
 }
 
+export function resolvePaymentCredit(
+  payments: readonly OrderingPaymentTransactionRecord[],
+  quote: Pick<OrderingQuoteSummaryRecord, 'id' | 'currency'>,
+  creditedStages: ReadonlySet<string>,
+  restrictToQuote: boolean,
+): number {
+  const succeeded = payments.filter(
+    (item) => item.status === 'SUCCEEDED' && item.currency === quote.currency,
+  );
+  const eligiblePayments = succeeded.filter(
+    (item) =>
+      item.transactionType === 'PAYMENT' &&
+      creditedStages.has(item.paymentStage) &&
+      (!restrictToQuote || item.quoteId === quote.id),
+  );
+  const paymentIds = new Set(eligiblePayments.map(({ id }) => id));
+  const refundedAmount = succeeded
+    .filter(
+      (item) =>
+        item.transactionType === 'REFUND' &&
+        item.relatedTransactionId &&
+        paymentIds.has(item.relatedTransactionId),
+    )
+    .reduce((total, item) => total + item.amount, 0);
+  return Math.max(
+    0,
+    eligiblePayments.reduce((total, item) => total + item.amount, 0) -
+      refundedAmount,
+  );
+}
+
 export function resolveOrderNextPayment(
   order: OrderingDetailRecord,
   payments: readonly OrderingPaymentTransactionRecord[],
@@ -135,8 +167,7 @@ export function resolveOrderNextPayment(
     order.status === 'AWAITING_P1' &&
     hasPersonalization &&
     quote.quoteType === 'PROVISIONAL' &&
-    quote.status === 'ISSUED' &&
-    (!quote.validUntil || quote.validUntil > now)
+    quote.status === 'ISSUED'
   ) {
     stage = 'DEPOSIT_P1';
     target = Math.round(quote.totalAmount * 0.3);
@@ -159,28 +190,11 @@ export function resolveOrderNextPayment(
       ? ['DEPOSIT_P1']
       : ['DEPOSIT_P1', 'MILESTONE_P2', 'FINAL_P3', 'FULL_PAYMENT'],
   );
-  const succeeded = payments.filter(
-    (item) => item.status === 'SUCCEEDED' && item.currency === quote.currency,
-  );
-  const eligiblePayments = succeeded.filter(
-    (item) =>
-      item.transactionType === 'PAYMENT' &&
-      creditedStages.has(item.paymentStage) &&
-      (stage !== 'DEPOSIT_P1' || item.quoteId === quote.id),
-  );
-  const paymentIds = new Set(eligiblePayments.map(({ id }) => id));
-  const refundedAmount = succeeded
-    .filter(
-      (item) =>
-        item.transactionType === 'REFUND' &&
-        item.relatedTransactionId &&
-        paymentIds.has(item.relatedTransactionId),
-    )
-    .reduce((total, item) => total + item.amount, 0);
-  const paidAmount = Math.max(
-    0,
-    eligiblePayments.reduce((total, item) => total + item.amount, 0) -
-      refundedAmount,
+  const paidAmount = resolvePaymentCredit(
+    payments,
+    quote,
+    creditedStages,
+    stage === 'DEPOSIT_P1',
   );
   const amountDue = Math.max(0, target - paidAmount);
   const expiresAt =

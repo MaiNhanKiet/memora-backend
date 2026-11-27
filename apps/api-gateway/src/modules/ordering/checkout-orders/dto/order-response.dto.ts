@@ -56,6 +56,13 @@ export class AdminCustomerInfoDto {
 }
 
 export class AdminOrderDetailsResponseDto {
+  @ApiPropertyOptional({
+    enum: ['CERTIFIED_GEMSTONE_RESERVATION_REQUIRED'],
+    description:
+      'P1 is fully paid and staff must resolve the certified gemstone reservation.',
+  })
+  attentionReason?: 'CERTIFIED_GEMSTONE_RESERVATION_REQUIRED';
+
   @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
   id!: string;
 

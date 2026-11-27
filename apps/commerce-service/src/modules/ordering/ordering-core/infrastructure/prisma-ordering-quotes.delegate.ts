@@ -1,5 +1,10 @@
+import { ConflictException } from '@nestjs/common';
 import { Prisma } from '../../../../../generated/prisma/client';
 import type { PrismaService } from '../../../../persistence/prisma/prisma.service';
+import {
+  findCertifiedGemstoneAssignments,
+  setCertifiedGemstoneAssignments,
+} from '../../../inventory/inventory-core/infrastructure/prisma-certified-gemstone-allocations';
 import type {
   OrderingFinalConfirmationRecord,
   OrderingQuoteRecord,
@@ -189,9 +194,21 @@ export class PrismaOrderingQuotesDelegate {
     quoteId: string,
   ): Promise<OrderingQuoteRecord> {
     const published = await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.quotes.findUnique({ where: { id: quoteId } });
+      await tx.$queryRaw`SELECT id FROM ordering.orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+      const existing = await tx.quotes.findFirst({
+        where: {
+          id: quoteId,
+          order_id: orderId,
+          quote_type: 'FINAL',
+          status: 'DRAFT',
+        },
+      });
+      if (!existing)
+        throw new ConflictException(
+          'The final quote can no longer be published',
+        );
       const validUntil =
-        existing?.valid_until ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        existing.valid_until ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       const quote = await tx.quotes.update({
         where: { id: quoteId },
@@ -225,6 +242,43 @@ export class PrismaOrderingQuotesDelegate {
   ): Promise<OrderingFinalConfirmationRecord> {
     const { confirmation, ringItems } = await this.prisma.$transaction(
       async (tx) => {
+        await tx.$queryRaw`SELECT id FROM ordering.orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+        const order = await tx.orders.findUnique({
+          where: { id: orderId },
+          select: {
+            status: true,
+            current_quote_id: true,
+            owner_customer_identity_id: true,
+          },
+        });
+        if (
+          order?.status !== 'AWAITING_FINAL_CONFIRMATION' ||
+          order.current_quote_id !== quoteId ||
+          order.owner_customer_identity_id !== customerIdentityId
+        ) {
+          throw new ConflictException(
+            'This quote is no longer the active final quote',
+          );
+        }
+        const accepted = await tx.quotes.updateMany({
+          where: {
+            id: quoteId,
+            order_id: orderId,
+            quote_type: 'FINAL',
+            status: 'ISSUED',
+            OR: [{ valid_until: null }, { valid_until: { gt: new Date() } }],
+          },
+          data: {
+            status: 'ACCEPTED',
+            accepted_by_customer_identity_id: customerIdentityId,
+            accepted_at: new Date(),
+          },
+        });
+        if (accepted.count !== 1)
+          throw new ConflictException(
+            'The final quote can no longer be accepted',
+          );
+
         await tx.final_confirmations.updateMany({
           where: { order_id: orderId, status: 'ACTIVE' },
           data: {
@@ -240,7 +294,7 @@ export class PrismaOrderingQuotesDelegate {
             id: true,
             current_version_id: true,
             ring_item_versions_ring_items_current_version_idToring_item_versions:
-              { select: { version_no: true } },
+              { select: { version_no: true, personalization_package: true } },
           },
         });
 
@@ -254,6 +308,12 @@ export class PrismaOrderingQuotesDelegate {
               ]
             : [],
         );
+
+        if (!items.length || confirmationItems.length !== items.length) {
+          throw new ConflictException(
+            'An order item is missing its current version',
+          );
+        }
 
         const created = await tx.final_confirmations.create({
           data: {
@@ -269,14 +329,32 @@ export class PrismaOrderingQuotesDelegate {
           include: { final_confirmation_items: true },
         });
 
-        await tx.quotes.update({
-          where: { id: quoteId },
-          data: {
-            status: 'ACCEPTED',
-            accepted_by_customer_identity_id: customerIdentityId,
-            accepted_at: new Date(),
-          },
-        });
+        const allNone = items.every(
+          ({
+            ring_item_versions_ring_items_current_version_idToring_item_versions:
+              version,
+          }) => version?.personalization_package === 'NONE',
+        );
+        if (allNone) {
+          const assignments = await findCertifiedGemstoneAssignments(
+            tx,
+            confirmationItems.map(
+              ({ ring_item_version_id }) => ring_item_version_id,
+            ),
+          );
+          if (
+            !assignments ||
+            !(await setCertifiedGemstoneAssignments(
+              tx,
+              assignments,
+              'RESERVED',
+            ))
+          ) {
+            throw new ConflictException(
+              'One or more certified gemstones are no longer available for this quote',
+            );
+          }
+        }
 
         await tx.orders.update({
           where: { id: orderId },
@@ -313,10 +391,33 @@ export class PrismaOrderingQuotesDelegate {
 
   async rejectFinalQuote(orderId: string, quoteId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await tx.quotes.update({
-        where: { id: quoteId },
+      await tx.$queryRaw`SELECT id FROM ordering.orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+      const order = await tx.orders.findUnique({
+        where: { id: orderId },
+        select: { current_quote_id: true, status: true },
+      });
+      if (
+        order?.status !== 'AWAITING_FINAL_CONFIRMATION' ||
+        order.current_quote_id !== quoteId
+      ) {
+        throw new ConflictException(
+          'This quote is no longer the active final quote',
+        );
+      }
+
+      const rejected = await tx.quotes.updateMany({
+        where: {
+          id: quoteId,
+          order_id: orderId,
+          quote_type: 'FINAL',
+          status: 'ISSUED',
+        },
         data: { status: 'REJECTED' },
       });
+      if (rejected.count !== 1)
+        throw new ConflictException(
+          'The final quote can no longer be rejected',
+        );
 
       await tx.orders.update({
         where: { id: orderId },

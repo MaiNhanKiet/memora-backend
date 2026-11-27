@@ -7,6 +7,11 @@ import type { VerifiedActor } from '../common/actor';
 export interface GemstoneSelectionItem {
   slotNumber: number;
   gemstoneOptionId: string;
+  certifiedGemstoneId?: string;
+}
+
+export interface GemstoneSelectionUpdate {
+  items: GemstoneSelectionItem[];
 }
 
 export interface CartItemDraft {
@@ -60,6 +65,7 @@ export interface AddCartItemResponse {
 }
 
 export interface UpdateCartItemRequest {
+  gemstoneSelectionUpdate?: GemstoneSelectionUpdate;
   actor: VerifiedActor;
   draftId: string;
   targetSize?: number;

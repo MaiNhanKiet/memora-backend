@@ -4,9 +4,13 @@ import type {
   ValidateCheckoutResponse,
 } from '@app/contracts';
 import { EstimatePriceUseCase } from '../../../pricing/pricing-core/application/estimate-price.use-case';
-import { parseGemstoneSelections } from './cart.mapper';
+import {
+  extractCertifiedPriceVersionIds,
+  extractMaintenancePlan,
+  parseGemstoneSelections,
+} from './cart.mapper';
 import { CART_REPOSITORY, type CartRepository } from './cart.repository';
-import { validateCartActor } from './cart.validation';
+import { priceCartSelections, validateCartActor } from './cart.validation';
 
 @Injectable()
 export class ValidateCheckoutUseCase {
@@ -37,6 +41,11 @@ export class ValidateCheckoutUseCase {
       );
     }
 
+    if (new Set(selectedDraftIds).size !== selectedDraftIds.length) {
+      throw new BadRequestException('A draft can only be selected once');
+    }
+
+    const selectedCertifiedIds = new Set<string>();
     const issues: { draftId: string; code: string; message: string }[] = [];
     let totalEstimatedPrice = 0;
 
@@ -55,13 +64,39 @@ export class ValidateCheckoutUseCase {
         const gemstoneSelections = parseGemstoneSelections(
           draft.gemstoneConfigJson,
         );
-        const pricing = await this.estimatePriceUseCase.execute({
-          templateVariantId: draft.templateVariantId,
-          targetSize: draft.targetSize,
-          gemstoneOptionIds: gemstoneSelections.map((g) => g.gemstoneOptionId),
-          personalizationPackage: draft.personalizationPackage,
-        });
-        totalEstimatedPrice += pricing.estimatedTotal;
+        const certifiedIds = gemstoneSelections.flatMap(
+          ({ certifiedGemstoneId }) =>
+            certifiedGemstoneId ? [certifiedGemstoneId.toLowerCase()] : [],
+        );
+        if (certifiedIds.some((id) => selectedCertifiedIds.has(id))) {
+          throw new BadRequestException(
+            'A certified gemstone cannot be used in two ring items',
+          );
+        }
+        certifiedIds.forEach((id) => selectedCertifiedIds.add(id));
+        const pricing = await priceCartSelections(
+          this.repository,
+          this.estimatePriceUseCase,
+          {
+            templateVariantId: draft.templateVariantId,
+            targetSize: draft.targetSize,
+            personalizationPackage: draft.personalizationPackage,
+            maintenancePlan: extractMaintenancePlan(draft.gemstoneConfigJson),
+          },
+          gemstoneSelections,
+        );
+        const storedPriceIds = extractCertifiedPriceVersionIds(
+          draft.gemstoneConfigJson,
+        );
+        if (
+          storedPriceIds.join(',') !==
+          pricing.certifiedPriceVersionIds.join(',')
+        ) {
+          throw new BadRequestException(
+            'Certified gemstone price changed. Update your cart item before placing the order',
+          );
+        }
+        totalEstimatedPrice += pricing.total;
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : 'Validation failed';

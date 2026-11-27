@@ -12,7 +12,11 @@ import {
   parseGemstoneSelections,
 } from './cart.mapper';
 import { CART_REPOSITORY, type CartRepository } from './cart.repository';
-import { assertDraftOwnership, validateCartActor } from './cart.validation';
+import {
+  assertDraftOwnership,
+  priceCartSelections,
+  validateCartActor,
+} from './cart.validation';
 
 @Injectable()
 export class UpdateCartItemUseCase {
@@ -38,27 +42,34 @@ export class UpdateCartItemUseCase {
     const pkg = request.personalizationPackage ?? draft.personalizationPackage;
     const memoryEnabled = request.memoryEnabled ?? draft.memoryEnabled;
 
-    const currentGemstones = parseGemstoneSelections(draft.gemstoneConfigJson);
+    const selections = request.gemstoneSelectionUpdate
+      ? (request.gemstoneSelectionUpdate.items ?? [])
+      : parseGemstoneSelections(draft.gemstoneConfigJson);
     const currentPlan = extractMaintenancePlan(draft.gemstoneConfigJson);
     const maintenancePlan = request.maintenancePlan ?? currentPlan ?? 'NONE';
 
-    const pricing = await this.estimatePriceUseCase.execute({
-      templateVariantId: draft.templateVariantId,
-      targetSize,
-      gemstoneOptionIds: currentGemstones.map((g) => g.gemstoneOptionId),
-      personalizationPackage: pkg,
-      maintenancePlan,
-    });
+    const pricing = await priceCartSelections(
+      this.repository,
+      this.estimatePriceUseCase,
+      {
+        templateVariantId: draft.templateVariantId,
+        targetSize,
+        personalizationPackage: pkg,
+        maintenancePlan,
+      },
+      selections,
+    );
 
     const updated = await this.repository.updateDraft(draft.id, {
       targetSize,
       personalizationPackage: pkg,
       memoryEnabled,
       gemstoneConfigJson: buildGemstoneConfigJson(
-        currentGemstones,
+        selections,
         maintenancePlan,
+        pricing.certifiedPriceVersionIds,
       ),
-      estimatedPrice: pricing.estimatedTotal,
+      estimatedPrice: pricing.total,
       estimatedPriceAt: new Date(),
     });
 

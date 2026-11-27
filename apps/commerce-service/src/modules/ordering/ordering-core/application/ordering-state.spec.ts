@@ -115,6 +115,34 @@ describe('ordering-state', () => {
       });
     });
 
+    it('keeps settled P1 credit visible after the provisional quote expires', () => {
+      const now = new Date('2026-11-27T12:00:00Z');
+      const expiredOrder = {
+        ...order,
+        status: 'AWAITING_P1',
+        createdAt: new Date('2026-11-26T00:00:00Z'),
+        currentQuote: {
+          ...quote,
+          quoteType: 'PROVISIONAL',
+          status: 'ISSUED',
+          validUntil: new Date('2026-11-27T00:00:00Z'),
+        },
+      };
+
+      expect(
+        resolveOrderNextPayment(
+          expiredOrder,
+          [{ ...deposit, quoteId: quote.id }],
+          now,
+        ),
+      ).toMatchObject({
+        stage: 'DEPOSIT_P1',
+        paidAmount: deposit.amount,
+        amountDue: 0,
+        canPay: false,
+      });
+    });
+
     it('does not offer payment while waiting for the final quote', () => {
       expect(
         resolveOrderNextPayment(
