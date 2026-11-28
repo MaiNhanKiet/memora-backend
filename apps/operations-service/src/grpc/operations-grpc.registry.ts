@@ -1,4 +1,4 @@
-import { FULFILLMENT_PACKAGE } from '@app/contracts';
+import { AFTER_SALES_PACKAGE, FULFILLMENT_PACKAGE } from '@app/contracts';
 
 /**
  * gRPC protos hosted by operations-service.
@@ -12,4 +12,5 @@ export const OPERATIONS_GRPC_PROTOS = [
     file: 'personalization/v1/personalization.proto',
   },
   { package: FULFILLMENT_PACKAGE, file: 'operations/v1/fulfillment.proto' },
+  { package: AFTER_SALES_PACKAGE, file: 'operations/v1/after-sales.proto' },
 ] as const;

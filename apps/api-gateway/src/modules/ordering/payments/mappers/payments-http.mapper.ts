@@ -45,14 +45,15 @@ export function toGetOrderPaymentByIdGrpcRequest(
 export function toCreateRefundRequestGrpcRequest(
   transactionId: string,
   body: CreateRefundRequestBodyDto,
-  staffUserId?: string,
+  actor: VerifiedActor,
 ): CreateRefundRequestMessage {
   return {
     transactionId,
     refundAmount: body.refundAmount,
     reason: body.reason,
     notes: body.notes,
-    staffUserId,
+    claimId: body.claimId,
+    actor,
   };
 }
 

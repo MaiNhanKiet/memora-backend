@@ -1,5 +1,5 @@
 import { Expose } from 'class-transformer';
-import { IsOptional } from 'class-validator';
+import { IsOptional, Validate } from 'class-validator';
 import { registerAs } from '@nestjs/config';
 import {
   EnvHostname,
@@ -7,6 +7,7 @@ import {
   EnvPort,
   EnvPostgresUrl,
   EnvSecret,
+  GrpcUrlConstraint,
   parseEnvText,
 } from '../validation/env-constraints';
 import { validateEnv } from '../validation/validate-env';
@@ -63,6 +64,16 @@ export class CommerceEnvironment extends NodeEnvironment {
   COMMERCE_INTERNAL_GRPC_SECRET!: string;
 
   @Expose()
+  @IsOptional()
+  @Validate(GrpcUrlConstraint)
+  OPERATIONS_GRPC_URL?: string;
+
+  @Expose()
+  @IsOptional()
+  @EnvSecret(32)
+  OPERATIONS_INTERNAL_GRPC_SECRET?: string;
+
+  @Expose()
   @EnvHttpUrl()
   CATALOG_CDN_BASE_URL!: string;
 
@@ -90,6 +101,8 @@ export interface CommerceEnv {
   COMMERCE_HEALTH_PORT: number;
   COMMERCE_DATABASE_URL: string;
   COMMERCE_INTERNAL_GRPC_SECRET: string;
+  OPERATIONS_GRPC_URL?: string;
+  OPERATIONS_INTERNAL_GRPC_SECRET?: string;
   CATALOG_CDN_BASE_URL: string;
   PAYOS_CLIENT_ID?: string;
   PAYOS_API_KEY?: string;
@@ -109,10 +122,22 @@ export function validateCommerceEnv(
       source.CATALOG_CDN_BASE_URL,
       'https://cdn.memora.style',
     ),
-    PAYOS_CLIENT_ID: optionalPayosCredential(source.PAYOS_CLIENT_ID),
-    PAYOS_API_KEY: optionalPayosCredential(source.PAYOS_API_KEY),
-    PAYOS_CHECKSUM_KEY: optionalPayosCredential(source.PAYOS_CHECKSUM_KEY),
+    OPERATIONS_GRPC_URL: optionalText(source.OPERATIONS_GRPC_URL),
+    OPERATIONS_INTERNAL_GRPC_SECRET: optionalText(
+      source.OPERATIONS_INTERNAL_GRPC_SECRET,
+    ),
+    PAYOS_CLIENT_ID: optionalText(source.PAYOS_CLIENT_ID),
+    PAYOS_API_KEY: optionalText(source.PAYOS_API_KEY),
+    PAYOS_CHECKSUM_KEY: optionalText(source.PAYOS_CHECKSUM_KEY),
   });
+  if (
+    validated.OPERATIONS_GRPC_URL &&
+    !validated.OPERATIONS_INTERNAL_GRPC_SECRET
+  ) {
+    throw new Error(
+      'OPERATIONS_GRPC_URL requires OPERATIONS_INTERNAL_GRPC_SECRET',
+    );
+  }
   assertCommerceDatabaseUrl(
     validated.COMMERCE_DATABASE_URL,
     validated.NODE_ENV,
@@ -125,6 +150,8 @@ export function validateCommerceEnv(
     COMMERCE_HEALTH_PORT: validated.COMMERCE_HEALTH_PORT,
     COMMERCE_DATABASE_URL: validated.COMMERCE_DATABASE_URL,
     COMMERCE_INTERNAL_GRPC_SECRET: validated.COMMERCE_INTERNAL_GRPC_SECRET,
+    OPERATIONS_GRPC_URL: validated.OPERATIONS_GRPC_URL,
+    OPERATIONS_INTERNAL_GRPC_SECRET: validated.OPERATIONS_INTERNAL_GRPC_SECRET,
     CATALOG_CDN_BASE_URL: validated.CATALOG_CDN_BASE_URL,
     PAYOS_CLIENT_ID: validated.PAYOS_CLIENT_ID,
     PAYOS_API_KEY: validated.PAYOS_API_KEY,
@@ -148,6 +175,13 @@ export const commerceConfig = registerAs('commerce', () => {
     healthPort: env.COMMERCE_HEALTH_PORT,
     databaseUrl: env.COMMERCE_DATABASE_URL,
     internalGrpcSecret: env.COMMERCE_INTERNAL_GRPC_SECRET,
+    operationsClaimAccess:
+      env.OPERATIONS_GRPC_URL && env.OPERATIONS_INTERNAL_GRPC_SECRET
+        ? {
+            url: env.OPERATIONS_GRPC_URL,
+            secret: env.OPERATIONS_INTERNAL_GRPC_SECRET,
+          }
+        : undefined,
     catalogCdnBaseUrl: env.CATALOG_CDN_BASE_URL,
     payos:
       PAYOS_CLIENT_ID && PAYOS_API_KEY && PAYOS_CHECKSUM_KEY
@@ -245,7 +279,7 @@ function defaultText(value: unknown, fallback: string): unknown {
   return value;
 }
 
-function optionalPayosCredential(value: unknown): unknown {
+function optionalText(value: unknown): unknown {
   const normalized = parseEnvText(value);
   return normalized === '' ? undefined : normalized;
 }

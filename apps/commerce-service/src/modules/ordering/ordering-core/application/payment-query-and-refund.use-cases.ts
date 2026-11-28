@@ -1,9 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { isUUID } from 'class-validator';
+import { parseVerifiedActor, requireUserActor } from '@app/common';
 import type {
   CreateRefundRequestMessage,
   CreateRefundResponse,
@@ -26,6 +29,10 @@ import {
   ORDERING_REPOSITORY,
   type OrderingRepository,
 } from './ordering.repository';
+import {
+  OPERATIONS_CLAIM_ACCESS,
+  type OperationsClaimAccess,
+} from './operations-claim-access.port';
 import {
   resolveOrderingActorId,
   validateOrderingActor,
@@ -191,12 +198,17 @@ export class CreateRefundRequestUseCase {
   constructor(
     @Inject(ORDERING_REPOSITORY)
     private readonly repository: OrderingRepository,
+    @Inject(OPERATIONS_CLAIM_ACCESS)
+    private readonly claimAccess: OperationsClaimAccess,
   ) {}
 
   async execute(
     request: CreateRefundRequestMessage,
   ): Promise<CreateRefundResponse> {
-    if (!request.refundAmount || request.refundAmount <= 0) {
+    if (!isUUID(request.transactionId)) {
+      throw new BadRequestException('Transaction ID must be a UUID');
+    }
+    if (!Number.isFinite(request.refundAmount) || request.refundAmount <= 0) {
       throw new BadRequestException('Refund amount must be greater than zero');
     }
 
@@ -204,7 +216,31 @@ export class CreateRefundRequestUseCase {
       throw new BadRequestException('A reason for the refund is required');
     }
 
-    const refund = await this.repository.createRefundRequest(request);
+    const staffUserId =
+      request.actor || request.claimId
+        ? requireUserActor(parseVerifiedActor(request.actor)).userId
+        : request.staffUserId;
+    const claimId = request.claimId;
+    let returnReceipt: Parameters<
+      OrderingRepository['createRefundRequest']
+    >[0]['returnReceipt'];
+    if (claimId !== undefined) {
+      if (!isUUID(claimId))
+        throw new BadRequestException('Claim ID must be a UUID');
+      const receipt = await this.claimAccess.getReturnReceipt(claimId);
+      if (!receipt.eligible) {
+        throw new ConflictException('A verified ring return is required');
+      }
+      returnReceipt = { ...receipt, claimId };
+    }
+    const refund = await this.repository.createRefundRequest({
+      transactionId: request.transactionId,
+      refundAmount: request.refundAmount,
+      reason: request.reason,
+      notes: request.notes,
+      staffUserId,
+      returnReceipt,
+    });
     if (!refund) {
       throw new NotFoundException(
         `Original payment transaction ${request.transactionId} not found`,

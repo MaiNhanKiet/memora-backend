@@ -719,6 +719,8 @@ message CreateRefundRequestMessage {
   string reason = 3;
   string notes = 4;
   string staff_user_id = 5;
+  optional string claim_id = 6;
+  memora.common.v1.VerifiedActor actor = 7;
 }
 
 message CreateRefundResponse {

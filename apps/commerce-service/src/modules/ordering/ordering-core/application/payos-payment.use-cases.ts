@@ -16,6 +16,12 @@ import type {
   PayosWebhookResponse,
   ReconcilePaymentTransactionRequest,
 } from '@app/contracts';
+import { ClaimQuoteAction } from '@app/contracts';
+import {
+  OPERATIONS_CLAIM_ACCESS,
+  requireClaimQuoteAccess,
+  type OperationsClaimAccess,
+} from './operations-claim-access.port';
 import { mapPaymentTransactionDetail } from './ordering.mapper';
 import {
   ORDERING_REPOSITORY,
@@ -332,60 +338,130 @@ export class CreateClaimPaymentLinkUseCase {
     private readonly repository: OrderingRepository,
     @Inject(PAYOS_GATEWAY)
     private readonly payosGateway: PayosGateway,
+    @Inject(OPERATIONS_CLAIM_ACCESS)
+    private readonly claimAccess: OperationsClaimAccess,
   ) {}
 
   async execute(
     request: CreateClaimPaymentLinkRequest,
   ): Promise<PaymentLinkResponse> {
-    if (!request.claimId) {
-      throw new BadRequestException('Claim ID is required');
-    }
-    validateOrderingActor(request.actor);
-
-    const quotes = await this.repository.findClaimQuotes(request.claimId);
-    const acceptedQuote = quotes.find((q) => q.status === 'ACCEPTED');
-    if (!acceptedQuote) {
-      throw new BadRequestException(
-        `No ACCEPTED service quote found for claim ${request.claimId}`,
+    await requireClaimQuoteAccess(
+      this.claimAccess,
+      request.claimId,
+      request.actor,
+      ClaimQuoteAction.PAY_QUOTE,
+    );
+    const attempt = await this.repository.beginClaimPaymentAttempt({
+      claimId: request.claimId,
+      providerOrderCode: BigInt(this.payosGateway.generateOrderCode()),
+    });
+    const { transaction } = attempt;
+    const orderCode = Number(transaction.providerOrderCode);
+    if (
+      transaction.provider !== 'PAYOS' ||
+      !Number.isSafeInteger(orderCode) ||
+      orderCode <= 0
+    ) {
+      throw new ConflictException(
+        'A previous service payment requires reconciliation',
       );
     }
-
-    const amount = acceptedQuote.totalAmount;
-    if (amount <= 0) {
-      throw new BadRequestException(
-        'Accepted quote amount must be greater than 0',
-      );
+    if (!attempt.created) {
+      const link = attempt.reusable && readStoredLink(transaction.metadataJson);
+      if (link)
+        return toPaymentLinkResponse(
+          transaction,
+          orderCode,
+          link,
+          transaction.paymentStage,
+        );
+      return this.reconcileClaimPayment(transaction, orderCode);
     }
-
-    const orderCode = this.payosGateway.generateOrderCode();
-    const returnUrl =
-      request.returnUrl || `https://memora.vn/claims/${request.claimId}`;
-    const cancelUrl =
-      request.cancelUrl || `https://memora.vn/claims/${request.claimId}`;
 
     const paymentLink = await this.payosGateway.createPaymentLink({
       orderCode,
-      amount,
-      description: `MEMORA CLAIM ${acceptedQuote.quoteNo}`,
-      returnUrl,
-      cancelUrl,
+      amount: transaction.amount,
+      description: `MEMORA CLAIM ${attempt.quoteNo}`,
+      returnUrl:
+        request.returnUrl || `https://memora.vn/claims/${request.claimId}`,
+      cancelUrl:
+        request.cancelUrl || `https://memora.vn/claims/${request.claimId}`,
+      expiredAt: transaction.expiresAt
+        ? Math.floor(transaction.expiresAt.getTime() / 1000)
+        : undefined,
     });
-
-    const tx = await this.repository.createPaymentTransaction({
-      claimId: request.claimId,
-      quoteId: acceptedQuote.id,
-      paymentStage: 'SERVICE_FEE',
-      providerOrderCode: BigInt(orderCode),
-      amount,
-      currency: acceptedQuote.currency || 'VND',
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      metadata: {
-        paymentLinkId: paymentLink.paymentLinkId,
-        checkoutUrl: paymentLink.checkoutUrl,
-        qrCode: paymentLink.qrCode,
-      },
+    if (
+      paymentLink.orderCode !== orderCode ||
+      paymentLink.amount !== transaction.amount ||
+      paymentLink.currency !== transaction.currency ||
+      !paymentLink.paymentLinkId ||
+      !paymentLink.checkoutUrl
+    ) {
+      throw new ServiceUnavailableException(
+        'PayOS returned a mismatched payment link',
+      );
+    }
+    const saved = await this.repository.saveOrderPaymentLink(transaction.id, {
+      paymentLinkId: paymentLink.paymentLinkId,
+      checkoutUrl: paymentLink.checkoutUrl,
+      qrCode: paymentLink.qrCode,
     });
+    if (saved.status !== 'PENDING') {
+      throw new ConflictException('The service payment is no longer pending');
+    }
+    return toPaymentLinkResponse(
+      saved,
+      orderCode,
+      paymentLink,
+      saved.paymentStage,
+    );
+  }
 
-    return toPaymentLinkResponse(tx, orderCode, paymentLink, 'SERVICE_FEE');
+  private async reconcileClaimPayment(
+    transaction: OrderingPaymentTransactionRecord,
+    orderCode: number,
+  ): Promise<never> {
+    const info = await this.payosGateway.getPaymentInformation(orderCode);
+    const knownLinkId = readPaymentLinkId(transaction.metadataJson);
+    if (
+      !info ||
+      info.orderCode !== orderCode ||
+      info.amount !== transaction.amount ||
+      !info.id ||
+      (knownLinkId && info.id !== knownLinkId)
+    ) {
+      throw new ServiceUnavailableException(
+        'The previous PayOS link could not be verified',
+      );
+    }
+    if (
+      info.status === 'PAID' &&
+      info.amountPaid === transaction.amount &&
+      info.amountRemaining === 0
+    ) {
+      await this.repository.markPaymentTransactionSucceeded({
+        transactionId: transaction.id,
+        completedAt: new Date(),
+      });
+      throw new ConflictException(
+        'The previous service payment was already paid',
+      );
+    }
+    if (
+      (info.status === 'CANCELLED' || info.status === 'EXPIRED') &&
+      info.amountPaid === 0 &&
+      info.amountRemaining === transaction.amount
+    ) {
+      await this.repository.closeClaimPaymentAttempt(
+        transaction.id,
+        info.status,
+      );
+      throw new ConflictException(
+        'The previous payment link was closed. Retry to request a new link',
+      );
+    }
+    throw new ConflictException(
+      'A previous service payment is still open or requires reconciliation',
+    );
   }
 }

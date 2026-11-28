@@ -614,18 +614,55 @@ export class PrismaOrderingQuotesDelegate {
   }
 
   async acceptClaimQuote(params: {
+    claimId: string;
     quoteId: string;
     customerIdentityId: string;
   }): Promise<OrderingQuoteRecord> {
-    const updated = await this.prisma.quotes.update({
-      where: { id: params.quoteId },
-      data: {
-        status: 'ACCEPTED',
-        accepted_by_customer_identity_id: params.customerIdentityId,
-        accepted_at: new Date(),
-      },
-      include: { quote_items: { orderBy: { created_at: 'asc' } } },
+    return this.prisma.$transaction(async (tx) => {
+      const quote = await lockCurrentServiceQuote(tx, params.claimId);
+      if (!quote || quote.id !== params.quoteId) {
+        throw new ConflictException('The service quote is no longer current');
+      }
+      if (quote.status === 'ACCEPTED') return toQuoteRecord(quote);
+      const now = new Date();
+      if (
+        quote.status !== 'ISSUED' ||
+        (quote.valid_until && quote.valid_until <= now)
+      ) {
+        throw new ConflictException(
+          'The service quote can no longer be accepted',
+        );
+      }
+      const updated = await tx.quotes.update({
+        where: { id: quote.id },
+        data: {
+          status: 'ACCEPTED',
+          accepted_by_customer_identity_id: params.customerIdentityId,
+          accepted_at: now,
+        },
+        include: { quote_items: { orderBy: { created_at: 'asc' } } },
+      });
+      return toQuoteRecord(updated);
     });
-    return toQuoteRecord(updated);
   }
+}
+
+export async function lockCurrentServiceQuote(
+  tx: Prisma.TransactionClient,
+  claimId: string,
+) {
+  await tx.$queryRaw`
+    SELECT 1 FROM pg_advisory_xact_lock(
+      hashtextextended('claim-payment:' || ${claimId}::uuid::text, 0)
+    )
+  `;
+  return tx.quotes.findFirst({
+    where: {
+      claim_id: claimId,
+      quote_type: 'SERVICE',
+      status: { not: 'DRAFT' },
+    },
+    orderBy: [{ version_no: 'desc' }, { created_at: 'desc' }, { id: 'desc' }],
+    include: { quote_items: { orderBy: { created_at: 'asc' } } },
+  });
 }

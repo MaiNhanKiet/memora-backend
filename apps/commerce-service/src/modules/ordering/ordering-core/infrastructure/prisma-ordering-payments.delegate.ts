@@ -21,6 +21,7 @@ import {
   toOrderInvoiceRecord,
   toPaymentTransactionRecord,
 } from './prisma-ordering.mappers';
+import { lockCurrentServiceQuote } from './prisma-ordering-quotes.delegate';
 
 export class PrismaOrderingPaymentsDelegate {
   constructor(private readonly prisma: PrismaService) {}
@@ -125,13 +126,9 @@ export class PrismaOrderingPaymentsDelegate {
     return toOrderInvoiceRecord(order);
   }
 
-  async createRefundRequest(params: {
-    transactionId: string;
-    refundAmount: number;
-    reason: string;
-    notes?: string;
-    staffUserId?: string;
-  }): Promise<OrderingPaymentTransactionRecord | undefined> {
+  async createRefundRequest(
+    params: Parameters<OrderingRepository['createRefundRequest']>[0],
+  ): Promise<OrderingPaymentTransactionRecord | undefined> {
     const amount = new Prisma.Decimal(params.refundAmount);
     if (!amount.isFinite() || !amount.gt(0) || amount.decimalPlaces() > 2) {
       throw new BadRequestException(
@@ -140,8 +137,10 @@ export class PrismaOrderingPaymentsDelegate {
     }
     const refund = await this.prisma.$transaction(async (tx) => {
       // Use the same order-before-payment lock order as payment settlement.
-      const [order] = await tx.$queryRaw<{ status: string }[]>`
-        SELECT status FROM ordering.orders WHERE id = (
+      const [order] = await tx.$queryRaw<
+        { id: string; status: string; current_quote_id: string | null }[]
+      >`
+        SELECT id, status, current_quote_id FROM ordering.orders WHERE id = (
           SELECT order_id FROM ordering.payment_transactions WHERE id = ${params.transactionId}::uuid
         ) FOR NO KEY UPDATE
       `;
@@ -169,30 +168,66 @@ export class PrismaOrderingPaymentsDelegate {
           'This refund route requires an order payment',
         );
       }
-      if (order.status === 'COMPLETED' || order.status === 'DELIVERED') {
+      const handedOver =
+        order.status === 'COMPLETED' || order.status === 'DELIVERED';
+      const receipt = params.returnReceipt;
+      if (handedOver && !receipt) {
         throw new ConflictException(
           'Refunding a handed-over order requires a verified ring return',
         );
       }
+      if (
+        receipt &&
+        (!handedOver || receipt.orderId !== order.id || original.claim_id)
+      ) {
+        throw new ConflictException(
+          'The return receipt does not match the handed-over order payment',
+        );
+      }
 
-      const reserved = await tx.payment_transactions.aggregate({
+      const previousRefunds = await tx.payment_transactions.findMany({
         where: {
           related_transaction_id: original.id,
           transaction_type: 'REFUND',
           status: { in: ['PENDING', 'SUCCEEDED'] },
         },
-        _sum: { amount: true },
+        select: {
+          amount: true,
+          payment_item_allocations: { select: { allocated_amount: true } },
+        },
       });
-      const refundable = original.amount.minus(reserved._sum.amount ?? 0);
+      const refundable = previousRefunds.reduce(
+        (remaining, refund) => remaining.minus(refund.amount),
+        original.amount,
+      );
       if (amount.gt(refundable)) {
         throw new ConflictException(
           'Refund amount exceeds the remaining refundable payment amount',
         );
       }
 
-      return tx.payment_transactions.create({
+      const allocations = receipt
+        ? await this.prepareRingRefund(
+            tx,
+            receipt,
+            order.current_quote_id,
+            original.id,
+            original.currency,
+            amount,
+            previousRefunds.reduce((total, refund) => {
+              const unattributed = refund.payment_item_allocations.reduce(
+                (remaining, allocation) =>
+                  remaining.minus(allocation.allocated_amount),
+                refund.amount,
+              );
+              return total.plus(Prisma.Decimal.max(0, unattributed));
+            }, new Prisma.Decimal(0)),
+          )
+        : [];
+      const refund = await tx.payment_transactions.create({
         data: {
           order_id: original.order_id,
+          claim_id: receipt?.claimId,
           related_transaction_id: original.id,
           transaction_type: 'REFUND',
           payment_stage: original.payment_stage,
@@ -210,9 +245,151 @@ export class PrismaOrderingPaymentsDelegate {
           },
         },
       });
+      if (allocations.length) {
+        await tx.payment_item_allocations.createMany({
+          data: allocations.map((allocation) => ({
+            ...allocation,
+            payment_transaction_id: refund.id,
+          })),
+        });
+      }
+      return refund;
     });
 
     return refund ? toPaymentTransactionRecord(refund) : undefined;
+  }
+
+  private async prepareRingRefund(
+    tx: Prisma.TransactionClient,
+    receipt: NonNullable<
+      Parameters<OrderingRepository['createRefundRequest']>[0]['returnReceipt']
+    >,
+    finalQuoteId: string | null,
+    originalTransactionId: string,
+    currency: string,
+    amount: Prisma.Decimal,
+    unattributedOriginalRefunds: Prisma.Decimal,
+  ) {
+    if (!finalQuoteId)
+      throw new ConflictException('A locked Final Quote is required');
+    const { orderId, ringItemId, claimId, receiptId } = receipt;
+    const confirmation = await tx.final_confirmations.findFirst({
+      where: {
+        order_id: orderId,
+        quote_id: finalQuoteId,
+        status: 'ACTIVE',
+        final_confirmation_items: { some: { ring_item_id: ringItemId } },
+        quotes: {
+          order_id: orderId,
+          quote_type: 'FINAL',
+          status: 'ACCEPTED',
+          currency,
+        },
+      },
+      select: { id: true },
+    });
+    const ring = await tx.ring_items.findFirst({
+      where: { id: ringItemId, order_id: orderId },
+      select: { id: true },
+    });
+    if (!confirmation || !ring) {
+      throw new ConflictException(
+        'The returned ring is not in the locked Final Quote',
+      );
+    }
+    const lines = await tx.quote_items.findMany({
+      where: { quote_id: finalQuoteId, ring_item_id: ringItemId },
+      select: { id: true, line_amount: true },
+    });
+    const quoteAmount = lines.reduce(
+      (sum, line) => sum.plus(line.line_amount),
+      new Prisma.Decimal(0),
+    );
+    const previousRingRefunds = await tx.payment_item_allocations.aggregate({
+      where: {
+        ring_item_id: ringItemId,
+        allocation_kind: 'RING_ITEM',
+        payment_transactions: {
+          order_id: orderId,
+          transaction_type: 'REFUND',
+          status: { in: ['PENDING', 'SUCCEEDED'] },
+        },
+      },
+      _sum: { allocated_amount: true },
+    });
+    if (
+      amount.gt(
+        quoteAmount.minus(previousRingRefunds._sum.allocated_amount ?? 0),
+      )
+    ) {
+      throw new ConflictException(
+        'Refund exceeds the remaining locked quote amount for this ring',
+      );
+    }
+    const originalAllocations = await tx.payment_item_allocations.findMany({
+      where: {
+        payment_transaction_id: originalTransactionId,
+        ring_item_id: ringItemId,
+        allocation_kind: 'RING_ITEM',
+        original_allocation_id: null,
+      },
+      orderBy: { id: 'asc' },
+      include: {
+        other_payment_item_allocations: {
+          where: {
+            payment_transactions: {
+              transaction_type: 'REFUND',
+              status: { in: ['PENDING', 'SUCCEEDED'] },
+            },
+          },
+          select: { allocated_amount: true },
+        },
+      },
+    });
+
+    let remaining = amount;
+    let unattributed = unattributedOriginalRefunds;
+    const allocations: Omit<
+      Prisma.payment_item_allocationsCreateManyInput,
+      'payment_transaction_id'
+    >[] = [];
+    for (const source of originalAllocations) {
+      const available = Prisma.Decimal.max(
+        0,
+        source.other_payment_item_allocations.reduce(
+          (net, refund) => net.minus(refund.allocated_amount),
+          source.allocated_amount,
+        ),
+      );
+      const unknownRefund = Prisma.Decimal.min(available, unattributed);
+      unattributed = unattributed.minus(unknownRefund);
+      const allocated = Prisma.Decimal.min(
+        remaining,
+        available.minus(unknownRefund),
+      );
+      if (allocated.gt(0)) {
+        allocations.push({
+          ring_item_id: ringItemId,
+          original_allocation_id: source.id,
+          allocated_amount: allocated,
+          allocation_kind: 'RING_ITEM',
+          basis_snapshot_json: {
+            claimId,
+            receiptId,
+            finalQuoteId,
+            confirmationId: confirmation.id,
+            quoteLineIds: lines.map(({ id }) => id),
+            quoteRingAmount: quoteAmount.toString(),
+            originalPaymentBasis: source.basis_snapshot_json,
+          },
+        });
+      }
+      remaining = remaining.minus(allocated);
+      if (remaining.isZero()) return allocations;
+    }
+    throw new ConflictException(
+      'Refund exceeds the remaining paid allocation for this ring',
+    );
   }
 
   async beginOrderPaymentAttempt(
@@ -327,35 +504,101 @@ export class PrismaOrderingPaymentsDelegate {
     return toPaymentTransactionRecord(updated);
   }
 
-  async createPaymentTransaction(params: {
-    orderId?: string;
-    claimId?: string;
-    quoteId?: string;
-    paymentStage: string;
-    providerOrderCode: bigint;
-    amount: number;
-    currency?: string;
-    expiresAt?: Date;
-    metadata?: Record<string, unknown>;
-  }): Promise<OrderingPaymentTransactionRecord> {
-    const created = await this.prisma.payment_transactions.create({
-      data: {
-        order_id: params.orderId ?? null,
-        claim_id: params.claimId ?? null,
-        quote_id: params.quoteId ?? null,
-        payment_stage: params.paymentStage,
-        transaction_type: 'PAYMENT',
-        payment_method: 'PAYOS',
-        provider: 'PAYOS',
-        provider_order_code: params.providerOrderCode,
-        amount: new Prisma.Decimal(params.amount),
-        currency: params.currency ?? 'VND',
-        status: 'PENDING',
-        expires_at: params.expiresAt ?? null,
-        metadata_json: (params.metadata as Prisma.InputJsonValue) ?? {},
-      },
+  beginClaimPaymentAttempt(
+    params: Parameters<OrderingRepository['beginClaimPaymentAttempt']>[0],
+  ): ReturnType<OrderingRepository['beginClaimPaymentAttempt']> {
+    return this.prisma.$transaction(async (tx) => {
+      const quote = await lockCurrentServiceQuote(tx, params.claimId);
+      if (quote?.status !== 'ACCEPTED') {
+        throw new ConflictException(
+          'An accepted current service quote is required',
+        );
+      }
+      const payments = await tx.payment_transactions.findMany({
+        where: {
+          claim_id: params.claimId,
+          transaction_type: 'PAYMENT',
+          status: { in: ['PENDING', 'SUCCEEDED'] },
+        },
+        orderBy: [{ requested_at: 'asc' }, { id: 'asc' }],
+      });
+      const paid = payments.filter(({ status }) => status === 'SUCCEEDED');
+      if (
+        paid.some(
+          (row) => row.quote_id !== quote.id || row.currency !== quote.currency,
+        )
+      ) {
+        throw new ConflictException(
+          'Previous service payments require reconciliation',
+        );
+      }
+      const due = paid.reduce(
+        (remaining, row) => remaining.minus(row.amount),
+        quote.total_amount,
+      );
+      if (due.lte(0))
+        throw new ConflictException('The service quote is already paid');
+      if (quote.currency !== 'VND' || !Number.isSafeInteger(due.toNumber())) {
+        throw new ConflictException(
+          'The remaining service amount cannot be paid by PayOS',
+        );
+      }
+
+      const open = payments.filter(({ status }) => status === 'PENDING');
+      const pending = open[0];
+      if (pending) {
+        return {
+          transaction: toPaymentTransactionRecord(pending),
+          created: false,
+          reusable:
+            open.length === 1 &&
+            pending.provider === 'PAYOS' &&
+            pending.quote_id === quote.id &&
+            pending.currency === quote.currency &&
+            pending.amount.eq(due) &&
+            pending.expires_at !== null &&
+            pending.expires_at > new Date(),
+          quoteNo: quote.quote_no,
+        };
+      }
+
+      const row = await tx.payment_transactions.create({
+        data: {
+          claim_id: params.claimId,
+          quote_id: quote.id,
+          payment_stage: 'SERVICE_FEE',
+          transaction_type: 'PAYMENT',
+          payment_method: 'PAYOS',
+          provider: 'PAYOS',
+          provider_order_code: params.providerOrderCode,
+          amount: due,
+          currency: quote.currency,
+          status: 'PENDING',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+      return {
+        transaction: toPaymentTransactionRecord(row),
+        created: true,
+        reusable: true,
+        quoteNo: quote.quote_no,
+      };
     });
-    return toPaymentTransactionRecord(created);
+  }
+
+  async closeClaimPaymentAttempt(
+    transactionId: string,
+    status: 'EXPIRED' | 'CANCELLED',
+  ): Promise<void> {
+    await this.prisma.payment_transactions.updateMany({
+      where: {
+        id: transactionId,
+        status: 'PENDING',
+        claim_id: { not: null },
+        provider: 'PAYOS',
+      },
+      data: { status },
+    });
   }
 
   async findTransactionByOrderCode(

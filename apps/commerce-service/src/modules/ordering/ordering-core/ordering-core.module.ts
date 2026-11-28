@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { OPERATIONS_CLAIM_ACCESS } from './application/operations-claim-access.port';
+import { GrpcOperationsClaimAccess } from './infrastructure/grpc-operations-claim-access';
 import {
   AcceptServiceQuoteUseCase,
   ListClaimQuotesUseCase,
@@ -56,6 +58,7 @@ import { OrderingGrpcController } from './presentation/ordering.grpc.controller'
 @Module({
   controllers: [OrderingGrpcController],
   providers: [
+    { provide: OPERATIONS_CLAIM_ACCESS, useClass: GrpcOperationsClaimAccess },
     ApplyRingItemReviewTransitionUseCase,
     CreateOrderUseCase,
     ListOrdersUseCase,

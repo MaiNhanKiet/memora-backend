@@ -1,17 +1,22 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ClaimQuoteAction } from '@app/contracts';
 import { AcceptServiceQuoteUseCase } from './claim-quote.use-cases';
 import { ConfirmFinalQuoteUseCase } from './final-quote.use-cases';
 import { ORDERING_REPOSITORY } from './ordering.repository';
+import { OPERATIONS_CLAIM_ACCESS } from './operations-claim-access.port';
 import {
   CreateRefundRequestUseCase,
   GetOrderInvoiceUseCase,
 } from './payment-query-and-refund.use-cases';
 import {
+  CreateClaimPaymentLinkUseCase,
   CreateOrderPaymentLinkUseCase,
   ProcessPayosWebhookUseCase,
 } from './payos-payment.use-cases';
@@ -24,6 +29,7 @@ describe('Quote & Payment UseCases', () => {
   let processPayosWebhookUseCase: ProcessPayosWebhookUseCase;
   let getOrderInvoiceUseCase: GetOrderInvoiceUseCase;
   let createRefundRequestUseCase: CreateRefundRequestUseCase;
+  let createClaimPaymentLinkUseCase: CreateClaimPaymentLinkUseCase;
 
   const mockRepository = {
     findOrderById: jest.fn(),
@@ -45,7 +51,8 @@ describe('Quote & Payment UseCases', () => {
     findClaimQuotes: jest.fn(),
     findClaimQuoteById: jest.fn(),
     acceptClaimQuote: jest.fn(),
-    createPaymentTransaction: jest.fn(),
+    beginClaimPaymentAttempt: jest.fn(),
+    closeClaimPaymentAttempt: jest.fn(),
     beginOrderPaymentAttempt: jest.fn(),
     saveOrderPaymentLink: jest.fn(),
     findTransactionByOrderCode: jest.fn(),
@@ -58,9 +65,16 @@ describe('Quote & Payment UseCases', () => {
     verifyWebhookSignature: jest.fn(),
     getPaymentInformation: jest.fn(),
   };
+  const mockClaimAccess = { authorize: jest.fn(), getReturnReceipt: jest.fn() };
 
   const validUserId = '11111111-1111-4111-8111-111111111111';
   const validCustomerIdentityId = '33333333-3333-4333-8333-333333333333';
+  const claimId = '44444444-4444-4444-8444-444444444444';
+  const claimQuoteId = '55555555-5555-4555-8555-555555555555';
+  const actor = {
+    userId: validUserId,
+    customerIdentityId: validCustomerIdentityId,
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -71,8 +85,10 @@ describe('Quote & Payment UseCases', () => {
         ProcessPayosWebhookUseCase,
         GetOrderInvoiceUseCase,
         CreateRefundRequestUseCase,
+        CreateClaimPaymentLinkUseCase,
         { provide: ORDERING_REPOSITORY, useValue: mockRepository },
         { provide: PAYOS_GATEWAY, useValue: mockPayosGateway },
+        { provide: OPERATIONS_CLAIM_ACCESS, useValue: mockClaimAccess },
       ],
     }).compile();
 
@@ -94,7 +110,9 @@ describe('Quote & Payment UseCases', () => {
     createRefundRequestUseCase = module.get<CreateRefundRequestUseCase>(
       CreateRefundRequestUseCase,
     );
+    createClaimPaymentLinkUseCase = module.get(CreateClaimPaymentLinkUseCase);
     jest.clearAllMocks();
+    mockClaimAccess.authorize.mockResolvedValue(true);
   });
 
   describe('Quote UseCases', () => {
@@ -142,13 +160,13 @@ describe('Quote & Payment UseCases', () => {
 
     it('should accept SERVICE quote idempotently or when ISSUED', async () => {
       mockRepository.findClaimQuoteById.mockResolvedValue({
-        id: 'q-srv-1',
+        id: claimQuoteId,
         quoteType: 'SERVICE',
         status: 'ISSUED',
         validUntil: new Date(Date.now() + 86400000),
       });
       mockRepository.acceptClaimQuote.mockResolvedValue({
-        id: 'q-srv-1',
+        id: claimQuoteId,
         status: 'ACCEPTED',
         acceptedAt: new Date('2026-11-25T10:00:00Z'),
       });
@@ -158,8 +176,8 @@ describe('Quote & Payment UseCases', () => {
           userId: validUserId,
           customerIdentityId: validCustomerIdentityId,
         },
-        claimId: 'claim-1',
-        quoteId: 'q-srv-1',
+        claimId,
+        quoteId: claimQuoteId,
       });
 
       expect(res.success).toBe(true);
@@ -168,7 +186,7 @@ describe('Quote & Payment UseCases', () => {
 
     it('should reject non-ISSUED service quote', async () => {
       mockRepository.findClaimQuoteById.mockResolvedValue({
-        id: 'q-srv-1',
+        id: claimQuoteId,
         quoteType: 'SERVICE',
         status: 'DRAFT',
       });
@@ -179,10 +197,27 @@ describe('Quote & Payment UseCases', () => {
             userId: validUserId,
             customerIdentityId: validCustomerIdentityId,
           },
-          claimId: 'claim-1',
-          quoteId: 'q-srv-1',
+          claimId,
+          quoteId: claimQuoteId,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('does not read the quote when Operations denies the claim', async () => {
+      mockClaimAccess.authorize.mockResolvedValue(false);
+      await expect(
+        acceptServiceQuoteUseCase.execute({
+          actor,
+          claimId,
+          quoteId: claimQuoteId,
+        }),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockClaimAccess.authorize).toHaveBeenCalledWith({
+        actor,
+        claimId,
+        action: ClaimQuoteAction.ACCEPT_QUOTE,
+      });
+      expect(mockRepository.findClaimQuoteById).not.toHaveBeenCalled();
     });
   });
 
@@ -372,11 +407,75 @@ describe('Quote & Payment UseCases', () => {
 
       await expect(
         createRefundRequestUseCase.execute({
-          transactionId: 'missing',
+          transactionId: '66666666-6666-4666-8666-666666666666',
           refundAmount: 100000,
           reason: 'Customer request',
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects a return refund without an eligible receipt before any write', async () => {
+      mockClaimAccess.getReturnReceipt.mockResolvedValue({ eligible: false });
+      await expect(
+        createRefundRequestUseCase.execute({
+          actor,
+          claimId,
+          transactionId: '66666666-6666-4666-8666-666666666666',
+          reason: 'Ring returned',
+          refundAmount: 100000,
+        }),
+      ).rejects.toThrow(ConflictException);
+      expect(mockRepository.createRefundRequest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Claim payment attempts', () => {
+    const transaction = {
+      id: 'claim-payment',
+      provider: 'PAYOS',
+      providerOrderCode: 123456n,
+      amount: 100000,
+      currency: 'VND',
+      status: 'PENDING',
+      paymentStage: 'SERVICE_FEE',
+    };
+
+    it('reuses the existing link for a repeated request', async () => {
+      mockRepository.beginClaimPaymentAttempt.mockResolvedValue({
+        created: false,
+        reusable: true,
+        transaction: {
+          ...transaction,
+          metadataJson: {
+            checkoutUrl: 'https://pay.example/link',
+            qrCode: 'qr',
+          },
+        },
+      });
+      await expect(
+        createClaimPaymentLinkUseCase.execute({ actor, claimId }),
+      ).resolves.toMatchObject({
+        transactionId: transaction.id,
+        orderCode: 123456,
+      });
+      expect(mockPayosGateway.createPaymentLink).not.toHaveBeenCalled();
+    });
+
+    it('holds the reserved code after an indeterminate provider response', async () => {
+      mockRepository.beginClaimPaymentAttempt.mockResolvedValue({
+        created: false,
+        reusable: true,
+        transaction,
+      });
+      mockPayosGateway.getPaymentInformation.mockResolvedValue(null);
+      await expect(
+        createClaimPaymentLinkUseCase.execute({ actor, claimId }),
+      ).rejects.toThrow(ServiceUnavailableException);
+      expect(mockPayosGateway.getPaymentInformation).toHaveBeenCalledWith(
+        123456,
+      );
+      expect(mockPayosGateway.createPaymentLink).not.toHaveBeenCalled();
+      expect(mockRepository.closeClaimPaymentAttempt).not.toHaveBeenCalled();
     });
   });
 });

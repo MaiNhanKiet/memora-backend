@@ -1,37 +1,46 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type {
-  AcceptServiceQuoteRequest,
-  AcceptServiceQuoteResponse,
-  ListClaimQuotesRequest,
-  ListClaimQuotesResponse,
+import { isUUID } from 'class-validator';
+import {
+  ClaimQuoteAction,
+  type AcceptServiceQuoteRequest,
+  type AcceptServiceQuoteResponse,
+  type ListClaimQuotesRequest,
+  type ListClaimQuotesResponse,
 } from '@app/contracts';
+import {
+  OPERATIONS_CLAIM_ACCESS,
+  requireClaimQuoteAccess,
+  type OperationsClaimAccess,
+} from './operations-claim-access.port';
 import { mapQuoteToDetail } from './ordering.mapper';
 import {
   ORDERING_REPOSITORY,
   type OrderingRepository,
 } from './ordering.repository';
-import { validateOrderingActor } from './ordering.validation';
 
 @Injectable()
 export class ListClaimQuotesUseCase {
   constructor(
     @Inject(ORDERING_REPOSITORY)
     private readonly repository: OrderingRepository,
+    @Inject(OPERATIONS_CLAIM_ACCESS)
+    private readonly claimAccess: OperationsClaimAccess,
   ) {}
 
   async execute(
     request: ListClaimQuotesRequest,
   ): Promise<ListClaimQuotesResponse> {
-    if (!request.claimId) {
-      throw new BadRequestException('Claim ID is required');
-    }
-    validateOrderingActor(request.actor);
+    await requireClaimQuoteAccess(
+      this.claimAccess,
+      request.claimId,
+      request.actor,
+      ClaimQuoteAction.VIEW_QUOTE,
+    );
 
     const quotes = await this.repository.findClaimQuotes(request.claimId);
     return {
@@ -45,22 +54,23 @@ export class AcceptServiceQuoteUseCase {
   constructor(
     @Inject(ORDERING_REPOSITORY)
     private readonly repository: OrderingRepository,
+    @Inject(OPERATIONS_CLAIM_ACCESS)
+    private readonly claimAccess: OperationsClaimAccess,
   ) {}
 
   async execute(
     request: AcceptServiceQuoteRequest,
   ): Promise<AcceptServiceQuoteResponse> {
-    if (!request.claimId || !request.quoteId) {
-      throw new BadRequestException('Claim ID and Quote ID are required');
+    if (!isUUID(request.quoteId)) {
+      throw new BadRequestException('Quote ID must be a UUID');
     }
 
-    const actor = validateOrderingActor(request.actor);
-    if (actor.kind === 'GUEST_SESSION') {
-      throw new ForbiddenException(
-        'A valid customer identity is required to accept a service quote',
-      );
-    }
-    const customerIdentityId = actor.customerIdentityId;
+    const customerIdentityId = await requireClaimQuoteAccess(
+      this.claimAccess,
+      request.claimId,
+      request.actor,
+      ClaimQuoteAction.ACCEPT_QUOTE,
+    );
 
     const quote = await this.repository.findClaimQuoteById(
       request.claimId,
@@ -78,28 +88,24 @@ export class AcceptServiceQuoteUseCase {
       );
     }
 
-    if (quote.status === 'ACCEPTED') {
-      return {
-        success: true,
-        quoteId: quote.id,
-        status: quote.status,
-        acceptedAt: (quote.acceptedAt ?? new Date()).toISOString(),
-      };
-    }
-
-    if (quote.status !== 'ISSUED') {
+    if (quote.status !== 'ISSUED' && quote.status !== 'ACCEPTED') {
       throw new BadRequestException(
         `Only ISSUED service quotes can be accepted. Current status: '${quote.status}'`,
       );
     }
 
-    if (quote.validUntil && quote.validUntil < new Date()) {
+    if (
+      quote.status === 'ISSUED' &&
+      quote.validUntil &&
+      quote.validUntil < new Date()
+    ) {
       throw new BadRequestException(
         `Service quote expired on ${quote.validUntil.toISOString()}`,
       );
     }
 
     const updated = await this.repository.acceptClaimQuote({
+      claimId: request.claimId,
       quoteId: quote.id,
       customerIdentityId,
     });

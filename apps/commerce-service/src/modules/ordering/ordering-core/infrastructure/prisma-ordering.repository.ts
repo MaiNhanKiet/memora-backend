@@ -297,13 +297,9 @@ export class PrismaOrderingRepository implements OrderingRepository {
     return this.payments.findOrderInvoice(orderId);
   }
 
-  createRefundRequest(params: {
-    transactionId: string;
-    refundAmount: number;
-    reason: string;
-    notes?: string;
-    staffUserId?: string;
-  }): Promise<OrderingPaymentTransactionRecord | undefined> {
+  createRefundRequest(
+    params: Parameters<OrderingRepository['createRefundRequest']>[0],
+  ) {
     return this.payments.createRefundRequest(params);
   }
 
@@ -318,25 +314,23 @@ export class PrismaOrderingRepository implements OrderingRepository {
     return this.quotes.findClaimQuoteById(claimId, quoteId);
   }
 
-  acceptClaimQuote(params: {
-    quoteId: string;
-    customerIdentityId: string;
-  }): Promise<OrderingQuoteRecord> {
+  acceptClaimQuote(
+    params: Parameters<OrderingRepository['acceptClaimQuote']>[0],
+  ) {
     return this.quotes.acceptClaimQuote(params);
   }
 
-  createPaymentTransaction(params: {
-    orderId?: string;
-    claimId?: string;
-    quoteId?: string;
-    paymentStage: string;
-    providerOrderCode: bigint;
-    amount: number;
-    currency?: string;
-    expiresAt?: Date;
-    metadata?: Record<string, unknown>;
-  }): Promise<OrderingPaymentTransactionRecord> {
-    return this.payments.createPaymentTransaction(params);
+  beginClaimPaymentAttempt(
+    params: Parameters<OrderingRepository['beginClaimPaymentAttempt']>[0],
+  ) {
+    return this.payments.beginClaimPaymentAttempt(params);
+  }
+
+  closeClaimPaymentAttempt(
+    transactionId: string,
+    status: 'EXPIRED' | 'CANCELLED',
+  ) {
+    return this.payments.closeClaimPaymentAttempt(transactionId, status);
   }
 
   beginOrderPaymentAttempt(

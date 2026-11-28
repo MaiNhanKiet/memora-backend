@@ -644,6 +644,8 @@ export interface CreateRefundRequestMessage {
   reason: string;
   notes?: string;
   staffUserId?: string;
+  claimId?: string;
+  actor?: VerifiedActor;
 }
 
 export interface CreateRefundResponse {

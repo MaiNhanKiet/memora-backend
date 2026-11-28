@@ -12,5 +12,6 @@ export * from './personalization/fingerprint-capture.grpc';
 export * from './personalization/source.grpc';
 export * from './personalization/soundwave-upload.grpc';
 export * from './operations/fulfillment.grpc';
+export * from './operations/after-sales.grpc';
 export * from './experience/memory.grpc';
 export * from './experience/platform.grpc';

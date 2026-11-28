@@ -452,6 +452,12 @@ export interface OrderingRepository {
     reason: string;
     notes?: string;
     staffUserId?: string;
+    returnReceipt?: {
+      claimId: string;
+      orderId: string;
+      ringItemId: string;
+      receiptId: string;
+    };
   }): Promise<OrderingPaymentTransactionRecord | undefined>;
   findClaimQuotes(claimId: string): Promise<OrderingQuoteRecord[]>;
   findClaimQuoteById(
@@ -459,20 +465,23 @@ export interface OrderingRepository {
     quoteId: string,
   ): Promise<OrderingQuoteRecord | undefined>;
   acceptClaimQuote(params: {
+    claimId: string;
     quoteId: string;
     customerIdentityId: string;
   }): Promise<OrderingQuoteRecord>;
-  createPaymentTransaction(params: {
-    orderId?: string;
-    claimId?: string;
-    quoteId?: string;
-    paymentStage: string;
+  beginClaimPaymentAttempt(params: {
+    claimId: string;
     providerOrderCode: bigint;
-    amount: number;
-    currency: string;
-    expiresAt: Date;
-    metadata: Record<string, unknown>;
-  }): Promise<OrderingPaymentTransactionRecord>;
+  }): Promise<{
+    transaction: OrderingPaymentTransactionRecord;
+    created: boolean;
+    reusable: boolean;
+    quoteNo: string;
+  }>;
+  closeClaimPaymentAttempt(
+    transactionId: string,
+    status: 'EXPIRED' | 'CANCELLED',
+  ): Promise<void>;
   beginOrderPaymentAttempt(params: {
     orderId: string;
     paymentStage?: string;

@@ -41,7 +41,11 @@ export class AdminPaymentsController {
     @CurrentUser() user: AuthenticatedPrincipal,
   ) {
     return this.orderingClient.createRefundRequest(
-      toCreateRefundRequestGrpcRequest(transactionId, body, user?.userId),
+      toCreateRefundRequestGrpcRequest(
+        transactionId,
+        body,
+        toVerifiedActor(user),
+      ),
     );
   }
 
