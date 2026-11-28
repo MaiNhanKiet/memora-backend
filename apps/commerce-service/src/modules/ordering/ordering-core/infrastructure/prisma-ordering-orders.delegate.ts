@@ -12,6 +12,7 @@ import {
   releaseCertifiedGemstoneAssignments,
   setCertifiedGemstoneAssignments,
 } from '../../../inventory/inventory-core/infrastructure/prisma-certified-gemstone-allocations';
+import { releaseOrderStockLotAllocations } from '../../../inventory/inventory-core/infrastructure/prisma-stock-lot-allocations';
 import { estimatePriceInTransaction } from '../../../pricing/pricing-core/infrastructure/prisma-pricing.repository';
 import type {
   CreateOrderTransactionInput,
@@ -668,14 +669,7 @@ export class PrismaOrderingOrdersDelegate {
       ['HOLD', 'RESERVED'],
       'Order cancelled',
     );
-    await tx.allocations.updateMany({
-      where: {
-        ring_item_id: { in: ringItemIds },
-        certified_gemstone_id: null,
-        status: { in: ['HOLD', 'RESERVED'] },
-      },
-      data: { status: 'RELEASED' },
-    });
+    await releaseOrderStockLotAllocations(tx, ringItemIds);
   }
 
   async cancelOrder(

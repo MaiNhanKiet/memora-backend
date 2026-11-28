@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../../generated/prisma/client';
 import type {
@@ -23,6 +27,11 @@ import {
   restoreCertifiedAvailability,
   setCertifiedGemstoneAssignments,
 } from './prisma-certified-gemstone-allocations';
+import {
+  lockAllocationStockLot,
+  lockStockLots,
+  releaseStockLotAllocation,
+} from './prisma-stock-lot-allocations';
 
 function toStockLotRecord(lot: stock_lots): StockLotRecord {
   return {
@@ -393,6 +402,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
     performedByUserId?: string;
   }): Promise<StockLotRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockStockLots(tx, [params.stockLotId]);
       const lot = await tx.stock_lots.findUnique({
         where: { id: params.stockLotId },
       });
@@ -444,7 +454,21 @@ export class PrismaInventoryRepository implements InventoryRepository {
     allocatedByUserId: string;
   }): Promise<AllocationRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
+      const [order] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT o.status FROM ordering.orders AS o
+        JOIN ordering.ring_items AS item ON item.order_id = o.id
+        WHERE item.id = ${params.ringItemId}::uuid
+        FOR NO KEY UPDATE OF o
+      `;
+      if (!order) throw new NotFoundException('Ring item not found');
+      if (order.status === 'CANCELLED' || order.status === 'EXPIRED_UNPAID') {
+        throw new ConflictException(
+          'Cannot hold inventory for an inactive order',
+        );
+      }
+
       if (params.stockLotId) {
+        await lockStockLots(tx, [params.stockLotId]);
         const lot = await tx.stock_lots.findUnique({
           where: { id: params.stockLotId },
         });
@@ -512,6 +536,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
   }): Promise<AllocationRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockAllocationGemstone(tx, params.allocationId);
+      await lockAllocationStockLot(tx, params.allocationId);
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
       });
@@ -562,6 +587,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
   }): Promise<AllocationRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockAllocationGemstone(tx, params.allocationId);
+      await lockAllocationStockLot(tx, params.allocationId);
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
       });
@@ -601,6 +627,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
   }): Promise<AllocationRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockAllocationGemstone(tx, params.allocationId);
+      await lockAllocationStockLot(tx, params.allocationId);
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
         include: { stock_lots: true, certified_gemstones: true },
@@ -615,11 +642,16 @@ export class PrismaInventoryRepository implements InventoryRepository {
         const lot = allocation.stock_lots;
         const nextOnHand = lot.quantity_on_hand - allocation.quantity;
         const nextReserved = lot.quantity_reserved - allocation.quantity;
+        if (nextOnHand < 0 || nextReserved < 0) {
+          throw new ConflictException(
+            'Stock reservation balance is inconsistent',
+          );
+        }
         await tx.stock_lots.update({
           where: { id: allocation.stock_lot_id },
           data: {
-            quantity_on_hand: Math.max(0, nextOnHand),
-            quantity_reserved: Math.max(0, nextReserved),
+            quantity_on_hand: nextOnHand,
+            quantity_reserved: nextReserved,
             status: nextOnHand <= 0 ? 'INACTIVE' : 'ACTIVE',
             updated_at: now,
           },
@@ -680,6 +712,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
   }): Promise<AllocationRecord> {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockAllocationGemstone(tx, params.allocationId);
+      await lockAllocationStockLot(tx, params.allocationId);
       const allocation = await tx.allocations.findUnique({
         where: { id: params.allocationId },
         include: { stock_lots: true, certified_gemstones: true },
@@ -694,18 +727,14 @@ export class PrismaInventoryRepository implements InventoryRepository {
       }
 
       const now = new Date();
-      if (allocation.stock_lot_id && allocation.stock_lots) {
-        const lot = allocation.stock_lots;
-        await tx.stock_lots.update({
-          where: { id: allocation.stock_lot_id },
-          data: {
-            quantity_reserved: Math.max(
-              0,
-              lot.quantity_reserved - allocation.quantity,
-            ),
-            updated_at: now,
-          },
-        });
+      if (allocation.stock_lot_id) {
+        return releaseStockLotAllocation(
+          tx,
+          { ...allocation, stock_lot_id: allocation.stock_lot_id },
+          now,
+          params.reason ?? 'Stock lot allocation released',
+          params.allocatedByUserId,
+        );
       }
 
       const released = await tx.allocations.update({
