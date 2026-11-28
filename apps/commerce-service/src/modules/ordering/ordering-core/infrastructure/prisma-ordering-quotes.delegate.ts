@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Prisma } from '../../../../../generated/prisma/client';
 import type { PrismaService } from '../../../../persistence/prisma/prisma.service';
 import {
@@ -9,7 +9,118 @@ import type {
   OrderingFinalConfirmationRecord,
   OrderingQuoteRecord,
 } from '../application/ordering.repository';
+import { resolveAllNoneFinalQuoteVersions } from '../application/ordering-state';
 import { toQuoteRecord } from './prisma-ordering.mappers';
+
+async function lockQuoteOrder(tx: Prisma.TransactionClient, orderId: string) {
+  await tx.$queryRaw`SELECT id FROM ordering.orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+  return tx.orders.findUnique({
+    where: { id: orderId },
+    select: {
+      order_no: true,
+      status: true,
+      current_quote_id: true,
+      owner_customer_identity_id: true,
+    },
+  });
+}
+
+async function lockQuoteRingItems(
+  tx: Prisma.TransactionClient,
+  orderId: string,
+) {
+  await tx.$queryRaw`
+    SELECT id FROM ordering.ring_items WHERE order_id = ${orderId}::uuid
+    ORDER BY id FOR NO KEY UPDATE
+  `;
+  await tx.$queryRaw`
+    SELECT version.id
+    FROM ordering.ring_item_versions AS version
+    JOIN ordering.ring_items AS item ON item.current_version_id = version.id
+    WHERE item.order_id = ${orderId}::uuid
+    ORDER BY version.id FOR NO KEY UPDATE OF version
+  `;
+  const rows = await tx.ring_items.findMany({
+    where: { order_id: orderId },
+    select: {
+      id: true,
+      current_version_id: true,
+      ring_item_versions_ring_items_current_version_idToring_item_versions: {
+        select: {
+          id: true,
+          ring_item_id: true,
+          status: true,
+          version_no: true,
+          personalization_package: true,
+        },
+      },
+    },
+  });
+
+  return rows.map((item) => {
+    const version =
+      item.ring_item_versions_ring_items_current_version_idToring_item_versions;
+    return {
+      id: item.id,
+      currentVersionId: item.current_version_id,
+      version: version && {
+        id: version.id,
+        ringItemId: version.ring_item_id,
+        status: version.status,
+        versionNo: version.version_no,
+        personalizationPackage: version.personalization_package,
+      },
+    };
+  });
+}
+
+function assertQuoteLinesBelongToOrder(
+  versions: Record<string, string> | undefined,
+  lines: readonly { ringItemId?: string }[],
+): void {
+  if (
+    versions &&
+    lines.some(
+      ({ ringItemId }) => ringItemId && !versions[ringItemId.toLowerCase()],
+    )
+  ) {
+    throw new BadRequestException(
+      'A final quote line refers to a ring item from another order',
+    );
+  }
+}
+
+async function assertFinalQuoteSnapshotMatches(
+  tx: Prisma.TransactionClient,
+  quoteId: string,
+  versions: Record<string, string> | undefined,
+): Promise<void> {
+  const line = await tx.quote_items.findFirst({
+    where: { quote_id: quoteId },
+    orderBy: { id: 'asc' },
+    select: { metadata_json: true },
+  });
+  const metadata = line?.metadata_json;
+  const snapshot =
+    metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? metadata.finalQuoteRingItemVersions
+      : undefined;
+  if (!versions && snapshot === undefined) return;
+  if (
+    !versions ||
+    !snapshot ||
+    typeof snapshot !== 'object' ||
+    Array.isArray(snapshot) ||
+    Object.keys(snapshot).length !== Object.keys(versions).length ||
+    Object.entries(versions).some(
+      ([itemId, versionId]) => snapshot[itemId] !== versionId,
+    )
+  ) {
+    throw new ConflictException(
+      'The final quote does not match the current ring item versions. Create a new final quote.',
+    );
+  }
+}
 
 export class PrismaOrderingQuotesDelegate {
   constructor(private readonly prisma: PrismaService) {}
@@ -61,13 +172,17 @@ export class PrismaOrderingQuotesDelegate {
     }[];
   }): Promise<OrderingQuoteRecord | undefined> {
     const created = await this.prisma.$transaction(async (tx) => {
-      const order = await tx.orders.findUnique({
-        where: { id: params.orderId },
-        select: { id: true, order_no: true },
-      });
+      const order = await lockQuoteOrder(tx, params.orderId);
       if (!order) {
         return undefined;
       }
+
+      const versions = resolveAllNoneFinalQuoteVersions(
+        order.status,
+        'PENDING_FINAL_QUOTE',
+        await lockQuoteRingItems(tx, params.orderId),
+      );
+      assertQuoteLinesBelongToOrder(versions, params.items);
 
       const lastQuote = await tx.quotes.findFirst({
         where: { order_id: params.orderId, quote_type: 'FINAL' },
@@ -101,6 +216,10 @@ export class PrismaOrderingQuotesDelegate {
               unit_amount: new Prisma.Decimal(item.unitAmount),
               line_amount: new Prisma.Decimal(item.lineAmount),
               price_source_type: item.priceSourceType ?? 'MANUAL',
+              // Every line carries the order snapshot so order-level lines work too.
+              metadata_json: versions
+                ? { finalQuoteRingItemVersions: versions }
+                : undefined,
             })),
           },
         },
@@ -143,6 +262,27 @@ export class PrismaOrderingQuotesDelegate {
     }[];
   }): Promise<OrderingQuoteRecord> {
     const updated = await this.prisma.$transaction(async (tx) => {
+      const order = await lockQuoteOrder(tx, params.orderId);
+      const existing = await tx.quotes.findFirst({
+        where: {
+          id: params.quoteId,
+          order_id: params.orderId,
+          quote_type: 'FINAL',
+          status: 'DRAFT',
+        },
+        select: { id: true },
+      });
+      if (!order || !existing) {
+        throw new ConflictException('The final quote can no longer be edited');
+      }
+
+      const versions = resolveAllNoneFinalQuoteVersions(
+        order.status,
+        'PENDING_FINAL_QUOTE',
+        await lockQuoteRingItems(tx, params.orderId),
+      );
+      await assertFinalQuoteSnapshotMatches(tx, params.quoteId, versions);
+      assertQuoteLinesBelongToOrder(versions, params.items ?? []);
       const updateData: Prisma.quotesUpdateInput = {
         ...(params.subtotalAmount !== undefined
           ? { subtotal_amount: new Prisma.Decimal(params.subtotalAmount) }
@@ -175,6 +315,9 @@ export class PrismaOrderingQuotesDelegate {
             unit_amount: new Prisma.Decimal(item.unitAmount),
             line_amount: new Prisma.Decimal(item.lineAmount),
             price_source_type: item.priceSourceType ?? 'MANUAL',
+            metadata_json: versions
+              ? { finalQuoteRingItemVersions: versions }
+              : undefined,
           })),
         });
       }
@@ -194,7 +337,7 @@ export class PrismaOrderingQuotesDelegate {
     quoteId: string,
   ): Promise<OrderingQuoteRecord> {
     const published = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM ordering.orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+      const order = await lockQuoteOrder(tx, orderId);
       const existing = await tx.quotes.findFirst({
         where: {
           id: quoteId,
@@ -203,10 +346,17 @@ export class PrismaOrderingQuotesDelegate {
           status: 'DRAFT',
         },
       });
-      if (!existing)
+      if (!order || !existing) {
         throw new ConflictException(
           'The final quote can no longer be published',
         );
+      }
+      const versions = resolveAllNoneFinalQuoteVersions(
+        order.status,
+        'PENDING_FINAL_QUOTE',
+        await lockQuoteRingItems(tx, orderId),
+      );
+      await assertFinalQuoteSnapshotMatches(tx, quoteId, versions);
       const validUntil =
         existing.valid_until ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -242,15 +392,7 @@ export class PrismaOrderingQuotesDelegate {
   ): Promise<OrderingFinalConfirmationRecord> {
     const { confirmation, ringItems } = await this.prisma.$transaction(
       async (tx) => {
-        await tx.$queryRaw`SELECT id FROM ordering.orders WHERE id = ${orderId}::uuid FOR UPDATE`;
-        const order = await tx.orders.findUnique({
-          where: { id: orderId },
-          select: {
-            status: true,
-            current_quote_id: true,
-            owner_customer_identity_id: true,
-          },
-        });
+        const order = await lockQuoteOrder(tx, orderId);
         if (
           order?.status !== 'AWAITING_FINAL_CONFIRMATION' ||
           order.current_quote_id !== quoteId ||
@@ -260,6 +402,14 @@ export class PrismaOrderingQuotesDelegate {
             'This quote is no longer the active final quote',
           );
         }
+        const items = await lockQuoteRingItems(tx, orderId);
+        const versions = resolveAllNoneFinalQuoteVersions(
+          order.status,
+          'AWAITING_FINAL_CONFIRMATION',
+          items,
+        );
+        await assertFinalQuoteSnapshotMatches(tx, quoteId, versions);
+
         const accepted = await tx.quotes.updateMany({
           where: {
             id: quoteId,
@@ -288,22 +438,12 @@ export class PrismaOrderingQuotesDelegate {
           },
         });
 
-        const items = await tx.ring_items.findMany({
-          where: { order_id: orderId },
-          select: {
-            id: true,
-            current_version_id: true,
-            ring_item_versions_ring_items_current_version_idToring_item_versions:
-              { select: { version_no: true, personalization_package: true } },
-          },
-        });
-
         const confirmationItems = items.flatMap((r) =>
-          r.current_version_id
+          r.currentVersionId
             ? [
                 {
                   ring_item_id: r.id,
-                  ring_item_version_id: r.current_version_id,
+                  ring_item_version_id: r.currentVersionId,
                 },
               ]
             : [],
@@ -329,13 +469,7 @@ export class PrismaOrderingQuotesDelegate {
           include: { final_confirmation_items: true },
         });
 
-        const allNone = items.every(
-          ({
-            ring_item_versions_ring_items_current_version_idToring_item_versions:
-              version,
-          }) => version?.personalization_package === 'NONE',
-        );
-        if (allNone) {
+        if (versions) {
           const assignments = await findCertifiedGemstoneAssignments(
             tx,
             confirmationItems.map(
@@ -377,13 +511,12 @@ export class PrismaOrderingQuotesDelegate {
       confirmedAt: confirmation.confirmed_at,
       items: confirmation.final_confirmation_items.map((i) => {
         const item = ringItems.find((r) => r.id === i.ring_item_id);
-        const ver =
-          item?.ring_item_versions_ring_items_current_version_idToring_item_versions;
+        const ver = item?.version;
         return {
           id: i.id,
           ringItemId: i.ring_item_id,
           ringItemVersionId: i.ring_item_version_id,
-          versionNo: ver?.version_no ?? 1,
+          versionNo: ver?.versionNo ?? 1,
         };
       }),
     };

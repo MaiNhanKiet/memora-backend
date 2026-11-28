@@ -1,7 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   assertOrderCancellable,
   assertValidOrderStatusTransition,
+  resolveAllNoneFinalQuoteVersions,
   resolveOrderNextPayment,
   resolveOrderStageGates,
 } from './ordering-state';
@@ -24,6 +25,86 @@ describe('ordering-state', () => {
       expect(() =>
         assertValidOrderStatusTransition('AWAITING_P1', 'DELIVERED'),
       ).toThrow(BadRequestException);
+    });
+  });
+
+  describe('resolveAllNoneFinalQuoteVersions', () => {
+    const ready = {
+      id: 'ring-1',
+      version: {
+        id: 'version-1',
+        ringItemId: 'ring-1',
+        status: 'REVIEW_NOT_REQUIRED',
+        personalizationPackage: 'NONE',
+      },
+    };
+
+    it('captures the current version of every ready ring in an All-NONE order', () => {
+      expect(
+        resolveAllNoneFinalQuoteVersions(
+          'PENDING_FINAL_QUOTE',
+          'PENDING_FINAL_QUOTE',
+          [
+            ready,
+            {
+              id: 'ring-2',
+              version: {
+                ...ready.version,
+                id: 'version-2',
+                ringItemId: 'ring-2',
+              },
+            },
+          ],
+        ),
+      ).toEqual({ 'ring-1': 'version-1', 'ring-2': 'version-2' });
+    });
+
+    it('rejects an All-NONE order at the wrong status', () => {
+      expect(() =>
+        resolveAllNoneFinalQuoteVersions('CANCELLED', 'PENDING_FINAL_QUOTE', [
+          ready,
+        ]),
+      ).toThrow(ConflictException);
+    });
+
+    it.each([
+      ['missing', null],
+      [
+        'not ready',
+        { ...ready.version, ringItemId: 'ring-2', status: 'DRAFT' },
+      ],
+      ['for a different ring', ready.version],
+    ])(
+      'rejects the order when a second current version is %s',
+      (_case, version) => {
+        expect(() =>
+          resolveAllNoneFinalQuoteVersions(
+            'AWAITING_FINAL_CONFIRMATION',
+            'AWAITING_FINAL_CONFIRMATION',
+            [ready, { id: 'ring-2', version }],
+          ),
+        ).toThrow(ConflictException);
+      },
+    );
+
+    it('leaves personalized orders to their separate workflow', () => {
+      expect(
+        resolveAllNoneFinalQuoteVersions(
+          'DESIGN_IN_PROGRESS',
+          'PENDING_FINAL_QUOTE',
+          [
+            ready,
+            {
+              id: 'ring-2',
+              version: {
+                ...ready.version,
+                ringItemId: 'ring-2',
+                personalizationPackage: 'FINGERPRINT',
+              },
+            },
+          ],
+        ),
+      ).toBeUndefined();
     });
   });
 

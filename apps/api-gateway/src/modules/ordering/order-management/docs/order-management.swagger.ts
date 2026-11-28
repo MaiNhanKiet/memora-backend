@@ -97,7 +97,7 @@ export function ApiCreateFinalQuoteDocs() {
     ApiOperation({
       summary: '[ORDER-011] Create Final Quote Draft (Staff)',
       description:
-        'Allows staff to create a DRAFT final quote with exact prices, components, and validity date for an order in PENDING_FINAL_QUOTE.',
+        'For All-NONE orders, the order must be in PENDING_FINAL_QUOTE and every current ring item version must be REVIEW_NOT_REQUIRED.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({
@@ -107,7 +107,12 @@ export function ApiCreateFinalQuoteDocs() {
     }),
     ApiResponse({
       status: 400,
-      description: 'Line items cannot be empty or invalid amounts',
+      description: 'Line items are missing, invalid, or refer to another order',
+    }),
+    ApiResponse({
+      status: 409,
+      description:
+        'The All-NONE order or its ring versions are not ready for a final quote',
     }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
@@ -131,7 +136,13 @@ export function ApiUpdateFinalQuoteDocs() {
     }),
     ApiResponse({
       status: 400,
-      description: 'Only DRAFT quotes can be edited',
+      description:
+        'Quote is not a DRAFT final quote or a line item refers to another order',
+    }),
+    ApiResponse({
+      status: 409,
+      description:
+        'The quote is stale or the All-NONE order or its ring versions are not ready',
     }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
@@ -154,6 +165,11 @@ export function ApiPublishFinalQuoteDocs() {
       description: 'Final quote published to customer successfully',
     }),
     ApiResponse({ status: 400, description: 'Quote is not in DRAFT status' }),
+    ApiResponse({
+      status: 409,
+      description:
+        'The quote is stale or the All-NONE order or its ring versions are not ready',
+    }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
     notFound('Quote or order'),

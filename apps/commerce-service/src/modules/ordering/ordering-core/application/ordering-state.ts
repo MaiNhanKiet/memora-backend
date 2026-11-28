@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import type { OrderNextPayment, StageGateItem } from '@app/contracts';
 import type {
   OrderingDetailRecord,
@@ -35,6 +35,48 @@ export function assertValidOrderStatusTransition(
       `Cannot transition order status from '${previousStatus}' to '${targetStatus}'. Allowed: [${allowed.join(', ')}]`,
     );
   }
+}
+
+export function resolveAllNoneFinalQuoteVersions(
+  orderStatus: string,
+  expectedOrderStatus: 'PENDING_FINAL_QUOTE' | 'AWAITING_FINAL_CONFIRMATION',
+  items: readonly {
+    id: string;
+    version: {
+      id: string;
+      ringItemId: string;
+      status: string;
+      personalizationPackage: string;
+    } | null;
+  }[],
+): Record<string, string> | undefined {
+  if (
+    items.some(
+      ({ version }) => version && version.personalizationPackage !== 'NONE',
+    )
+  ) {
+    return undefined;
+  }
+
+  if (orderStatus !== expectedOrderStatus || items.length === 0) {
+    throw new ConflictException(
+      `The order must contain ring items and be in ${expectedOrderStatus} for this final quote action`,
+    );
+  }
+
+  return Object.fromEntries(
+    items.map(({ id, version }) => {
+      if (
+        version?.ringItemId !== id ||
+        version.status !== 'REVIEW_NOT_REQUIRED'
+      ) {
+        throw new ConflictException(
+          `Ring item ${id} does not have a current version ready for the final quote`,
+        );
+      }
+      return [id, version.id];
+    }),
+  );
 }
 
 export function assertOrderCancellable(status: string): void {
