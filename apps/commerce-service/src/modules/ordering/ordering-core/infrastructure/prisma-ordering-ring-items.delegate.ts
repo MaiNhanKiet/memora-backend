@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { Prisma } from '../../../../../generated/prisma/client';
 import type { PrismaService } from '../../../../persistence/prisma/prisma.service';
 import type {
@@ -213,10 +214,21 @@ export class PrismaOrderingRingItemsDelegate {
         : {}),
     };
 
-    const updated = await this.prisma.ring_item_versions.update({
-      where: { id: versionId },
+    const [updated] = await this.prisma.ring_item_versions.updateManyAndReturn({
+      where: {
+        id: versionId,
+        status: 'DRAFT',
+        ring_items_ring_items_current_version_idToring_item_versions: {
+          some: {},
+        },
+      },
       data: updateData,
     });
+    if (!updated) {
+      throw new ConflictException(
+        'The current ring item version is no longer editable',
+      );
+    }
 
     return {
       id: updated.id,

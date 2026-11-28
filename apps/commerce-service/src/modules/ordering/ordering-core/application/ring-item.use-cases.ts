@@ -109,12 +109,9 @@ export class UpdateCurrentRingItemVersionUseCase {
       );
     }
 
-    if (
-      currentVersion.status !== 'DRAFT' &&
-      currentVersion.status !== 'SUBMITTED'
-    ) {
+    if (currentVersion.status !== 'DRAFT') {
       throw new BadRequestException(
-        `Cannot modify ring item version in status '${currentVersion.status}'. Only DRAFT or SUBMITTED versions can be updated.`,
+        `Cannot modify ring item version in status '${currentVersion.status}'. Only DRAFT versions can be updated.`,
       );
     }
 

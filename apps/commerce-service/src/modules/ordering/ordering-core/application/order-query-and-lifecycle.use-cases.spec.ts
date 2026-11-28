@@ -208,24 +208,27 @@ describe('Order Query, Ring Item & Lifecycle UseCases', () => {
   });
 
   describe('UpdateCurrentRingItemVersionUseCase', () => {
-    it('should throw BadRequestException if version is locked', async () => {
-      mockRepository.findCurrentRingItemVersion.mockResolvedValue({
-        id: 'ver-1',
-        status: 'APPROVED',
-      });
+    it.each(['SUBMITTED', 'MANAGER_APPROVED'])(
+      'rejects direct edits to a %s version',
+      async (status) => {
+        mockRepository.findCurrentRingItemVersion.mockResolvedValue({
+          id: 'ver-1',
+          status,
+        });
 
-      await expect(
-        updateCurrentRingItemVersionUseCase.execute({
-          actor: {
-            userId: validUserId,
-            customerIdentityId: validCustomerIdentityId,
-          },
-          orderId: 'order-1',
-          ringItemId: 'item-1',
-          targetSize: 13,
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
+        await expect(
+          updateCurrentRingItemVersionUseCase.execute({
+            actor: {
+              userId: validUserId,
+              customerIdentityId: validCustomerIdentityId,
+            },
+            orderId: 'order-1',
+            ringItemId: 'item-1',
+            targetSize: 13,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
 
     it('should update current version when DRAFT', async () => {
       mockRepository.findCurrentRingItemVersion.mockResolvedValue({
