@@ -62,7 +62,7 @@ export interface MemoryCardRepository {
   activateCard(
     cardId: string,
     initialPinHash?: string,
-  ): Promise<MemoryCardRecord>;
+  ): Promise<MemoryCardRecord | undefined>;
   updatePin(cardId: string, pinHash: string): Promise<MemoryCardRecord>;
   changeVerifiedPin(
     cardId: string,

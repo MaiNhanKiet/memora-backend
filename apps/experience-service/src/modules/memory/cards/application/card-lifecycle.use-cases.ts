@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -11,6 +12,10 @@ import type {
   MemoryCardDetailResponse,
   ProvisionMemoryCardRequest,
 } from '@app/contracts';
+import {
+  MEMORY_ACTIVATION_ELIGIBILITY,
+  type MemoryActivationEligibility,
+} from './memory-activation-eligibility.port';
 import { toMemoryCardDetail } from './memory-card.mapper';
 import {
   MEMORY_CARD_REPOSITORY,
@@ -56,6 +61,8 @@ export class ActivateCardUseCase {
     @Inject(MEMORY_CARD_REPOSITORY)
     private readonly cardRepository: MemoryCardRepository,
     private readonly pinHasher: PinHasher,
+    @Inject(MEMORY_ACTIVATION_ELIGIBILITY)
+    private readonly eligibility: MemoryActivationEligibility,
   ) {}
 
   async execute(
@@ -81,19 +88,28 @@ export class ActivateCardUseCase {
       );
     }
 
-    let initialPinHash: string | undefined;
     if (request.initialPin) {
       assertValidPinFormat(
         request.initialPin,
         'PIN must be 4 to 6 numeric digits',
       );
-      initialPinHash = await this.pinHasher.hash(request.initialPin);
     }
+    if (!(await this.eligibility.isEligible(card.ringItemId, request.actor))) {
+      throw new ConflictException(
+        'The order does not meet the Memory activation requirements',
+      );
+    }
+    const initialPinHash = request.initialPin
+      ? await this.pinHasher.hash(request.initialPin)
+      : undefined;
 
     const updated = await this.cardRepository.activateCard(
       card.id,
       initialPinHash,
     );
+    if (!updated) {
+      throw new ConflictException('The memory card is no longer pending');
+    }
 
     return toMemoryCardDetail(updated, true);
   }

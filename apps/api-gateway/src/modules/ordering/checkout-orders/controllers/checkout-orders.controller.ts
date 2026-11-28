@@ -113,9 +113,11 @@ export class CheckoutOrdersController {
     @Param('orderId', ParseUUIDPipe) orderId: string,
   ) {
     const actor = toVerifiedActor(principal);
-    return this.orderingClient.getOrderById(
-      toGetOrderByIdGrpcRequest(actor, orderId),
-    );
+    const { finalPaymentSatisfied: _finalPaymentSatisfied, ...order } =
+      await this.orderingClient.getOrderById(
+        toGetOrderByIdGrpcRequest(actor, orderId),
+      );
+    return order;
   }
 
   // ---------------------------------------------------------------------------

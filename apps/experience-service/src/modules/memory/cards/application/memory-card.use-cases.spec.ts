@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ConflictException,
+  ServiceUnavailableException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -22,6 +24,7 @@ import {
   MEMORY_CARD_REPOSITORY,
   type MemoryCardWithGrantsRecord,
 } from './memory-card.repository';
+import { MEMORY_ACTIVATION_ELIGIBILITY } from './memory-activation-eligibility.port';
 import { PinHasher } from './pin-hasher';
 
 describe('MemoryCard UseCases', () => {
@@ -44,6 +47,8 @@ describe('MemoryCard UseCases', () => {
     changeVerifiedPin: jest.fn(),
     applyPinVerification: jest.fn(),
   };
+
+  const mockEligibility = { isEligible: jest.fn() };
 
   const mockPinHasher = {
     hash: jest
@@ -75,6 +80,7 @@ describe('MemoryCard UseCases', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockEligibility.isEligible.mockReset().mockResolvedValue(true);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -88,6 +94,7 @@ describe('MemoryCard UseCases', () => {
         ResetPinUseCase,
         { provide: MEMORY_CARD_REPOSITORY, useValue: mockCardRepository },
         { provide: PinHasher, useValue: mockPinHasher },
+        { provide: MEMORY_ACTIVATION_ELIGIBILITY, useValue: mockEligibility },
       ],
     }).compile();
 
@@ -210,11 +217,70 @@ describe('MemoryCard UseCases', () => {
 
       expect(res.status).toBe('ACTIVE');
       expect(res.hasPin).toBe(true);
+      expect(mockEligibility.isEligible).toHaveBeenCalledWith(
+        sampleCard.ringItemId,
+        sampleActor,
+      );
       expect(mockPinHasher.hash).toHaveBeenCalledWith('1234');
       expect(mockCardRepository.activateCard).toHaveBeenCalledWith(
         sampleCard.id,
         'hash_1234',
       );
+    });
+  });
+
+  describe('activation requirements', () => {
+    it('rejects a different owner before contacting another service', async () => {
+      mockCardRepository.findById.mockResolvedValue({
+        ...sampleCard,
+        ownerCustomerIdentityId: 'other-customer',
+      });
+      await expect(
+        activateCardUseCase.execute({
+          actor: sampleActor,
+          cardId: sampleCard.id,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockEligibility.isEligible).not.toHaveBeenCalled();
+    });
+
+    it('leaves the card pending when handover or order checks fail', async () => {
+      mockCardRepository.findById.mockResolvedValue(sampleCard);
+      mockEligibility.isEligible.mockResolvedValue(false);
+      await expect(
+        activateCardUseCase.execute({
+          actor: sampleActor,
+          cardId: sampleCard.id,
+          initialPin: '1234',
+        }),
+      ).rejects.toThrow(ConflictException);
+      expect(mockCardRepository.activateCard).not.toHaveBeenCalled();
+      expect(mockPinHasher.hash).not.toHaveBeenCalled();
+    });
+
+    it('leaves the card pending when a dependency is unavailable', async () => {
+      mockCardRepository.findById.mockResolvedValue(sampleCard);
+      mockEligibility.isEligible.mockRejectedValue(
+        new ServiceUnavailableException(),
+      );
+      await expect(
+        activateCardUseCase.execute({
+          actor: sampleActor,
+          cardId: sampleCard.id,
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+      expect(mockCardRepository.activateCard).not.toHaveBeenCalled();
+    });
+
+    it('rejects activation when another request has already changed the card', async () => {
+      mockCardRepository.findById.mockResolvedValue(sampleCard);
+      mockCardRepository.activateCard.mockResolvedValue(undefined);
+      await expect(
+        activateCardUseCase.execute({
+          actor: sampleActor,
+          cardId: sampleCard.id,
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 

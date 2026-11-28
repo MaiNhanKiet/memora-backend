@@ -15,6 +15,7 @@ import type {
   TimelineEventItem,
 } from '@app/contracts';
 import {
+  isFinalPaymentSatisfied,
   resolveOrderNextPayment,
   resolveOrderStageGates,
 } from './ordering-state';
@@ -89,6 +90,7 @@ export class GetOrderByIdUseCase {
     return {
       ...mapOrderDetail(order),
       nextPayment: resolveOrderNextPayment(order, payments),
+      finalPaymentSatisfied: isFinalPaymentSatisfied(order, payments),
     };
   }
 }

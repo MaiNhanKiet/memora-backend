@@ -138,6 +138,7 @@ export interface OrderNextPayment {
 }
 
 export interface GetOrderByIdResponse {
+  finalPaymentSatisfied?: boolean;
   nextPayment?: OrderNextPayment;
   id: string;
   orderNo: string;

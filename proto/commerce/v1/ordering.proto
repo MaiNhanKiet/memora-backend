@@ -182,6 +182,7 @@ message GetOrderByIdResponse {
   string created_at = 12;
   string updated_at = 13;
   OrderNextPayment next_payment = 14;
+  optional bool final_payment_satisfied = 15;
 }
 
 message GetOrderTimelineRequest {

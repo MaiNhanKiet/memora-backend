@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   assertOrderCancellable,
   assertValidOrderStatusTransition,
+  isFinalPaymentSatisfied,
   resolveFinalQuoteVersions,
   resolveOrderNextPayment,
   resolveOrderStageGates,
@@ -187,6 +188,47 @@ describe('ordering-state', () => {
       status: 'SUCCEEDED',
       requestedAt: new Date(),
     };
+
+    it('checks final payment for completed orders using net settled credit', () => {
+      const completedOrder = { ...order, status: 'COMPLETED' };
+      const final = {
+        ...deposit,
+        id: 'p3',
+        paymentStage: 'FINAL_P3',
+        amount: 6500000,
+      };
+      expect(
+        resolveOrderNextPayment(completedOrder, [deposit, final]),
+      ).toBeUndefined();
+      expect(isFinalPaymentSatisfied(completedOrder, [deposit, final])).toBe(
+        true,
+      );
+      expect(
+        isFinalPaymentSatisfied(completedOrder, [
+          deposit,
+          { ...final, status: 'PENDING' },
+        ]),
+      ).toBe(false);
+      expect(
+        isFinalPaymentSatisfied(completedOrder, [
+          deposit,
+          final,
+          {
+            ...final,
+            id: 'refund',
+            transactionType: 'REFUND',
+            relatedTransactionId: final.id,
+            amount: 1,
+          },
+        ]),
+      ).toBe(false);
+      expect(
+        isFinalPaymentSatisfied(
+          { ...completedOrder, currentQuote: { ...quote, status: 'ISSUED' } },
+          [deposit, final],
+        ),
+      ).toBe(false);
+    });
 
     it('charges only the gap to 70% and blocks a new payment when already paid', () => {
       expect(resolveOrderNextPayment(order, [deposit])).toMatchObject({

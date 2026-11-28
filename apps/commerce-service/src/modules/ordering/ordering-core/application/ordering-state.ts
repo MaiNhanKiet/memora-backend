@@ -205,6 +205,32 @@ export function resolvePaymentCredit(
   );
 }
 
+const FINAL_PAYMENT_CREDIT_STAGES = new Set([
+  'DEPOSIT_P1',
+  'MILESTONE_P2',
+  'FINAL_P3',
+  'FULL_PAYMENT',
+]);
+
+export function isFinalPaymentSatisfied(
+  order: OrderingDetailRecord,
+  payments: readonly OrderingPaymentTransactionRecord[],
+): boolean {
+  const quote = order.currentQuote;
+  if (
+    quote?.quoteType !== 'FINAL' ||
+    quote.status !== 'ACCEPTED' ||
+    quote.currency !== 'VND' ||
+    quote.totalAmount < 0
+  ) {
+    return false;
+  }
+  return (
+    resolvePaymentCredit(payments, quote, FINAL_PAYMENT_CREDIT_STAGES, false) >=
+    Math.round(quote.totalAmount)
+  );
+}
+
 export function resolveOrderNextPayment(
   order: OrderingDetailRecord,
   payments: readonly OrderingPaymentTransactionRecord[],
@@ -244,11 +270,10 @@ export function resolveOrderNextPayment(
     return undefined;
   }
 
-  const creditedStages = new Set(
+  const creditedStages =
     stage === 'DEPOSIT_P1'
-      ? ['DEPOSIT_P1']
-      : ['DEPOSIT_P1', 'MILESTONE_P2', 'FINAL_P3', 'FULL_PAYMENT'],
-  );
+      ? new Set(['DEPOSIT_P1'])
+      : FINAL_PAYMENT_CREDIT_STAGES;
   const paidAmount = resolvePaymentCredit(
     payments,
     quote,

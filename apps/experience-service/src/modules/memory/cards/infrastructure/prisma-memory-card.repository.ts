@@ -145,10 +145,10 @@ export class PrismaMemoryCardRepository implements MemoryCardRepository {
   async activateCard(
     cardId: string,
     initialPinHash?: string,
-  ): Promise<MemoryCardRecord> {
+  ): Promise<MemoryCardRecord | undefined> {
     const now = new Date();
-    const updated = await this.prisma.memory_cards.update({
-      where: { id: cardId },
+    const [updated] = await this.prisma.memory_cards.updateManyAndReturn({
+      where: { id: cardId, status: 'PENDING', deleted_at: null },
       data: {
         status: 'ACTIVE',
         activated_at: now,
@@ -163,7 +163,7 @@ export class PrismaMemoryCardRepository implements MemoryCardRepository {
         updated_at: now,
       },
     });
-    return toMemoryCardRecord(updated);
+    return updated ? toMemoryCardRecord(updated) : undefined;
   }
 
   async updatePin(cardId: string, pinHash: string): Promise<MemoryCardRecord> {

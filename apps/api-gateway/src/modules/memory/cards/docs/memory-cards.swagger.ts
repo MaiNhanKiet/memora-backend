@@ -1,6 +1,8 @@
 import { applyDecorators } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConflictResponse,
+  ApiServiceUnavailableResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -60,7 +62,7 @@ export function ApiActivateCardDocs() {
     ApiOperation({
       summary: '[MEMOR-003] Kích hoạt Thẻ Ký Ức',
       description:
-        'Chủ sở hữu kích hoạt thẻ sau khi nhận nhẫn bàn giao thành công. Có thể cài đặt mã PIN ban đầu ngay khi kích hoạt.',
+        'Chủ sở hữu có thể kích hoạt thẻ và cài PIN sau khi đơn đã thanh toán đủ và bàn giao đầy đủ.',
     }),
     ApiParam({
       name: 'cardId',
@@ -72,6 +74,13 @@ export function ApiActivateCardDocs() {
       type: MemoryCardDetailDto,
       status: 200,
       description: 'Thẻ đã được kích hoạt thành công',
+    }),
+    ApiConflictResponse({
+      description:
+        'Đơn chưa đủ điều kiện kích hoạt hoặc thẻ vừa được kích hoạt',
+    }),
+    ApiServiceUnavailableResponse({
+      description: 'Tạm thời chưa xác minh được đơn hàng hoặc bàn giao',
     }),
   );
 }
