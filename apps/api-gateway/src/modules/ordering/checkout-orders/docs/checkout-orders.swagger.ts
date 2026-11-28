@@ -11,6 +11,7 @@ import {
   AdminOrderDetailsResponseDto,
   AdminOrderSummaryDto,
   CancelOrderResponseDto,
+  OrderDetailsResponseDto,
   RingItemDetailResponseDto,
   RingItemVersionSummaryDto,
   UpdateCurrentRingItemVersionResponseDto,
@@ -46,6 +47,7 @@ export function ApiCreateOrderDocs() {
       description:
         'Converts 1-2 selected drafts into an Order with Ring Items, Version V1 snapshot, and Provisional Quote. ' +
         'Sets initial status to AWAITING_P1 (for FP/SW rings) or PENDING_FINAL_QUOTE (for All-NONE rings). ' +
+        'Certified gemstones selected in the cart are held for 15 minutes. If any cannot be held, all selected drafts remain in the cart. ' +
         'Selected drafts are converted and detached from active cart upon success.',
     }),
     ApiSuccessResponse({
@@ -61,6 +63,11 @@ export function ApiCreateOrderDocs() {
     unauthorized,
     forbidden('Guest checkout is not permitted for personalized rings'),
     notFound('One or more selected drafts not found or not in cart'),
+    ApiResponse({
+      status: 409,
+      description:
+        'A selected draft changed, a selected price changed or is no longer available, or a certified gemstone became unavailable. Review the cart before placing the order again.',
+    }),
   );
 }
 
@@ -98,7 +105,7 @@ export function ApiGetOrderByIdDocs() {
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({
-      type: AdminOrderDetailsResponseDto,
+      type: OrderDetailsResponseDto,
       description: 'Order details returned successfully',
     }),
     unauthorized,
@@ -214,7 +221,7 @@ export function ApiCancelOrderDocs() {
     ApiOperation({
       summary: '[ORDER-005] Customer cancels order',
       description:
-        'Cancels order if in cancellable status (AWAITING_P1, PENDING_FINAL_QUOTE, AWAITING_CUSTOMER_CONFIRMATION) and releases inventory allocations.',
+        'Cancels order if in cancellable status (AWAITING_P1, PENDING_FINAL_QUOTE, AWAITING_FINAL_CONFIRMATION) and releases inventory allocations.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({

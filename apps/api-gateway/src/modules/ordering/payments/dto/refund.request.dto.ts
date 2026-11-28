@@ -1,6 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateRefundRequestBodyDto {
   @ApiProperty({ example: 4500000 })
@@ -19,6 +25,14 @@ export class CreateRefundRequestBodyDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Return claim ID for refunds after handover',
+  })
+  @IsOptional()
+  @IsUUID()
+  claimId?: string;
 }
 
 export class CreateRefundResponseDto {

@@ -1,10 +1,12 @@
 import type {
   CreateCertifiedGemstoneRequest,
   ListCertifiedGemstoneAvailabilityRequest,
+  ListCertifiedGemstoneAvailabilityResponse,
   ListGemstoneBatchesRequest,
   ReceiveGemstoneBatchRequest,
 } from '@app/contracts';
 import type {
+  CertifiedGemstoneListResponseDto,
   CreateCertifiedGemstoneBodyDto,
   ListCertifiedGemstoneAvailabilityQueryDto,
   ListGemstoneBatchesQueryDto,
@@ -65,5 +67,21 @@ export function toListCertifiedGemstoneAvailabilityGrpcRequest(
     status: query.status,
     limit: query.limit,
     offset: query.offset,
+  };
+}
+
+export function toCertifiedGemstoneAvailabilityHttpResponse(
+  response: ListCertifiedGemstoneAvailabilityResponse,
+): CertifiedGemstoneListResponseDto {
+  return {
+    items: response.items.map(
+      ({ id, gemstoneOptionId, certificateProvider, status }) => ({
+        id,
+        gemstoneOptionId,
+        certificateProvider,
+        status,
+      }),
+    ),
+    total: response.total,
   };
 }

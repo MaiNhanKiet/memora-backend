@@ -89,14 +89,6 @@ export class ResetPinDto {
   @IsString()
   @Matches(/^\d{4,6}$/, { message: 'Mã PIN mới phải gồm từ 4 đến 6 chữ số' })
   newPin!: string;
-
-  @ApiProperty({
-    description: 'Mã OTP xác thực danh tính gửi về email',
-    example: '123456',
-  })
-  @IsNotEmpty({ message: 'Mã xác thực OTP không được để trống' })
-  @IsString()
-  verificationCode!: string;
 }
 
 export class PinActionResponseDto {

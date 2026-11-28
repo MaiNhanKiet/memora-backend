@@ -84,7 +84,7 @@ export function ApiConfirmFinalQuoteDocs() {
     ApiOperation({
       summary: '[ORDER-014] Customer confirms Final Quote',
       description:
-        'Customer accepts the ISSUED final quote, snapshots confirmed items, and advances order to AWAITING_P2.',
+        'The customer accepts the active ISSUED final quote. All-NONE orders confirm the quoted versions and skip P2. Orders with personalization advance to AWAITING_P2.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({
@@ -94,6 +94,11 @@ export function ApiConfirmFinalQuoteDocs() {
     ApiResponse({
       status: 400,
       description: 'Quote is not in ISSUED status or has expired',
+    }),
+    ApiResponse({
+      status: 409,
+      description:
+        'The final quote is stale, no longer active, or has ring versions that are not ready',
     }),
     unauthorized,
     forbidden('Caller does not own this order'),
@@ -108,7 +113,7 @@ export function ApiRejectFinalQuoteDocs() {
     ApiOperation({
       summary: '[ORDER-015 Part B] Customer rejects Final Quote',
       description:
-        'Customer rejects the final quote with a mandatory reason, reverting order to PENDING_FINAL_QUOTE.',
+        'The customer rejects the final quote with a reason. All-NONE orders return to PENDING_FINAL_QUOTE. Personalized orders return to DESIGN_IN_PROGRESS.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({

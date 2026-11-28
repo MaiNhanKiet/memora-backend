@@ -20,6 +20,11 @@ service CartService {
 message GemstoneSelectionItem {
   int32 slot_number = 1;
   string gemstone_option_id = 2;
+  optional string certified_gemstone_id = 3;
+}
+
+message GemstoneSelectionUpdate {
+  repeated GemstoneSelectionItem items = 1;
 }
 
 message CartItemDraft {
@@ -79,6 +84,7 @@ message UpdateCartItemRequest {
   optional string personalization_package = 4;
   optional bool memory_enabled = 5;
   optional string maintenance_plan = 6;
+  GemstoneSelectionUpdate gemstone_selection_update = 7;
 }
 
 message UpdateCartItemResponse {

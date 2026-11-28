@@ -1,12 +1,79 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  CATALOG_CDN_BASE_URL,
+  DEFAULT_CATALOG_CDN_BASE_URL,
+} from './application/catalog.mapper';
+import { CATALOG_REPOSITORY } from './application/catalog.repository';
+import {
+  CreateGemstoneOptionUseCase,
+  ListGemstoneOptionsUseCase,
+  ListGemstoneSlotsUseCase,
+  UpdateCompatibilitiesUseCase,
+} from './application/gemstone.use-cases';
+import {
+  CreateMaterialUseCase,
+  ListMaterialsUseCase,
+  UpdateMaterialUseCase,
+} from './application/material.use-cases';
+import {
+  GetResizePoliciesUseCase,
+  UpdateResizePoliciesUseCase,
+} from './application/resize-policy.use-cases';
+import {
+  GetTemplate3DAssetsUseCase,
+  GetTemplateByIdUseCase,
+  GetTemplateConfigurationOptionsUseCase,
+  ListTemplatesUseCase,
+} from './application/template-query.use-cases';
+import {
+  ArchiveTemplateUseCase,
+  CreateTemplateUseCase,
+  PublishTemplateUseCase,
+  UpdateTemplateUseCase,
+} from './application/template.use-cases';
+import { ValidateConfigurationUseCase } from './application/validate-configuration.use-case';
+import {
+  CreateVariantUseCase,
+  ListTemplateVariantsUseCase,
+  UpdateVariantUseCase,
+} from './application/variant.use-cases';
+import { PrismaCatalogRepository } from './infrastructure/prisma-catalog.repository';
 import { CatalogGrpcController } from './presentation/catalog.grpc.controller';
-import { CatalogService } from './application/catalog.service';
-import { CatalogMapper } from './application/catalog.mapper';
-import { CatalogRepository } from './infrastructure/catalog.repository';
 
 @Module({
   controllers: [CatalogGrpcController],
-  providers: [CatalogService, CatalogMapper, CatalogRepository],
-  exports: [CatalogService, CatalogMapper, CatalogRepository],
+  providers: [
+    ListTemplatesUseCase,
+    GetTemplateByIdUseCase,
+    GetTemplateConfigurationOptionsUseCase,
+    GetTemplate3DAssetsUseCase,
+    CreateTemplateUseCase,
+    UpdateTemplateUseCase,
+    PublishTemplateUseCase,
+    ArchiveTemplateUseCase,
+    ListMaterialsUseCase,
+    CreateMaterialUseCase,
+    UpdateMaterialUseCase,
+    ListTemplateVariantsUseCase,
+    CreateVariantUseCase,
+    UpdateVariantUseCase,
+    ListGemstoneOptionsUseCase,
+    ListGemstoneSlotsUseCase,
+    CreateGemstoneOptionUseCase,
+    UpdateCompatibilitiesUseCase,
+    GetResizePoliciesUseCase,
+    UpdateResizePoliciesUseCase,
+    ValidateConfigurationUseCase,
+    {
+      provide: CATALOG_CDN_BASE_URL,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService): string =>
+        configService.get<string>('commerce.catalogCdnBaseUrl') ??
+        DEFAULT_CATALOG_CDN_BASE_URL,
+    },
+    { provide: CATALOG_REPOSITORY, useClass: PrismaCatalogRepository },
+  ],
+  exports: [CATALOG_REPOSITORY],
 })
 export class CatalogCoreModule {}

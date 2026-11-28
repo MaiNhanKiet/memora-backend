@@ -4,7 +4,10 @@ import { Public } from '@app/common';
 import { InventoryGrpcClient } from '../../clients/inventory-grpc.client';
 import { ListCertifiedGemstoneAvailabilityQueryDto } from '../dto';
 import { ApiListCertifiedGemstoneAvailabilityDocs } from '../docs/gemstone-availability.swagger';
-import { toListCertifiedGemstoneAvailabilityGrpcRequest } from '../mappers/gemstone-http.mapper';
+import {
+  toCertifiedGemstoneAvailabilityHttpResponse,
+  toListCertifiedGemstoneAvailabilityGrpcRequest,
+} from '../mappers/gemstone-http.mapper';
 
 @ApiTags('commerce-inventory')
 @Controller('inventory')
@@ -21,8 +24,9 @@ export class GemstoneAvailabilityController {
   async listCertifiedGemstoneAvailability(
     @Query() query: ListCertifiedGemstoneAvailabilityQueryDto,
   ) {
-    return this.inventoryClient.listCertifiedGemstoneAvailability(
+    const result = await this.inventoryClient.listCertifiedGemstoneAvailability(
       toListCertifiedGemstoneAvailabilityGrpcRequest(query),
     );
+    return toCertifiedGemstoneAvailabilityHttpResponse(result);
   }
 }

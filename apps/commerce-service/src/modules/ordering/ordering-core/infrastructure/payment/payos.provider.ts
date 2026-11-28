@@ -1,31 +1,34 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import type {
   PayosCreatePaymentLinkParams,
+  PayosGateway,
+  PayosPaymentInfo,
   PayosPaymentLinkData,
   PayosWebhookPayload,
-} from './payos.interface';
+} from '../../application/payos.gateway';
+
+interface PayosCredentials {
+  readonly clientId: string;
+  readonly apiKey: string;
+  readonly checksumKey: string;
+}
 
 @Injectable()
-export class PayosProvider {
+export class PayosProvider implements PayosGateway {
   private readonly logger = new Logger(PayosProvider.name);
-  private readonly clientId?: string;
-  private readonly apiKey?: string;
-  private readonly checksumKey?: string;
-  private readonly isConfigured: boolean;
+  private readonly credentials?: PayosCredentials;
 
-  constructor(private readonly configService: ConfigService) {
-    this.clientId = this.configService.get<string>('PAYOS_CLIENT_ID');
-    this.apiKey = this.configService.get<string>('PAYOS_API_KEY');
-    this.checksumKey = this.configService.get<string>('PAYOS_CHECKSUM_KEY');
-    this.isConfigured = Boolean(
-      this.clientId && this.apiKey && this.checksumKey,
-    );
-
-    if (!this.isConfigured) {
+  constructor(configService: ConfigService) {
+    this.credentials = configService.get<PayosCredentials>('commerce.payos');
+    if (!this.credentials) {
       this.logger.warn(
-        'PayOS credentials not found (PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY). Running in Mock/Simulator mode.',
+        'PayOS is unavailable because credentials are incomplete',
       );
     }
   }
@@ -40,28 +43,7 @@ export class PayosProvider {
   async createPaymentLink(
     params: PayosCreatePaymentLinkParams,
   ): Promise<PayosPaymentLinkData> {
-    if (!this.isConfigured) {
-      this.logger.log(
-        `[MOCK PayOS] Creating simulated payment link for orderCode: ${params.orderCode}, amount: ${params.amount}`,
-      );
-      const mockLinkId = `pl_${params.orderCode}`;
-      const checkoutUrl = `https://pay.payos.vn/web/${mockLinkId}`;
-      const qrCode = `00020101021238540010A000000727012400069704220110${params.orderCode}5303704540${params.amount}5802VN62140810${mockLinkId}6304MOCK`;
-
-      return {
-        bin: '970422',
-        accountNumber: '103870000000',
-        accountName: 'MEMORA JEWELRY',
-        amount: params.amount,
-        description: params.description,
-        orderCode: params.orderCode,
-        currency: 'VND',
-        paymentLinkId: mockLinkId,
-        status: 'PENDING',
-        checkoutUrl,
-        qrCode,
-      };
-    }
+    const credentials = this.requireCredentials();
 
     // Call live PayOS API using native fetch
     try {
@@ -70,7 +52,7 @@ export class PayosProvider {
       ).slice(0, 25);
       const signatureData = `amount=${params.amount}&cancelUrl=${params.cancelUrl}&description=${description}&orderCode=${params.orderCode}&returnUrl=${params.returnUrl}`;
       const signature = crypto
-        .createHmac('sha256', this.checksumKey!)
+        .createHmac('sha256', credentials.checksumKey)
         .update(signatureData)
         .digest('hex');
 
@@ -80,6 +62,7 @@ export class PayosProvider {
         description,
         returnUrl: params.returnUrl,
         cancelUrl: params.cancelUrl,
+        expiredAt: params.expiredAt,
         items: params.items || [],
         signature,
       };
@@ -90,8 +73,8 @@ export class PayosProvider {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-client-id': this.clientId!,
-            'x-api-key': this.apiKey!,
+            'x-client-id': credentials.clientId,
+            'x-api-key': credentials.apiKey,
           },
           body: JSON.stringify(body),
         },
@@ -104,10 +87,7 @@ export class PayosProvider {
       };
 
       if (resData.code !== '00' || !resData.data) {
-        this.logger.error(
-          `PayOS API error response: ${JSON.stringify(resData)}`,
-        );
-        throw new Error(`PayOS API error: [${resData.code}] ${resData.desc}`);
+        throw new Error('PayOS rejected the payment link request');
       }
 
       return resData.data;
@@ -121,10 +101,7 @@ export class PayosProvider {
   }
 
   verifyWebhookSignature(payload: PayosWebhookPayload): boolean {
-    if (!this.isConfigured) {
-      // In mock mode, if signature is "mock-signature" or any non-empty in test, accept
-      return true;
-    }
+    const credentials = this.requireCredentials();
 
     const { data, signature } = payload;
     if (!data || !signature) {
@@ -149,14 +126,13 @@ export class PayosProvider {
 
     // PayOS sorted key signature calculation:
     // amount, cancelUrl (if any), description, orderCode, returnUrl, etc.
-    const dataRecord = data as unknown as Record<string, unknown>;
-    const sortedKeys = Object.keys(dataRecord).sort();
-    const signString = sortedKeys
-      .map((k) => `${k}=${formatValue(dataRecord[k])}`)
+    const signString = Object.entries(data)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${formatValue(v)}`)
       .join('&');
 
     const expectedSignature = crypto
-      .createHmac('sha256', this.checksumKey!)
+      .createHmac('sha256', credentials.checksumKey)
       .update(signString)
       .digest('hex');
 
@@ -165,17 +141,8 @@ export class PayosProvider {
 
   async getPaymentInformation(
     orderCode: number,
-  ): Promise<{ status: string; amount: number; orderCode: number } | null> {
-    if (!this.isConfigured) {
-      this.logger.log(
-        `[MOCK PayOS] Fetching payment info for orderCode: ${orderCode}`,
-      );
-      return {
-        status: 'PAID',
-        amount: 1000000,
-        orderCode,
-      };
-    }
+  ): Promise<PayosPaymentInfo | null> {
+    const credentials = this.requireCredentials();
 
     try {
       const response = await fetch(
@@ -183,8 +150,8 @@ export class PayosProvider {
         {
           method: 'GET',
           headers: {
-            'x-client-id': this.clientId!,
-            'x-api-key': this.apiKey!,
+            'x-client-id': credentials.clientId,
+            'x-api-key': credentials.apiKey,
           },
         },
       );
@@ -192,11 +159,7 @@ export class PayosProvider {
       const resData = (await response.json()) as {
         code: string;
         desc: string;
-        data?: {
-          status: string;
-          amount: number;
-          orderCode: number;
-        };
+        data?: PayosPaymentInfo;
       };
 
       if (resData.code !== '00' || !resData.data) {
@@ -211,5 +174,12 @@ export class PayosProvider {
       );
       return null;
     }
+  }
+
+  private requireCredentials(): PayosCredentials {
+    if (!this.credentials) {
+      throw new ServiceUnavailableException('PayOS is not configured');
+    }
+    return this.credentials;
   }
 }

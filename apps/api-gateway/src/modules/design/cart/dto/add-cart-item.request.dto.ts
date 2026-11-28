@@ -22,6 +22,14 @@ export class GemstoneSelectionDto {
   })
   @IsUUID()
   gemstoneOptionId!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Exact inventory gemstone UUID, required for a certified option',
+  })
+  @IsOptional()
+  @IsUUID()
+  certifiedGemstoneId?: string;
 }
 
 export class AddCartItemBodyDto {

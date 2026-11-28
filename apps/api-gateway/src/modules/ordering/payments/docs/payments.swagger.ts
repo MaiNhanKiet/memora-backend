@@ -117,7 +117,7 @@ export function ApiCreateRefundRequestDocs() {
     ApiOperation({
       summary: '[ORDER-023] Create Refund Request (Staff / Admin)',
       description:
-        'Allows staff to create an audited refund request linked to an existing successful transaction.',
+        'Creates a refund request linked to a successful payment. After handover, send claimId for a verified ring return. The refund is capped by the returned ring’s paid allocation and locked Final Quote.',
     }),
     ApiParam({
       name: 'transactionId',
@@ -136,6 +136,15 @@ export function ApiCreateRefundRequestDocs() {
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
     notFound('Original payment transaction'),
+    ApiResponse({
+      status: 409,
+      description:
+        'Return proof or paid allocation is missing, or the requested amount exceeds the refundable balance',
+    }),
+    ApiResponse({
+      status: 503,
+      description: 'Return receipt verification is unavailable',
+    }),
   );
 }
 

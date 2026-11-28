@@ -64,9 +64,9 @@ export function ApiGetOrderInvoiceDocs() {
     bearer,
     guestSessionHeader,
     ApiOperation({
-      summary: '[ORDER-022] Get Order Invoice / Summary',
+      summary: '[ORDER-022] Get Issued Order Invoice',
       description:
-        'Retrieves comprehensive order invoice breakdown with invoice_no, total, totalPaid, remaining, and items.',
+        'Returns the issued invoice and its breakdown for the order. Returns 404 until the invoice has been issued.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({
@@ -75,6 +75,6 @@ export function ApiGetOrderInvoiceDocs() {
     }),
     unauthorized,
     forbidden('Caller does not own this order invoice'),
-    notFound('Order'),
+    notFound('Order or issued invoice'),
   );
 }

@@ -26,7 +26,7 @@ export class PaymentsWebhookController {
     @Body() body: PayosWebhookBodyDto,
   ): Promise<PayosWebhookResponseDto> {
     // 1. PayOS test/confirm webhook endpoint validation
-    if (body.webhookUrl || !body.signature) {
+    if (body.webhookUrl && !body.signature && !body.data) {
       return {
         success: true,
         message: 'Webhook URL verified successfully',
@@ -38,7 +38,7 @@ export class PaymentsWebhookController {
       toProcessPayosWebhookGrpcRequest(body),
     );
 
-    if (res.success && res.orderId) {
+    if (res.applied && res.orderId) {
       this.paymentEventsService.emitPaymentSucceeded({
         orderId: res.orderId,
         transactionId: res.transactionId,
@@ -46,6 +46,7 @@ export class PaymentsWebhookController {
       });
     }
 
-    return res;
+    const { applied: _applied, ...response } = res;
+    return response;
   }
 }

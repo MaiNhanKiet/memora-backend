@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package memora.after_sales.v1;
+
+import "common/v1/actor.proto";
+
+service AfterSalesClaimsService {
+  rpc AuthorizeClaimQuoteAccess (AuthorizeClaimQuoteAccessRequest) returns (AuthorizeClaimQuoteAccessResponse);
+  rpc GetReturnReceiptForRefund (GetReturnReceiptForRefundRequest) returns (GetReturnReceiptForRefundResponse);
+}
+
+enum ClaimQuoteAction {
+  CLAIM_QUOTE_ACTION_UNSPECIFIED = 0;
+  VIEW_QUOTE = 1;
+  ACCEPT_QUOTE = 2;
+  PAY_QUOTE = 3;
+}
+
+message AuthorizeClaimQuoteAccessRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string claim_id = 2;
+  ClaimQuoteAction action = 3;
+}
+
+message AuthorizeClaimQuoteAccessResponse {
+  bool allowed = 1;
+}
+
+message GetReturnReceiptForRefundRequest {
+  string claim_id = 1;
+}
+
+message GetReturnReceiptForRefundResponse {
+  bool eligible = 1;
+  optional string order_id = 2;
+  optional string ring_item_id = 3;
+  optional string receipt_id = 4;
+}

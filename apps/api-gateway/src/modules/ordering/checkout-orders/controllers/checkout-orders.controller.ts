@@ -16,7 +16,7 @@ import { CurrentUser } from '../../../../common/decorators/current-user.decorato
 import { toVerifiedActor } from '../../../../common/grpc/verified-actor';
 import { toPaginatedSuccessResponse } from '../../../../common/mappers/paginated-success.mapper';
 import { OrderingGrpcClient } from '../../clients/ordering-grpc.client';
-import { MemoryGrpcClient } from '../../../memory/clients/memory-grpc.client';
+import { CheckoutOrderMemoryOrchestrator } from '../services/checkout-order-memory.orchestrator';
 import {
   CancelOrderBodyDto,
   CreateOrderBodyDto,
@@ -49,7 +49,7 @@ import {
 export class CheckoutOrdersController {
   constructor(
     private readonly orderingClient: OrderingGrpcClient,
-    private readonly memoryClient: MemoryGrpcClient,
+    private readonly memoryOrchestrator: CheckoutOrderMemoryOrchestrator,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -66,37 +66,11 @@ export class CheckoutOrdersController {
     const order = await this.orderingClient.createOrder(
       toCreateOrderGrpcRequest(actor, body),
     );
-
-    // Fault-tolerant memory card provisioning for memory-enabled ring items
-    if (order.items && order.items.length > 0) {
-      const ownerCustomerIdentityId =
-        actor.customerIdentityId ?? actor.userId ?? '';
-      const ownerEmail =
-        (principal as unknown as { email?: string }).email ??
-        body.recipientEmail ??
-        'customer@memora.vn';
-
-      for (const item of order.items) {
-        if (item.memoryEnabled) {
-          try {
-            await Promise.race([
-              this.memoryClient.provisionMemoryCard({
-                actor,
-                ringItemId: item.id,
-                ownerCustomerIdentityId,
-                ownerEmail,
-              }),
-              new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Provision timeout')), 3000),
-              ),
-            ]);
-          } catch {
-            // Fault-tolerant: non-blocking, fallback will run on getRingItemDetails
-          }
-        }
-      }
-    }
-
+    await this.memoryOrchestrator.provisionCardsForCreatedOrder(
+      actor,
+      order.items,
+      body.recipientEmail,
+    );
     return order;
   }
 
@@ -139,9 +113,11 @@ export class CheckoutOrdersController {
     @Param('orderId', ParseUUIDPipe) orderId: string,
   ) {
     const actor = toVerifiedActor(principal);
-    return this.orderingClient.getOrderById(
-      toGetOrderByIdGrpcRequest(actor, orderId),
-    );
+    const { finalPaymentSatisfied: _finalPaymentSatisfied, ...order } =
+      await this.orderingClient.getOrderById(
+        toGetOrderByIdGrpcRequest(actor, orderId),
+      );
+    return order;
   }
 
   // ---------------------------------------------------------------------------
@@ -173,35 +149,13 @@ export class CheckoutOrdersController {
     const details = await this.orderingClient.getRingItemDetails(
       toGetRingItemDetailsGrpcRequest(actor, orderId, ringItemId),
     );
-
-    let memoryCard: { id: string; status: string } | undefined;
-    if (details.memoryEnabled) {
-      try {
-        const card = await this.memoryClient.getCardByRingItemId({
-          actor,
-          ringItemId,
-        });
-        memoryCard = { id: card.id, status: card.status };
-      } catch {
-        // Fallback: if not found, lazy-provision card
-        try {
-          const ownerCustomerIdentityId =
-            actor.customerIdentityId ?? actor.userId ?? '';
-          const ownerEmail =
-            (principal as unknown as { email?: string }).email ??
-            'customer@memora.vn';
-          const card = await this.memoryClient.provisionMemoryCard({
-            actor,
-            ringItemId,
-            ownerCustomerIdentityId,
-            ownerEmail,
-          });
-          memoryCard = { id: card.id, status: card.status };
-        } catch {
-          // If experience service is unreachable, keep memoryCard undefined
-        }
-      }
-    }
+    const memoryCard =
+      await this.memoryOrchestrator.resolveMemoryCardForRingItem(
+        actor,
+        orderId,
+        ringItemId,
+        details.memoryEnabled,
+      );
 
     return {
       ...details,

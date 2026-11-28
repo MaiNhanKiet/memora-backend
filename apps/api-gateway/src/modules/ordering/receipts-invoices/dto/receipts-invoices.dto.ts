@@ -76,7 +76,7 @@ export class OrderInvoiceDetailDto {
   @ApiProperty({ example: 'ORD-20261115-A1B2' })
   orderNo!: string;
 
-  @ApiProperty({ example: 'AWAITING_CUSTOMER_CONFIRMATION' })
+  @ApiProperty({ example: 'AWAITING_FINAL_CONFIRMATION' })
   status!: string;
 
   @ApiProperty({ example: '2026-11-15T09:00:00.000Z' })

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HandoverModule } from './handover/handover.module';
 
-@Module({})
+@Module({ imports: [HandoverModule] })
 export class FulfillmentModule {}

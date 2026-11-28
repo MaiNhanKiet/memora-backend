@@ -306,10 +306,10 @@ async function main(): Promise<void> {
     durationMs: changePinRes.durationMs,
   });
 
-  // [MEMOR-006] POST /api/v1/memory/cards/:cardId/pin/reset (Reset PIN qua mã OTP: -> 9999)
+  // [MEMOR-006] POST /api/v1/memory/cards/:cardId/pin/reset (Chủ thẻ đặt lại PIN thành 9999)
   const resetPinRes = await client.post<{ data?: { success: boolean } }>(
     `/api/v1/memory/cards/${dbContext.cardId}/pin/reset`,
-    { verificationCode: '123456', newPin: '9999' },
+    { newPin: '9999' },
   );
   const resetPinData = resetPinRes.data.data || (resetPinRes.data as unknown as { success: boolean });
   TestReporter.record({
@@ -380,7 +380,7 @@ async function main(): Promise<void> {
         {
           contentType: 'IMAGE',
           title: 'Khoảnh Khắc Đeo Nhẫn',
-          assetKey: uploadInfo.assetKey || 'memories/fallback/image.jpg',
+          assetKey: uploadInfo.assetKey,
           sortOrder: 1,
         },
       ],

@@ -159,7 +159,6 @@ export class MemoryCardsController {
       actor,
       cardId,
       newPin: body.newPin,
-      verificationCode: body.verificationCode,
     });
   }
 }

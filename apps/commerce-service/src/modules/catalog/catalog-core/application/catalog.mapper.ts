@@ -1,143 +1,161 @@
-import { Injectable } from '@nestjs/common';
-import type {
-  gemstone_options,
-  gemstone_slots,
-  materials,
-  ring_templates,
-  template_variants,
-} from '../../../../../generated/prisma/client';
 import type {
   AnchorNode,
   GemstoneOptionResponse,
   GemstoneSlotResponse,
   MaterialResponse,
+  ResizePolicyItem,
   TemplateResponse,
   TemplateVariantResponse,
 } from '@app/contracts';
+import type {
+  GemstoneOptionRecord,
+  GemstoneSlotRecord,
+  MaterialRecord,
+  ResizePolicyVariantRecord,
+  RingTemplateRecord,
+  TemplateVariantRecord,
+} from './catalog.repository';
 
-@Injectable()
-export class CatalogMapper {
-  private readonly cdnBaseUrl: string;
+export const CATALOG_CDN_BASE_URL = Symbol('CATALOG_CDN_BASE_URL');
+export const DEFAULT_CATALOG_CDN_BASE_URL = 'https://cdn.memora.style';
 
-  constructor() {
-    this.cdnBaseUrl = (
-      process.env.CATALOG_CDN_BASE_URL ?? 'https://cdn.memora.style'
-    ).replace(/\/+$/, '');
+export function resolveGlbUrl(
+  key: string,
+  cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
+): string {
+  if (!key) return '';
+  if (key.startsWith('http://') || key.startsWith('https://')) {
+    return key;
   }
+  const normalizedBase = (cdnBaseUrl || DEFAULT_CATALOG_CDN_BASE_URL).replace(
+    /\/+$/,
+    '',
+  );
+  const cleanKey = key.replace(/^\/+/, '');
+  return `${normalizedBase}/${cleanKey}`;
+}
 
-  resolveGlbUrl(key: string): string {
-    if (!key) return '';
-    if (key.startsWith('http://') || key.startsWith('https://')) {
-      return key;
-    }
-    const cleanKey = key.replace(/^\/+/, '');
-    return `${this.cdnBaseUrl}/${cleanKey}`;
-  }
+export function toTemplateResponse(
+  entity: RingTemplateRecord,
+  cdnBaseUrl: string = DEFAULT_CATALOG_CDN_BASE_URL,
+): TemplateResponse {
+  return {
+    id: entity.id,
+    templateCode: entity.code,
+    name: entity.name,
+    description: entity.description ?? '',
+    gender: 'UNISEX',
+    engraveSurfaceType: 'INNER_FLAT',
+    model3dAssetKey: entity.glbAssetKey,
+    glbUrl: resolveGlbUrl(entity.glbAssetKey, cdnBaseUrl),
+    mappingVersion: '1.0',
+    defaultMaterialId: '',
+    status: entity.status,
+    createdAt: entity.createdAt.toISOString(),
+    updatedAt: entity.updatedAt.toISOString(),
+  };
+}
 
-  toTemplateResponse(entity: ring_templates): TemplateResponse {
-    return {
-      id: entity.id,
-      templateCode: entity.code,
-      name: entity.name,
-      description: entity.description ?? '',
-      gender: 'UNISEX', // standard fallback if not directly on entity
-      engraveSurfaceType: 'INNER_FLAT',
-      model3dAssetKey: entity.glb_asset_key,
-      glbUrl: this.resolveGlbUrl(entity.glb_asset_key),
-      mappingVersion: '1.0',
-      defaultMaterialId: '',
-      status: entity.status,
-      createdAt: entity.created_at.toISOString(),
-      updatedAt: entity.updated_at.toISOString(),
-    };
-  }
+export function toMaterialResponse(entity: MaterialRecord): MaterialResponse {
+  return {
+    id: entity.id,
+    materialCode: entity.code,
+    name: entity.name,
+    metalType: entity.materialFamily ?? 'GOLD',
+    purityKarat: entity.purityPercent ?? 18,
+    densityGCm3: 15.58,
+    status: entity.status,
+  };
+}
 
-  toMaterialResponse(entity: materials): MaterialResponse {
-    return {
-      id: entity.id,
-      materialCode: entity.code,
-      name: entity.name,
-      metalType: entity.material_family ?? 'GOLD',
-      purityKarat: entity.purity_percent ? Number(entity.purity_percent) : 18,
-      densityGCm3: 15.58, // standard jewellery gold density fallback
-      status: entity.status,
-    };
-  }
+export function toVariantResponse(
+  entity: TemplateVariantRecord,
+): TemplateVariantResponse {
+  return {
+    id: entity.id,
+    ringTemplateId: entity.ringTemplateId,
+    materialId: entity.materialId,
+    standardSize: entity.standardSize,
+    maxUpDelta: entity.maxUpDelta,
+    maxDownDelta: entity.maxDownDelta,
+    resizeMethod: entity.resizeMethod,
+    addedMetalAllowed: entity.addedMetalAllowed,
+    localWallThicknessMm: entity.localWallThicknessMm,
+    minRemainingWallThicknessMm: entity.minRemainingWallThicknessMm,
+    maxSafeEngravingDepthMm: entity.maxSafeEngravingDepthMm,
+    status: entity.status,
+  };
+}
 
-  toVariantResponse(entity: template_variants): TemplateVariantResponse {
-    return {
-      id: entity.id,
-      ringTemplateId: entity.ring_template_id,
-      materialId: entity.material_id,
-      standardSize: Number(entity.standard_size),
-      maxUpDelta: entity.max_up_delta ? Number(entity.max_up_delta) : undefined,
-      maxDownDelta: entity.max_down_delta
-        ? Number(entity.max_down_delta)
-        : undefined,
-      resizeMethod: entity.resize_method ?? undefined,
-      addedMetalAllowed: entity.added_metal_allowed,
-      localWallThicknessMm: Number(entity.local_wall_thickness_mm),
-      minRemainingWallThicknessMm: Number(
-        entity.min_remaining_wall_thickness_mm,
-      ),
-      maxSafeEngravingDepthMm: Number(entity.max_safe_engraving_depth_mm),
-      status: entity.status,
-    };
-  }
+export function toGemstoneOptionResponse(
+  entity: GemstoneOptionRecord,
+): GemstoneOptionResponse {
+  return {
+    id: entity.id,
+    stoneCode: entity.code,
+    name: entity.name,
+    stoneType: entity.stoneType,
+    shape: entity.shape,
+    color: entity.colorGrade ?? '',
+    clarity: entity.clarityGrade ?? '',
+    dimensionLengthMm: entity.lengthMm,
+    dimensionWidthMm: entity.widthMm,
+    isCertified: entity.certifiedRequired,
+    status: entity.status,
+  };
+}
 
-  toTemplateVariantResponse(
-    entity: template_variants,
-  ): TemplateVariantResponse {
-    return this.toVariantResponse(entity);
-  }
+export function toGemstoneSlotResponse(
+  entity: GemstoneSlotRecord,
+  ringTemplateId = '',
+): GemstoneSlotResponse {
+  return {
+    id: entity.id,
+    ringTemplateId,
+    slotNumber: entity.slotIndex,
+    slotType: 'CENTER_STONE',
+    gemstoneGroupId: entity.gemstoneGroupId,
+    anchorNodeName: entity.glbNodeName,
+    isRequired: entity.isRequired,
+  };
+}
 
-  toGemstoneOptionResponse(entity: gemstone_options): GemstoneOptionResponse {
-    return {
-      id: entity.id,
-      stoneCode: entity.code,
-      name: entity.name,
-      stoneType: entity.stone_type,
-      shape: entity.shape,
-      color: entity.color_grade ?? '',
-      clarity: entity.clarity_grade ?? '',
-      dimensionLengthMm: Number(entity.length_mm),
-      dimensionWidthMm: Number(entity.width_mm),
-      isCertified: entity.certified_required,
-      status: entity.status,
-    };
-  }
+export function toAnchorNodes(
+  slots: readonly GemstoneSlotRecord[],
+): AnchorNode[] {
+  const anchors: AnchorNode[] = slots.map((slot) => ({
+    nodeName: slot.glbNodeName,
+    slotNumber: slot.slotIndex,
+    slotType: 'CENTER_STONE',
+  }));
 
-  toGemstoneSlotResponse(
-    entity: gemstone_slots & {
-      gemstone_groups?: { is_required: boolean };
-    },
-  ): GemstoneSlotResponse {
-    return {
-      id: entity.id,
-      ringTemplateId: '', // populated or left as logical reference
-      slotNumber: entity.slot_index,
-      slotType: 'CENTER_STONE',
-      gemstoneGroupId: entity.gemstone_group_id,
-      anchorNodeName: entity.glb_node_name,
-      isRequired: entity.gemstone_groups?.is_required ?? false,
-    };
-  }
+  anchors.push({
+    nodeName: 'Engrave_Inner_Plane',
+    surfaceType: 'INNER_FLAT',
+  });
 
-  toAnchorNodes(
-    slots: (gemstone_slots & { gemstone_groups?: { is_required: boolean } })[],
-  ): AnchorNode[] {
-    const anchors: AnchorNode[] = slots.map((slot) => ({
-      nodeName: slot.glb_node_name,
-      slotNumber: slot.slot_index,
-      slotType: 'CENTER_STONE',
-    }));
+  return anchors;
+}
 
-    // Add standard engraving surface anchor
-    anchors.push({
-      nodeName: 'Engrave_Inner_Plane',
-      surfaceType: 'INNER_FLAT',
-    });
-
-    return anchors;
-  }
+export function toResizePolicyItem(
+  v: ResizePolicyVariantRecord,
+): ResizePolicyItem {
+  const up = v.maxUpDelta ?? 0;
+  const down = v.maxDownDelta ?? 0;
+  return {
+    templateVariantId: v.id,
+    templateId: v.ringTemplateId,
+    templateName: v.templateName,
+    materialName: v.materialName,
+    standardSize: v.standardSize,
+    minSize: v.standardSize - down,
+    maxSize: v.standardSize + up,
+    maxUpDelta: up,
+    maxDownDelta: down,
+    resizeMethod: v.resizeMethod ?? 'STRETCH_COMPRESS',
+    addedMetalAllowed: v.addedMetalAllowed,
+    localWallThicknessMm: v.localWallThicknessMm,
+    minRemainingWallThicknessMm: v.minRemainingWallThicknessMm,
+    maxSafeEngravingDepthMm: v.maxSafeEngravingDepthMm,
+  };
 }

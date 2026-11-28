@@ -97,7 +97,7 @@ export function ApiCreateFinalQuoteDocs() {
     ApiOperation({
       summary: '[ORDER-011] Create Final Quote Draft (Staff)',
       description:
-        'Allows staff to create a DRAFT final quote with exact prices, components, and validity date for an order in PENDING_FINAL_QUOTE.',
+        'All current ring item versions must be ready. All-NONE orders use PENDING_FINAL_QUOTE. Personalized orders use DESIGN_IN_PROGRESS and require Manager approval.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({
@@ -107,7 +107,12 @@ export function ApiCreateFinalQuoteDocs() {
     }),
     ApiResponse({
       status: 400,
-      description: 'Line items cannot be empty or invalid amounts',
+      description: 'Line items are missing, invalid, or refer to another order',
+    }),
+    ApiResponse({
+      status: 409,
+      description:
+        'The order or its ring versions are not ready for a final quote',
     }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
@@ -131,7 +136,13 @@ export function ApiUpdateFinalQuoteDocs() {
     }),
     ApiResponse({
       status: 400,
-      description: 'Only DRAFT quotes can be edited',
+      description:
+        'Quote is not a DRAFT final quote or a line item refers to another order',
+    }),
+    ApiResponse({
+      status: 409,
+      description:
+        'The quote is stale or the order or its ring versions are not ready',
     }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
@@ -145,7 +156,7 @@ export function ApiPublishFinalQuoteDocs() {
     ApiOperation({
       summary: '[ORDER-013 Part A] Publish Final Quote to Customer (Staff)',
       description:
-        'Transitions quote status from DRAFT to ISSUED, locks items, and advances order to AWAITING_CUSTOMER_CONFIRMATION.',
+        'Transitions quote status from DRAFT to ISSUED, and advances order to AWAITING_FINAL_CONFIRMATION.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiParam({ name: 'quoteId', description: 'Quote UUID', type: String }),
@@ -154,6 +165,11 @@ export function ApiPublishFinalQuoteDocs() {
       description: 'Final quote published to customer successfully',
     }),
     ApiResponse({ status: 400, description: 'Quote is not in DRAFT status' }),
+    ApiResponse({
+      status: 409,
+      description:
+        'The quote is stale or the order or its ring versions are not ready',
+    }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
     notFound('Quote or order'),

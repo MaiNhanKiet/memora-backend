@@ -5,6 +5,33 @@ import type { Metadata } from '@grpc/grpc-js';
 import type { VerifiedActor } from '../common/actor';
 
 export const COMMERCE_ORDERING_SERVICE_NAME = 'OrderingService';
+export const COMMERCE_RING_ITEM_REVIEW_SERVICE_NAME = 'RingItemReviewService';
+
+export enum RingItemReviewTransition {
+  UNSPECIFIED = 0,
+  MARK_READY_FOR_REVIEW = 1,
+  SUBMIT_FOR_REVIEW = 2,
+  APPROVE_REVIEW = 3,
+}
+
+export interface ApplyRingItemReviewTransitionRequest {
+  readonly orderId: string;
+  readonly ringItemId: string;
+  readonly ringItemVersionId: string;
+  readonly transition: RingItemReviewTransition;
+}
+
+export interface ApplyRingItemReviewTransitionResponse {
+  readonly ringItemVersionId: string;
+  readonly status: string;
+}
+
+export interface CommerceRingItemReviewServiceClient {
+  applyRingItemReviewTransition(
+    request: ApplyRingItemReviewTransitionRequest,
+    metadata?: Metadata,
+  ): Observable<ApplyRingItemReviewTransitionResponse>;
+}
 
 export interface OrderPreP1Acknowledgement {
   noticeVersion: string;
@@ -96,7 +123,23 @@ export interface RingItemSummary {
   memoryEnabled: boolean;
 }
 
+export interface OrderNextPayment {
+  stage: string;
+  amountDue: number;
+  paidAmount: number;
+  orderTotal: number;
+  currency: string;
+  canPay: boolean;
+  expiresAt?: string;
+  pendingAttempt?: {
+    transactionId: string;
+    expiresAt?: string;
+  };
+}
+
 export interface GetOrderByIdResponse {
+  finalPaymentSatisfied?: boolean;
+  nextPayment?: OrderNextPayment;
   id: string;
   orderNo: string;
   status: string;
@@ -203,6 +246,7 @@ export interface AdminCustomerInfo {
 }
 
 export interface GetAdminOrderDetailsResponse {
+  attentionReason?: 'CERTIFIED_GEMSTONE_RESERVATION_REQUIRED';
   id: string;
   orderNo: string;
   status: string;
@@ -600,6 +644,8 @@ export interface CreateRefundRequestMessage {
   reason: string;
   notes?: string;
   staffUserId?: string;
+  claimId?: string;
+  actor?: VerifiedActor;
 }
 
 export interface CreateRefundResponse {
@@ -665,6 +711,7 @@ export interface PayosWebhookRequest {
 
 export interface PayosWebhookResponse {
   success: boolean;
+  applied?: boolean;
   message: string;
   transactionId?: string;
   status?: string;

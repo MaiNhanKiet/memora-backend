@@ -26,6 +26,11 @@ const notFound = (resource: string) =>
     status: 404,
     description: `${resource} not found`,
   });
+const unavailable = ApiResponse({
+  status: 503,
+  description:
+    'After-sales verification or payment reconciliation is unavailable',
+});
 
 export function ApiListClaimQuotes() {
   return applyDecorators(
@@ -33,7 +38,7 @@ export function ApiListClaimQuotes() {
     ApiOperation({
       summary: '[ORDER-024] View service quotes for a post-purchase claim',
       description:
-        'Retrieves all service quotes (quote_type = SERVICE) associated with the given claimId. Accessible by the customer or authenticated caller.',
+        'Retrieves the service quotes for a claim after Operations verifies the requester.',
     }),
     ApiParam({
       name: 'claimId',
@@ -53,6 +58,7 @@ export function ApiListClaimQuotes() {
     unauthorized,
     forbidden,
     notFound('Claim'),
+    unavailable,
   );
 }
 
@@ -89,6 +95,11 @@ export function ApiAcceptServiceQuote() {
     unauthorized,
     forbidden,
     notFound('Claim or quote'),
+    ApiResponse({
+      status: 409,
+      description: 'The service quote is no longer current or actionable',
+    }),
+    unavailable,
   );
 }
 
@@ -98,7 +109,7 @@ export function ApiCreateClaimPaymentLink() {
     ApiOperation({
       summary: '[ORDER-026] Create PayOS payment link for claim service quote',
       description:
-        'Generates PayOS VietQR payment link for the accepted service quote on a post-purchase claim.',
+        'Creates or reuses a PayOS link for the current accepted service quote after verifying claim access.',
     }),
     ApiParam({
       name: 'claimId',
@@ -108,14 +119,20 @@ export function ApiCreateClaimPaymentLink() {
     ApiSuccessResponse({
       type: PaymentLinkResponseDto,
       status: 201,
-      description: 'Payment link created successfully',
+      description: 'Current claim payment link',
     }),
     ApiResponse({
       status: 400,
-      description: 'No ACCEPTED service quote found for this claim',
+      description: 'Invalid claim ID or request',
     }),
     unauthorized,
     forbidden,
     notFound('Claim or quote'),
+    ApiResponse({
+      status: 409,
+      description:
+        'No payment is due or an existing payment must be reconciled',
+    }),
+    unavailable,
   );
 }

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PickType } from '@nestjs/swagger';
 
 export class AdminOrderSummaryDto {
   @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
@@ -56,6 +56,13 @@ export class AdminCustomerInfoDto {
 }
 
 export class AdminOrderDetailsResponseDto {
+  @ApiPropertyOptional({
+    enum: ['CERTIFIED_GEMSTONE_RESERVATION_REQUIRED'],
+    description:
+      'P1 is fully paid and staff must resolve the certified gemstone reservation.',
+  })
+  attentionReason?: 'CERTIFIED_GEMSTONE_RESERVATION_REQUIRED';
+
   @ApiProperty({ example: 'd1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c' })
   id!: string;
 
@@ -102,4 +109,64 @@ export class AdminOrderDetailsResponseDto {
 
   @ApiProperty({ example: '2026-11-14T10:00:00.000Z' })
   updatedAt!: string;
+}
+
+export class PendingOrderPaymentDto {
+  @ApiProperty()
+  transactionId!: string;
+
+  @ApiPropertyOptional()
+  expiresAt?: string;
+}
+
+export class OrderNextPaymentDto {
+  @ApiProperty({ example: 'MILESTONE_P2' })
+  stage!: string;
+
+  @ApiProperty()
+  amountDue!: number;
+
+  @ApiProperty()
+  paidAmount!: number;
+
+  @ApiProperty()
+  orderTotal!: number;
+
+  @ApiProperty({ example: 'VND' })
+  currency!: string;
+
+  @ApiProperty()
+  canPay!: boolean;
+
+  @ApiPropertyOptional()
+  expiresAt?: string;
+
+  @ApiPropertyOptional({ type: PendingOrderPaymentDto })
+  pendingAttempt?: PendingOrderPaymentDto;
+}
+
+export class OrderDetailsResponseDto extends PickType(
+  AdminOrderDetailsResponseDto,
+  [
+    'id',
+    'orderNo',
+    'status',
+    'sourcePlanMode',
+    'fulfillmentMode',
+    'recipientName',
+    'recipientPhone',
+    'recipientEmail',
+    'deliveryAddressJson',
+    'createdAt',
+    'updatedAt',
+  ] as const,
+) {
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  currentQuote?: Record<string, unknown>;
+
+  @ApiProperty({ type: 'array', items: { type: 'object' } })
+  items!: Record<string, unknown>[];
+
+  @ApiPropertyOptional({ type: OrderNextPaymentDto })
+  nextPayment?: OrderNextPaymentDto;
 }

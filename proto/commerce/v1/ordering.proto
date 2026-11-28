@@ -4,6 +4,29 @@ package memora.commerce.v1;
 
 import "common/v1/actor.proto";
 
+service RingItemReviewService {
+  rpc ApplyRingItemReviewTransition (ApplyRingItemReviewTransitionRequest) returns (ApplyRingItemReviewTransitionResponse);
+}
+
+enum RingItemReviewTransition {
+  RING_ITEM_REVIEW_TRANSITION_UNSPECIFIED = 0;
+  MARK_READY_FOR_REVIEW = 1;
+  SUBMIT_FOR_REVIEW = 2;
+  APPROVE_REVIEW = 3;
+}
+
+message ApplyRingItemReviewTransitionRequest {
+  string order_id = 1;
+  string ring_item_id = 2;
+  string ring_item_version_id = 3;
+  RingItemReviewTransition transition = 4;
+}
+
+message ApplyRingItemReviewTransitionResponse {
+  string ring_item_version_id = 1;
+  string status = 2;
+}
+
 service OrderingService {
   rpc CreateOrder (CreateOrderRequest) returns (CreateOrderResponse);
   rpc ListOrders (ListOrdersRequest) returns (ListOrdersResponse);
@@ -128,6 +151,22 @@ message RingItemSummary {
   bool memory_enabled = 12;
 }
 
+message PendingOrderPayment {
+  string transaction_id = 1;
+  optional string expires_at = 2;
+}
+
+message OrderNextPayment {
+  string stage = 1;
+  double amount_due = 2;
+  double paid_amount = 3;
+  double order_total = 4;
+  string currency = 5;
+  bool can_pay = 6;
+  PendingOrderPayment pending_attempt = 7;
+  optional string expires_at = 8;
+}
+
 message GetOrderByIdResponse {
   string id = 1;
   string order_no = 2;
@@ -142,6 +181,8 @@ message GetOrderByIdResponse {
   repeated RingItemSummary items = 11;
   string created_at = 12;
   string updated_at = 13;
+  OrderNextPayment next_payment = 14;
+  optional bool final_payment_satisfied = 15;
 }
 
 message GetOrderTimelineRequest {
@@ -275,6 +316,7 @@ message GetAdminOrderDetailsResponse {
   string cancellation_reason = 15;
   string created_at = 16;
   string updated_at = 17;
+  optional string attention_reason = 18;
 }
 
 message UpdateOrderStatusRequest {
@@ -677,6 +719,8 @@ message CreateRefundRequestMessage {
   string reason = 3;
   string notes = 4;
   string staff_user_id = 5;
+  optional string claim_id = 6;
+  memora.common.v1.VerifiedActor actor = 7;
 }
 
 message CreateRefundResponse {
@@ -746,6 +790,7 @@ message PayosWebhookResponse {
   string transaction_id = 3;
   string status = 4;
   string order_id = 5;
+  bool applied = 6;
 }
 
 message ReconcilePaymentTransactionRequest {

@@ -1,98 +1,107 @@
-import { Injectable } from '@nestjs/common';
-import type {
-  allocations,
-  certified_gemstones,
-  inventory_movements,
-  stock_lots,
-} from '../../../../../generated/prisma/client';
 import type {
   AllocationResponse,
   CertifiedGemstoneResponse,
   InventoryMovementResponse,
   StockLotResponse,
 } from '@app/contracts';
+import type {
+  AllocationRecord,
+  CertifiedGemstoneRecord,
+  InventoryMovementRecord,
+  StockLotRecord,
+} from './inventory.repository';
 
-@Injectable()
-export class InventoryMapper {
-  toStockLotResponse(lot: stock_lots): StockLotResponse {
-    return {
-      id: lot.id,
-      stockCode: lot.stock_code,
-      stockType: lot.stock_type,
-      templateVariantId: lot.template_variant_id ?? undefined,
-      gemstoneOptionId: lot.gemstone_option_id ?? undefined,
-      lotCode: lot.lot_code ?? undefined,
-      supplierRef: lot.supplier_ref ?? undefined,
-      quantityOnHand: lot.quantity_on_hand,
-      quantityReserved: lot.quantity_reserved,
-      unitCost: lot.unit_cost !== null ? Number(lot.unit_cost) : undefined,
-      locationCode: lot.location_code ?? undefined,
-      status: lot.status,
-      receivedAt: lot.received_at?.toISOString(),
-      updatedAt: lot.updated_at.toISOString(),
-    };
+export function parseJsonRecord(raw?: string): Record<string, unknown> {
+  if (!raw) {
+    return {};
   }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
 
-  toCertifiedGemstoneResponse(
-    gem: certified_gemstones,
-  ): CertifiedGemstoneResponse {
-    return {
-      id: gem.id,
-      internalCode: gem.internal_code,
-      gemstoneOptionId: gem.gemstone_option_id,
-      certificateProvider: gem.certificate_provider ?? undefined,
-      certificateNumber: gem.certificate_number ?? undefined,
-      certificateUrl: gem.certificate_url ?? undefined,
-      certificateMetadataJson: gem.certificate_metadata_json
-        ? JSON.stringify(gem.certificate_metadata_json)
-        : undefined,
-      purchaseCost:
-        gem.purchase_cost !== null ? Number(gem.purchase_cost) : undefined,
-      status: gem.status,
-      locationCode: gem.location_code ?? undefined,
-      receivedAt: gem.received_at?.toISOString(),
-      updatedAt: gem.updated_at.toISOString(),
-    };
-  }
+export function toStockLotResponse(lot: StockLotRecord): StockLotResponse {
+  return {
+    id: lot.id,
+    stockCode: lot.stockCode,
+    stockType: lot.stockType,
+    templateVariantId: lot.templateVariantId,
+    gemstoneOptionId: lot.gemstoneOptionId,
+    lotCode: lot.lotCode,
+    supplierRef: lot.supplierRef,
+    quantityOnHand: lot.quantityOnHand,
+    quantityReserved: lot.quantityReserved,
+    unitCost: lot.unitCost,
+    locationCode: lot.locationCode,
+    status: lot.status,
+    receivedAt: lot.receivedAt?.toISOString(),
+    updatedAt: lot.updatedAt.toISOString(),
+  };
+}
 
-  toInventoryMovementResponse(
-    movement: inventory_movements,
-  ): InventoryMovementResponse {
-    return {
-      id: movement.id,
-      movementType: movement.movement_type,
-      stockLotId: movement.stock_lot_id ?? undefined,
-      certifiedGemstoneId: movement.certified_gemstone_id ?? undefined,
-      allocationId: movement.allocation_id ?? undefined,
-      ringItemId: movement.ring_item_id ?? undefined,
-      productionAttemptId: movement.production_attempt_id ?? undefined,
-      quantity: movement.quantity,
-      unitCostSnapshot:
-        movement.unit_cost_snapshot !== null
-          ? Number(movement.unit_cost_snapshot)
-          : undefined,
-      reason: movement.reason ?? undefined,
-      performedByUserId: movement.performed_by_user_id ?? undefined,
-      occurredAt: movement.occurred_at.toISOString(),
-      metadataJson: movement.metadata_json
-        ? JSON.stringify(movement.metadata_json)
-        : undefined,
-    };
-  }
+export function toCertifiedGemstoneResponse(
+  gem: CertifiedGemstoneRecord,
+): CertifiedGemstoneResponse {
+  return {
+    id: gem.id,
+    internalCode: gem.internalCode,
+    gemstoneOptionId: gem.gemstoneOptionId,
+    certificateProvider: gem.certificateProvider,
+    certificateNumber: gem.certificateNumber,
+    certificateUrl: gem.certificateUrl,
+    certificateMetadataJson: gem.certificateMetadataJson
+      ? JSON.stringify(gem.certificateMetadataJson)
+      : undefined,
+    purchaseCost: gem.purchaseCost,
+    status: gem.status,
+    locationCode: gem.locationCode,
+    receivedAt: gem.receivedAt?.toISOString(),
+    updatedAt: gem.updatedAt.toISOString(),
+  };
+}
 
-  toAllocationResponse(allocation: allocations): AllocationResponse {
-    return {
-      id: allocation.id,
-      ringItemId: allocation.ring_item_id,
-      productionAttemptId: allocation.production_attempt_id ?? undefined,
-      stockLotId: allocation.stock_lot_id ?? undefined,
-      certifiedGemstoneId: allocation.certified_gemstone_id ?? undefined,
-      quantity: allocation.quantity,
-      status: allocation.status,
-      expiresAt: allocation.expires_at?.toISOString(),
-      allocatedByUserId: allocation.allocated_by_user_id ?? undefined,
-      createdAt: allocation.created_at.toISOString(),
-      updatedAt: allocation.updated_at.toISOString(),
-    };
-  }
+export function toInventoryMovementResponse(
+  movement: InventoryMovementRecord,
+): InventoryMovementResponse {
+  return {
+    id: movement.id,
+    movementType: movement.movementType,
+    stockLotId: movement.stockLotId,
+    certifiedGemstoneId: movement.certifiedGemstoneId,
+    allocationId: movement.allocationId,
+    ringItemId: movement.ringItemId,
+    productionAttemptId: movement.productionAttemptId,
+    quantity: movement.quantity,
+    unitCostSnapshot: movement.unitCostSnapshot,
+    reason: movement.reason,
+    performedByUserId: movement.performedByUserId,
+    occurredAt: movement.occurredAt.toISOString(),
+    metadataJson: movement.metadataJson
+      ? JSON.stringify(movement.metadataJson)
+      : undefined,
+  };
+}
+
+export function toAllocationResponse(
+  allocation: AllocationRecord,
+): AllocationResponse {
+  return {
+    id: allocation.id,
+    ringItemId: allocation.ringItemId,
+    productionAttemptId: allocation.productionAttemptId,
+    stockLotId: allocation.stockLotId,
+    certifiedGemstoneId: allocation.certifiedGemstoneId,
+    quantity: allocation.quantity,
+    status: allocation.status,
+    expiresAt: allocation.expiresAt?.toISOString(),
+    allocatedByUserId: allocation.allocatedByUserId,
+    createdAt: allocation.createdAt.toISOString(),
+    updatedAt: allocation.updatedAt.toISOString(),
+  };
 }

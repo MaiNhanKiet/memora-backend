@@ -128,9 +128,6 @@ export class RedeemInvitationResponseDto {
   @ApiProperty({ description: 'ID Thẻ Ký Ức' })
   memoryCardId!: string;
 
-  @ApiProperty({ description: 'Thời điểm phiên hết hạn' })
-  expiresAt!: string;
-
   @ApiProperty({
     description: 'Cờ báo hiệu thẻ có được bảo vệ bằng mã PIN hay không',
   })

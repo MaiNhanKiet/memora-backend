@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package memora.experience.v1;
+
+import "common/v1/actor.proto";
+
+service PlatformSharingService {
+  rpc ResolveShareLink (ResolveShareLinkRequest) returns (ResolveShareLinkResponse);
+  rpc CreateShareLink (CreateShareLinkRequest) returns (CreateShareLinkResponse);
+  rpc RevokeShareLink (RevokeShareLinkRequest) returns (RevokeShareLinkResponse);
+}
+
+service PlatformAuditService {
+  rpc ListAuditLogs (ListAuditLogsRequest) returns (ListAuditLogsResponse);
+  rpc RecordAuditEvent (RecordAuditEventRequest) returns (RecordAuditEventResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Resolve Share Link (Public 3D Preview)
+// ---------------------------------------------------------------------------
+
+message ResolveShareLinkRequest {
+  string share_token = 1;
+}
+
+message ResolveShareLinkResponse {
+  string id = 1;
+  string share_token = 2;
+  string status = 3;
+  string expires_at = 4;
+  string ring_template_id = 5;
+  string ring_design_draft_id = 6;
+  string sanitized_snapshot_json = 7;
+  string created_at = 8;
+}
+
+// ---------------------------------------------------------------------------
+// Create Share Link
+// ---------------------------------------------------------------------------
+
+message CreateShareLinkRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string ring_design_draft_id = 2;
+  string ring_template_id = 3;
+  string sanitized_snapshot_json = 4;
+  int32 expires_in_days = 5;
+}
+
+message CreateShareLinkResponse {
+  string id = 1;
+  string share_token = 2;
+  string share_url = 3;
+  string status = 4;
+  string expires_at = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Revoke Share Link
+// ---------------------------------------------------------------------------
+
+message RevokeShareLinkRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string share_link_id = 2;
+}
+
+message RevokeShareLinkResponse {
+  string id = 1;
+  string status = 2;
+  string revoked_at = 3;
+}
+
+
+// ---------------------------------------------------------------------------
+// Platform Audit Service
+// ---------------------------------------------------------------------------
+
+message AuditLogItem {
+  string id = 1;
+  string actor_user_id = 2;
+  string action = 3;
+  string entity_type = 4;
+  string entity_id = 5;
+  string request_id = 6;
+  string trace_id = 7;
+  string result_status = 8;
+  string change_summary_json = 9;
+  string metadata_json = 10;
+  string created_at = 11;
+}
+
+message ListAuditLogsRequest {
+  memora.common.v1.VerifiedActor actor = 1;
+  string actor_user_id = 2;
+  string entity_type = 3;
+  string action = 4;
+  string result_status = 5;
+  string from_date = 6;
+  string to_date = 7;
+  int32 page = 8;
+  int32 limit = 9;
+}
+
+message ListAuditLogsResponse {
+  repeated AuditLogItem items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 limit = 4;
+  int32 total_pages = 5;
+}
+
+message RecordAuditEventRequest {
+  string actor_user_id = 1;
+  string action = 2;
+  string entity_type = 3;
+  string entity_id = 4;
+  string request_id = 5;
+  string trace_id = 6;
+  string result_status = 7;
+  string change_summary_json = 8;
+  string metadata_json = 9;
+}
+
+message RecordAuditEventResponse {
+  string id = 1;
+  string created_at = 2;
+}

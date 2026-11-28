@@ -23,98 +23,131 @@ import type {
   ReserveInventoryRequest,
   StockLotResponse,
 } from '@app/contracts';
-import { InventoryService } from '../application/inventory.service';
 import { CommerceInternalGrpcAuthGuard } from '../../../../grpc/commerce-internal-grpc-auth.guard';
+import {
+  AllocateInventoryUseCase,
+  ConsumeInventoryUseCase,
+  HoldInventoryUseCase,
+  ReleaseInventoryUseCase,
+  ReserveInventoryUseCase,
+} from '../application/allocation.use-cases';
+import {
+  CreateCertifiedGemstoneUseCase,
+  ListCertifiedGemstoneAvailabilityUseCase,
+} from '../application/certified-gemstone.use-cases';
+import {
+  AdjustInventoryUseCase,
+  ListGemstoneBatchesUseCase,
+  ListInventoryMovementsUseCase,
+  ListRingBlankStocksUseCase,
+  ReceiveGemstoneBatchUseCase,
+  ReceiveRingBlankStockUseCase,
+} from '../application/stock-lot.use-cases';
 
+/** Thin gRPC adapter. Inventory invariants and actor enforcement live in the use cases. */
 @Controller()
 @UseGuards(CommerceInternalGrpcAuthGuard)
 export class InventoryGrpcController implements InventoryServiceHandler {
-  constructor(private readonly inventoryService: InventoryService) {}
+  constructor(
+    private readonly listRingBlankStocksUseCase: ListRingBlankStocksUseCase,
+    private readonly receiveRingBlankStockUseCase: ReceiveRingBlankStockUseCase,
+    private readonly listGemstoneBatchesUseCase: ListGemstoneBatchesUseCase,
+    private readonly receiveGemstoneBatchUseCase: ReceiveGemstoneBatchUseCase,
+    private readonly listCertifiedGemstoneAvailabilityUseCase: ListCertifiedGemstoneAvailabilityUseCase,
+    private readonly createCertifiedGemstoneUseCase: CreateCertifiedGemstoneUseCase,
+    private readonly listInventoryMovementsUseCase: ListInventoryMovementsUseCase,
+    private readonly adjustInventoryUseCase: AdjustInventoryUseCase,
+    private readonly holdInventoryUseCase: HoldInventoryUseCase,
+    private readonly reserveInventoryUseCase: ReserveInventoryUseCase,
+    private readonly allocateInventoryUseCase: AllocateInventoryUseCase,
+    private readonly consumeInventoryUseCase: ConsumeInventoryUseCase,
+    private readonly releaseInventoryUseCase: ReleaseInventoryUseCase,
+  ) {}
 
   @GrpcMethod('InventoryService', 'ListRingBlankStocks')
   listRingBlankStocks(
     request: ListRingBlankStocksRequest,
   ): Promise<ListRingBlankStocksResponse> {
-    return this.inventoryService.listRingBlankStocks(request);
+    return this.listRingBlankStocksUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'ReceiveRingBlankStock')
   receiveRingBlankStock(
     request: ReceiveRingBlankStockRequest,
   ): Promise<StockLotResponse> {
-    return this.inventoryService.receiveRingBlankStock(request);
+    return this.receiveRingBlankStockUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'ListGemstoneBatches')
   listGemstoneBatches(
     request: ListGemstoneBatchesRequest,
   ): Promise<ListGemstoneBatchesResponse> {
-    return this.inventoryService.listGemstoneBatches(request);
+    return this.listGemstoneBatchesUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'ReceiveGemstoneBatch')
   receiveGemstoneBatch(
     request: ReceiveGemstoneBatchRequest,
   ): Promise<StockLotResponse> {
-    return this.inventoryService.receiveGemstoneBatch(request);
+    return this.receiveGemstoneBatchUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'ListCertifiedGemstoneAvailability')
   listCertifiedGemstoneAvailability(
     request: ListCertifiedGemstoneAvailabilityRequest,
   ): Promise<ListCertifiedGemstoneAvailabilityResponse> {
-    return this.inventoryService.listCertifiedGemstoneAvailability(request);
+    return this.listCertifiedGemstoneAvailabilityUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'CreateCertifiedGemstone')
   createCertifiedGemstone(
     request: CreateCertifiedGemstoneRequest,
   ): Promise<CertifiedGemstoneResponse> {
-    return this.inventoryService.createCertifiedGemstone(request);
+    return this.createCertifiedGemstoneUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'ListInventoryMovements')
   listInventoryMovements(
     request: ListInventoryMovementsRequest,
   ): Promise<ListInventoryMovementsResponse> {
-    return this.inventoryService.listInventoryMovements(request);
+    return this.listInventoryMovementsUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'AdjustInventory')
   adjustInventory(request: AdjustInventoryRequest): Promise<StockLotResponse> {
-    return this.inventoryService.adjustInventory(request);
+    return this.adjustInventoryUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'HoldInventory')
   holdInventory(request: HoldInventoryRequest): Promise<AllocationResponse> {
-    return this.inventoryService.holdInventory(request);
+    return this.holdInventoryUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'ReserveInventory')
   reserveInventory(
     request: ReserveInventoryRequest,
   ): Promise<AllocationResponse> {
-    return this.inventoryService.reserveInventory(request);
+    return this.reserveInventoryUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'AllocateInventory')
   allocateInventory(
     request: AllocateInventoryRequest,
   ): Promise<AllocationResponse> {
-    return this.inventoryService.allocateInventory(request);
+    return this.allocateInventoryUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'ConsumeInventory')
   consumeInventory(
     request: ConsumeInventoryRequest,
   ): Promise<AllocationResponse> {
-    return this.inventoryService.consumeInventory(request);
+    return this.consumeInventoryUseCase.execute(request);
   }
 
   @GrpcMethod('InventoryService', 'ReleaseInventory')
   releaseInventory(
     request: ReleaseInventoryRequest,
   ): Promise<AllocationResponse> {
-    return this.inventoryService.releaseInventory(request);
+    return this.releaseInventoryUseCase.execute(request);
   }
 }
