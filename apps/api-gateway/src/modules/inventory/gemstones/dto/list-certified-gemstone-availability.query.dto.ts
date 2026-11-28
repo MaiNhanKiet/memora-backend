@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { Equals, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class ListCertifiedGemstoneAvailabilityQueryDto {
   @ApiPropertyOptional({
@@ -12,11 +12,12 @@ export class ListCertifiedGemstoneAvailabilityQueryDto {
   gemstoneOptionId?: string;
 
   @ApiPropertyOptional({
-    description: 'Filter by availability status',
+    description: 'Only AVAILABLE is supported on this public endpoint',
+    enum: ['AVAILABLE'],
     default: 'AVAILABLE',
   })
   @IsOptional()
-  @IsString()
+  @Equals('AVAILABLE')
   status?: string = 'AVAILABLE';
 
   @ApiPropertyOptional({

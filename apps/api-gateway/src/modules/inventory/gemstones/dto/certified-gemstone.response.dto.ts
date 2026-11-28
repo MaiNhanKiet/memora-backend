@@ -43,9 +43,23 @@ export class CertifiedGemstoneResponseDto {
   updatedAt!: string;
 }
 
+export class AvailableCertifiedGemstoneResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  gemstoneOptionId!: string;
+
+  @ApiPropertyOptional({ example: 'GIA' })
+  certificateProvider?: string;
+
+  @ApiProperty({ enum: ['AVAILABLE'] })
+  status!: string;
+}
+
 export class CertifiedGemstoneListResponseDto {
-  @ApiProperty({ type: () => [CertifiedGemstoneResponseDto] })
-  items!: CertifiedGemstoneResponseDto[];
+  @ApiProperty({ type: () => [AvailableCertifiedGemstoneResponseDto] })
+  items!: AvailableCertifiedGemstoneResponseDto[];
 
   @ApiProperty({ example: 8 })
   total!: number;

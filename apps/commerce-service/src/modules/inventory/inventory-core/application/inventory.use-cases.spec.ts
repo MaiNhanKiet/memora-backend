@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   NotFoundException,
   UnprocessableEntityException,
@@ -11,7 +12,10 @@ import {
   ReleaseInventoryUseCase,
   ReserveInventoryUseCase,
 } from './allocation.use-cases';
-import { CreateCertifiedGemstoneUseCase } from './certified-gemstone.use-cases';
+import {
+  CreateCertifiedGemstoneUseCase,
+  ListCertifiedGemstoneAvailabilityUseCase,
+} from './certified-gemstone.use-cases';
 import { INVENTORY_REPOSITORY } from './inventory.repository';
 import {
   AdjustInventoryUseCase,
@@ -26,6 +30,7 @@ describe('Inventory Use Cases', () => {
   let receiveGemstoneBatchUseCase: ReceiveGemstoneBatchUseCase;
   let adjustInventoryUseCase: AdjustInventoryUseCase;
   let createCertifiedGemstoneUseCase: CreateCertifiedGemstoneUseCase;
+  let listCertifiedGemstoneAvailabilityUseCase: ListCertifiedGemstoneAvailabilityUseCase;
   let holdInventoryUseCase: HoldInventoryUseCase;
   let reserveInventoryUseCase: ReserveInventoryUseCase;
   let allocateInventoryUseCase: AllocateInventoryUseCase;
@@ -59,6 +64,7 @@ describe('Inventory Use Cases', () => {
         ReceiveGemstoneBatchUseCase,
         AdjustInventoryUseCase,
         CreateCertifiedGemstoneUseCase,
+        ListCertifiedGemstoneAvailabilityUseCase,
         HoldInventoryUseCase,
         ReserveInventoryUseCase,
         AllocateInventoryUseCase,
@@ -83,6 +89,9 @@ describe('Inventory Use Cases', () => {
     createCertifiedGemstoneUseCase = module.get<CreateCertifiedGemstoneUseCase>(
       CreateCertifiedGemstoneUseCase,
     );
+    listCertifiedGemstoneAvailabilityUseCase = module.get(
+      ListCertifiedGemstoneAvailabilityUseCase,
+    );
     holdInventoryUseCase =
       module.get<HoldInventoryUseCase>(HoldInventoryUseCase);
     reserveInventoryUseCase = module.get<ReserveInventoryUseCase>(
@@ -98,6 +107,42 @@ describe('Inventory Use Cases', () => {
       ReleaseInventoryUseCase,
     );
     jest.clearAllMocks();
+  });
+
+  describe('public gemstone availability', () => {
+    it('returns only the fields needed to select an available gemstone', async () => {
+      const expected = {
+        id: 'gem-1',
+        gemstoneOptionId: 'option-1',
+        certificateProvider: 'GIA',
+        status: 'AVAILABLE',
+      };
+      mockRepository.findCertifiedGemstoneAvailability.mockResolvedValue({
+        items: [
+          {
+            ...expected,
+            purchaseCost: 200,
+            locationCode: 'store',
+            certificateMetadataJson: { internal: true },
+          },
+        ],
+        total: 1,
+      });
+      await expect(
+        listCertifiedGemstoneAvailabilityUseCase.execute({}),
+      ).resolves.toEqual({ items: [expected], total: 1 });
+    });
+
+    it('rejects non-available status before reading inventory', async () => {
+      await expect(
+        listCertifiedGemstoneAvailabilityUseCase.execute({
+          status: 'RESERVED',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(
+        mockRepository.findCertifiedGemstoneAvailability,
+      ).not.toHaveBeenCalled();
+    });
   });
 
   describe('StockLot UseCases', () => {

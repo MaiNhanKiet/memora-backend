@@ -95,7 +95,10 @@ export interface ListCertifiedGemstoneAvailabilityRequest {
 }
 
 export interface ListCertifiedGemstoneAvailabilityResponse {
-  items: CertifiedGemstoneResponse[];
+  items: Pick<
+    CertifiedGemstoneResponse,
+    'id' | 'gemstoneOptionId' | 'certificateProvider' | 'status'
+  >[];
   total: number;
 }
 

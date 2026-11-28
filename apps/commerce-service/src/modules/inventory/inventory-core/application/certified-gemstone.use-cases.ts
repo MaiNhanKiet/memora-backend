@@ -1,4 +1,9 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import type {
   CertifiedGemstoneResponse,
   CreateCertifiedGemstoneRequest,
@@ -24,19 +29,29 @@ export class ListCertifiedGemstoneAvailabilityUseCase {
   async execute(
     request: ListCertifiedGemstoneAvailabilityRequest,
   ): Promise<ListCertifiedGemstoneAvailabilityResponse> {
+    if (request.status && request.status !== 'AVAILABLE') {
+      throw new BadRequestException('Only AVAILABLE gemstones can be listed');
+    }
     const limit = request.limit && request.limit > 0 ? request.limit : 20;
     const offset = request.offset && request.offset >= 0 ? request.offset : 0;
 
     const { items, total } =
       await this.repository.findCertifiedGemstoneAvailability({
         gemstoneOptionId: request.gemstoneOptionId,
-        status: request.status ?? 'AVAILABLE',
+        status: 'AVAILABLE',
         limit,
         offset,
       });
 
     return {
-      items: items.map((g) => toCertifiedGemstoneResponse(g)),
+      items: items.map(
+        ({ id, gemstoneOptionId, certificateProvider, status }) => ({
+          id,
+          gemstoneOptionId,
+          certificateProvider,
+          status,
+        }),
+      ),
       total,
     };
   }
