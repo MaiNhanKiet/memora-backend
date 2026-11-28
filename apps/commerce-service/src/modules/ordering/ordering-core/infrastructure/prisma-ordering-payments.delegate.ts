@@ -132,12 +132,57 @@ export class PrismaOrderingPaymentsDelegate {
     notes?: string;
     staffUserId?: string;
   }): Promise<OrderingPaymentTransactionRecord | undefined> {
+    const amount = new Prisma.Decimal(params.refundAmount);
+    if (!amount.isFinite() || !amount.gt(0) || amount.decimalPlaces() > 2) {
+      throw new BadRequestException(
+        'Refund amount must be positive with at most two decimal places',
+      );
+    }
     const refund = await this.prisma.$transaction(async (tx) => {
+      // Use the same order-before-payment lock order as payment settlement.
+      await tx.$queryRaw`
+        SELECT id FROM ordering.orders WHERE id = (
+          SELECT order_id FROM ordering.payment_transactions WHERE id = ${params.transactionId}::uuid
+        ) FOR NO KEY UPDATE
+      `;
+      await tx.$queryRaw`
+        SELECT id FROM ordering.payment_transactions
+        WHERE id = ${params.transactionId}::uuid FOR NO KEY UPDATE
+      `;
+
       const original = await tx.payment_transactions.findUnique({
         where: { id: params.transactionId },
       });
       if (!original) {
         return undefined;
+      }
+      if (
+        original.transaction_type !== 'PAYMENT' ||
+        original.status !== 'SUCCEEDED'
+      ) {
+        throw new BadRequestException(
+          'Only successful payments can be refunded',
+        );
+      }
+      if (!original.order_id) {
+        throw new BadRequestException(
+          'This refund route requires an order payment',
+        );
+      }
+
+      const reserved = await tx.payment_transactions.aggregate({
+        where: {
+          related_transaction_id: original.id,
+          transaction_type: 'REFUND',
+          status: { in: ['PENDING', 'SUCCEEDED'] },
+        },
+        _sum: { amount: true },
+      });
+      const refundable = original.amount.minus(reserved._sum.amount ?? 0);
+      if (amount.gt(refundable)) {
+        throw new ConflictException(
+          'Refund amount exceeds the remaining refundable payment amount',
+        );
       }
 
       return tx.payment_transactions.create({
@@ -148,7 +193,7 @@ export class PrismaOrderingPaymentsDelegate {
           payment_stage: original.payment_stage,
           payment_method: original.payment_method,
           provider: original.provider,
-          amount: new Prisma.Decimal(params.refundAmount),
+          amount,
           currency: original.currency,
           status: 'PENDING',
           recorded_by_user_id: params.staffUserId ?? null,
