@@ -140,8 +140,8 @@ export class PrismaOrderingPaymentsDelegate {
     }
     const refund = await this.prisma.$transaction(async (tx) => {
       // Use the same order-before-payment lock order as payment settlement.
-      await tx.$queryRaw`
-        SELECT id FROM ordering.orders WHERE id = (
+      const [order] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM ordering.orders WHERE id = (
           SELECT order_id FROM ordering.payment_transactions WHERE id = ${params.transactionId}::uuid
         ) FOR NO KEY UPDATE
       `;
@@ -164,9 +164,14 @@ export class PrismaOrderingPaymentsDelegate {
           'Only successful payments can be refunded',
         );
       }
-      if (!original.order_id) {
+      if (!original.order_id || !order) {
         throw new BadRequestException(
           'This refund route requires an order payment',
+        );
+      }
+      if (order.status === 'COMPLETED' || order.status === 'DELIVERED') {
+        throw new ConflictException(
+          'Refunding a handed-over order requires a verified ring return',
         );
       }
 

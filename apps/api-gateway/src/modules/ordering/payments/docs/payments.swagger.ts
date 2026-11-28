@@ -117,7 +117,7 @@ export function ApiCreateRefundRequestDocs() {
     ApiOperation({
       summary: '[ORDER-023] Create Refund Request (Staff / Admin)',
       description:
-        'Allows staff to create an audited refund request linked to an existing successful transaction.',
+        'Allows staff to create an audited refund request linked to a successful payment before handover. A handed-over order requires a verified ring return.',
     }),
     ApiParam({
       name: 'transactionId',
@@ -136,6 +136,11 @@ export function ApiCreateRefundRequestDocs() {
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
     notFound('Original payment transaction'),
+    ApiResponse({
+      status: 409,
+      description:
+        'The order requires a verified ring return or the amount exceeds the remaining refundable payment',
+    }),
   );
 }
 
