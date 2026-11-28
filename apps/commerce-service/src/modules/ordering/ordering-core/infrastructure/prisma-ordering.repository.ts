@@ -12,6 +12,7 @@ import type {
   OrderingPersonalizationContextRecord,
   OrderingQuoteRecord,
   OrderingRepository,
+  RingItemReviewTransitionInput,
   OrderingRingItemDetailRecord,
   OrderingRingItemVersionRecord,
 } from '../application/ordering.repository';
@@ -139,6 +140,10 @@ export class PrismaOrderingRepository implements OrderingRepository {
     );
   }
 
+  applyRingItemReviewTransition(input: RingItemReviewTransitionInput) {
+    return this.ringItems.applyRingItemReviewTransition(input);
+  }
+
   updateCurrentRingItemVersion(
     versionId: string,
     data: {
@@ -246,17 +251,11 @@ export class PrismaOrderingRepository implements OrderingRepository {
     orderId: string,
     quoteId: string,
     customerIdentityId: string,
-    nextOrderStatus: string,
-  ): Promise<OrderingFinalConfirmationRecord> {
-    return this.quotes.confirmFinalQuote(
-      orderId,
-      quoteId,
-      customerIdentityId,
-      nextOrderStatus,
-    );
+  ): Promise<OrderingFinalConfirmationRecord & { nextOrderStatus: string }> {
+    return this.quotes.confirmFinalQuote(orderId, quoteId, customerIdentityId);
   }
 
-  rejectFinalQuote(orderId: string, quoteId: string): Promise<void> {
+  rejectFinalQuote(orderId: string, quoteId: string): Promise<string> {
     return this.quotes.rejectFinalQuote(orderId, quoteId);
   }
 

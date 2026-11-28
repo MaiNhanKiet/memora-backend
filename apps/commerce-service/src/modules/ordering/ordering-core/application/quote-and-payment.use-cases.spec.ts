@@ -112,6 +112,7 @@ describe('Quote & Payment UseCases', () => {
       });
       mockRepository.confirmFinalQuote.mockResolvedValue({
         id: 'conf-1',
+        nextOrderStatus: 'AWAITING_P2',
         orderId: 'order-1',
         quoteId: 'q-1',
         quoteNo: 'QUO-F1',
@@ -134,7 +135,6 @@ describe('Quote & Payment UseCases', () => {
         'order-1',
         'q-1',
         validCustomerIdentityId,
-        'AWAITING_P2',
       );
       expect(res.nextOrderStatus).toBe('AWAITING_P2');
       expect(res.confirmationId).toBe('conf-1');

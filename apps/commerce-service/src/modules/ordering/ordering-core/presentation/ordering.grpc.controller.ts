@@ -1,8 +1,11 @@
 import { Controller, UseGuards } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
+import { COMMERCE_RING_ITEM_REVIEW_SERVICE_NAME } from '@app/contracts';
 import type {
   AcceptServiceQuoteRequest,
   AcceptServiceQuoteResponse,
+  ApplyRingItemReviewTransitionRequest,
+  ApplyRingItemReviewTransitionResponse,
   CancelOrderRequest,
   CancelOrderResponse,
   ConfirmFinalQuoteRequest,
@@ -61,6 +64,7 @@ import type {
   UpdateOrderStatusResponse,
 } from '@app/contracts';
 import { CommerceInternalGrpcAuthGuard } from '../../../../grpc/commerce-internal-grpc-auth.guard';
+import { ApplyRingItemReviewTransitionUseCase } from '../application/apply-ring-item-review-transition.use-case';
 import {
   AcceptServiceQuoteUseCase,
   ListClaimQuotesUseCase,
@@ -124,6 +128,7 @@ export class OrderingGrpcController implements OrderingServiceHandler {
     private readonly updateOrderStatusUseCase: UpdateOrderStatusUseCase,
     private readonly listRingItemVersionsUseCase: ListRingItemVersionsUseCase,
     private readonly updateCurrentRingItemVersionUseCase: UpdateCurrentRingItemVersionUseCase,
+    private readonly applyRingItemReviewTransitionUseCase: ApplyRingItemReviewTransitionUseCase,
     private readonly listOrderQuotesUseCase: ListOrderQuotesUseCase,
     private readonly getOrderPersonalizationContextUseCase: GetOrderPersonalizationContextUseCase,
     private readonly cancelOrderUseCase: CancelOrderUseCase,
@@ -209,6 +214,16 @@ export class OrderingGrpcController implements OrderingServiceHandler {
     request: UpdateCurrentRingItemVersionRequest,
   ): Promise<UpdateCurrentRingItemVersionResponse> {
     return this.updateCurrentRingItemVersionUseCase.execute(request);
+  }
+
+  @GrpcMethod(
+    COMMERCE_RING_ITEM_REVIEW_SERVICE_NAME,
+    'ApplyRingItemReviewTransition',
+  )
+  applyRingItemReviewTransition(
+    request: ApplyRingItemReviewTransitionRequest,
+  ): Promise<ApplyRingItemReviewTransitionResponse> {
+    return this.applyRingItemReviewTransitionUseCase.execute(request);
   }
 
   @GrpcMethod('OrderingService', 'ListOrderQuotes')

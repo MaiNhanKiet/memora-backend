@@ -97,7 +97,7 @@ export function ApiCreateFinalQuoteDocs() {
     ApiOperation({
       summary: '[ORDER-011] Create Final Quote Draft (Staff)',
       description:
-        'For All-NONE orders, the order must be in PENDING_FINAL_QUOTE and every current ring item version must be REVIEW_NOT_REQUIRED.',
+        'All current ring item versions must be ready. All-NONE orders use PENDING_FINAL_QUOTE. Personalized orders use DESIGN_IN_PROGRESS and require Manager approval.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({
@@ -112,7 +112,7 @@ export function ApiCreateFinalQuoteDocs() {
     ApiResponse({
       status: 409,
       description:
-        'The All-NONE order or its ring versions are not ready for a final quote',
+        'The order or its ring versions are not ready for a final quote',
     }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
@@ -142,7 +142,7 @@ export function ApiUpdateFinalQuoteDocs() {
     ApiResponse({
       status: 409,
       description:
-        'The quote is stale or the All-NONE order or its ring versions are not ready',
+        'The quote is stale or the order or its ring versions are not ready',
     }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),
@@ -168,7 +168,7 @@ export function ApiPublishFinalQuoteDocs() {
     ApiResponse({
       status: 409,
       description:
-        'The quote is stale or the All-NONE order or its ring versions are not ready',
+        'The quote is stale or the order or its ring versions are not ready',
     }),
     unauthorized,
     forbidden('Caller lacks staff/admin role'),

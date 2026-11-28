@@ -113,7 +113,7 @@ export function ApiRejectFinalQuoteDocs() {
     ApiOperation({
       summary: '[ORDER-015 Part B] Customer rejects Final Quote',
       description:
-        'Customer rejects the final quote with a mandatory reason, reverting order to PENDING_FINAL_QUOTE.',
+        'The customer rejects the final quote with a reason. All-NONE orders return to PENDING_FINAL_QUOTE. Personalized orders return to DESIGN_IN_PROGRESS.',
     }),
     ApiParam({ name: 'orderId', description: 'Order UUID', type: String }),
     ApiSuccessResponse({

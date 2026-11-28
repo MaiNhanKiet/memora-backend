@@ -1,9 +1,10 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../../../../../generated/prisma/client';
 import type { PrismaService } from '../../../../persistence/prisma/prisma.service';
 import type {
   OrderingRingItemDetailRecord,
   OrderingRingItemVersionRecord,
+  RingItemReviewTransitionInput,
 } from '../application/ordering.repository';
 import { toGemstoneDetailRecords } from './prisma-ordering.mappers';
 
@@ -185,6 +186,68 @@ export class PrismaOrderingRingItemsDelegate {
       ringItem.ring_item_versions_ring_items_current_version_idToring_item_versions ??
       undefined
     );
+  }
+
+  async applyRingItemReviewTransition(input: RingItemReviewTransitionInput) {
+    return this.prisma.$transaction(async (tx) => {
+      const [order] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM ordering.orders
+        WHERE id = ${input.orderId}::uuid FOR UPDATE
+      `;
+      const [item] = await tx.$queryRaw<
+        { current_version_id: string | null }[]
+      >`
+        SELECT current_version_id FROM ordering.ring_items
+        WHERE id = ${input.ringItemId}::uuid AND order_id = ${input.orderId}::uuid
+        FOR NO KEY UPDATE
+      `;
+      if (!order || !item) {
+        throw new NotFoundException('Ring item not found for this order');
+      }
+      if (item.current_version_id !== input.ringItemVersionId) {
+        throw new ConflictException(
+          'Review must target the current ring item version',
+        );
+      }
+
+      const version = await tx.ring_item_versions.findFirst({
+        where: {
+          id: input.ringItemVersionId,
+          ring_item_id: input.ringItemId,
+          personalization_package: { in: ['FINGERPRINT', 'SOUNDWAVE'] },
+        },
+        select: { status: true },
+      });
+      if (!version) {
+        throw new ConflictException(
+          'Only FINGERPRINT and SOUNDWAVE versions require review',
+        );
+      }
+      if (version.status === input.to) {
+        return { ringItemVersionId: input.ringItemVersionId, status: input.to };
+      }
+      if (
+        order.status !== 'DESIGN_IN_PROGRESS' ||
+        version.status !== input.from
+      ) {
+        throw new ConflictException(
+          'The order or ring version is not ready for this review transition',
+        );
+      }
+
+      const updated = await tx.ring_item_versions.updateMany({
+        where: {
+          id: input.ringItemVersionId,
+          ring_item_id: input.ringItemId,
+          status: input.from,
+        },
+        data: { status: input.to },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException('Ring item version changed during review');
+      }
+      return { ringItemVersionId: input.ringItemVersionId, status: input.to };
+    });
   }
 
   async updateCurrentRingItemVersion(

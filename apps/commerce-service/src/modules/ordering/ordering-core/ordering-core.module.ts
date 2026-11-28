@@ -3,6 +3,7 @@ import {
   AcceptServiceQuoteUseCase,
   ListClaimQuotesUseCase,
 } from './application/claim-quote.use-cases';
+import { ApplyRingItemReviewTransitionUseCase } from './application/apply-ring-item-review-transition.use-case';
 import { CreateOrderUseCase } from './application/create-order.use-case';
 import {
   ConfirmFinalQuoteUseCase,
@@ -55,6 +56,7 @@ import { OrderingGrpcController } from './presentation/ordering.grpc.controller'
 @Module({
   controllers: [OrderingGrpcController],
   providers: [
+    ApplyRingItemReviewTransitionUseCase,
     CreateOrderUseCase,
     ListOrdersUseCase,
     GetOrderByIdUseCase,

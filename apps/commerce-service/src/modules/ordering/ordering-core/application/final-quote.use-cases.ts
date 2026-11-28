@@ -179,7 +179,7 @@ export class ConfirmFinalQuoteUseCase {
       );
     }
 
-    const { order, quote } = await loadActiveIssuedQuote(
+    const { quote } = await loadActiveIssuedQuote(
       this.repository,
       request.orderId,
       actor.customerIdentityId,
@@ -193,18 +193,10 @@ export class ConfirmFinalQuoteUseCase {
       );
     }
 
-    const hasPersonalization = order.ringItems.some(
-      ({ personalizationPackage }) =>
-        personalizationPackage === 'FINGERPRINT' ||
-        personalizationPackage === 'SOUNDWAVE',
-    );
-    const nextOrderStatus = hasPersonalization ? 'AWAITING_P2' : order.status;
-
     const confirmation = await this.repository.confirmFinalQuote(
       request.orderId,
       quote.id,
       actor.customerIdentityId,
-      nextOrderStatus,
     );
 
     return {
@@ -213,7 +205,7 @@ export class ConfirmFinalQuoteUseCase {
       quoteId: confirmation.quoteId,
       status: confirmation.status,
       confirmedAt: confirmation.confirmedAt.toISOString(),
-      nextOrderStatus,
+      nextOrderStatus: confirmation.nextOrderStatus,
       items: [...confirmation.items],
     };
   }
@@ -244,7 +236,7 @@ export class RejectFinalQuoteUseCase {
       throw new BadRequestException('A reason for rejection is required');
     }
 
-    await this.repository.rejectFinalQuote(
+    const updatedOrderStatus = await this.repository.rejectFinalQuote(
       request.orderId,
       quote.id,
       request.reason,
@@ -255,7 +247,7 @@ export class RejectFinalQuoteUseCase {
       quoteId: quote.id,
       status: 'REJECTED',
       reason: request.reason,
-      updatedOrderStatus: 'PENDING_FINAL_QUOTE',
+      updatedOrderStatus,
     };
   }
 }

@@ -5,6 +5,33 @@ import type { Metadata } from '@grpc/grpc-js';
 import type { VerifiedActor } from '../common/actor';
 
 export const COMMERCE_ORDERING_SERVICE_NAME = 'OrderingService';
+export const COMMERCE_RING_ITEM_REVIEW_SERVICE_NAME = 'RingItemReviewService';
+
+export enum RingItemReviewTransition {
+  UNSPECIFIED = 0,
+  MARK_READY_FOR_REVIEW = 1,
+  SUBMIT_FOR_REVIEW = 2,
+  APPROVE_REVIEW = 3,
+}
+
+export interface ApplyRingItemReviewTransitionRequest {
+  readonly orderId: string;
+  readonly ringItemId: string;
+  readonly ringItemVersionId: string;
+  readonly transition: RingItemReviewTransition;
+}
+
+export interface ApplyRingItemReviewTransitionResponse {
+  readonly ringItemVersionId: string;
+  readonly status: string;
+}
+
+export interface CommerceRingItemReviewServiceClient {
+  applyRingItemReviewTransition(
+    request: ApplyRingItemReviewTransitionRequest,
+    metadata?: Metadata,
+  ): Observable<ApplyRingItemReviewTransitionResponse>;
+}
 
 export interface OrderPreP1Acknowledgement {
   noticeVersion: string;

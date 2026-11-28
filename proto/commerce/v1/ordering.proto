@@ -4,6 +4,29 @@ package memora.commerce.v1;
 
 import "common/v1/actor.proto";
 
+service RingItemReviewService {
+  rpc ApplyRingItemReviewTransition (ApplyRingItemReviewTransitionRequest) returns (ApplyRingItemReviewTransitionResponse);
+}
+
+enum RingItemReviewTransition {
+  RING_ITEM_REVIEW_TRANSITION_UNSPECIFIED = 0;
+  MARK_READY_FOR_REVIEW = 1;
+  SUBMIT_FOR_REVIEW = 2;
+  APPROVE_REVIEW = 3;
+}
+
+message ApplyRingItemReviewTransitionRequest {
+  string order_id = 1;
+  string ring_item_id = 2;
+  string ring_item_version_id = 3;
+  RingItemReviewTransition transition = 4;
+}
+
+message ApplyRingItemReviewTransitionResponse {
+  string ring_item_version_id = 1;
+  string status = 2;
+}
+
 service OrderingService {
   rpc CreateOrder (CreateOrderRequest) returns (CreateOrderResponse);
   rpc ListOrders (ListOrdersRequest) returns (ListOrdersResponse);

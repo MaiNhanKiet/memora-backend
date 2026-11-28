@@ -9,7 +9,10 @@ import type {
   OrderingFinalConfirmationRecord,
   OrderingQuoteRecord,
 } from '../application/ordering.repository';
-import { resolveAllNoneFinalQuoteVersions } from '../application/ordering-state';
+import {
+  resolveFinalQuotePreparationStatus,
+  resolveFinalQuoteVersions,
+} from '../application/ordering-state';
 import { toQuoteRecord } from './prisma-ordering.mappers';
 
 async function lockQuoteOrder(tx: Prisma.TransactionClient, orderId: string) {
@@ -75,11 +78,10 @@ async function lockQuoteRingItems(
 }
 
 function assertQuoteLinesBelongToOrder(
-  versions: Record<string, string> | undefined,
+  versions: Record<string, string>,
   lines: readonly { ringItemId?: string }[],
 ): void {
   if (
-    versions &&
     lines.some(
       ({ ringItemId }) => ringItemId && !versions[ringItemId.toLowerCase()],
     )
@@ -93,7 +95,7 @@ function assertQuoteLinesBelongToOrder(
 async function assertFinalQuoteSnapshotMatches(
   tx: Prisma.TransactionClient,
   quoteId: string,
-  versions: Record<string, string> | undefined,
+  versions: Record<string, string>,
 ): Promise<void> {
   const line = await tx.quote_items.findFirst({
     where: { quote_id: quoteId },
@@ -105,9 +107,7 @@ async function assertFinalQuoteSnapshotMatches(
     metadata && typeof metadata === 'object' && !Array.isArray(metadata)
       ? metadata.finalQuoteRingItemVersions
       : undefined;
-  if (!versions && snapshot === undefined) return;
   if (
-    !versions ||
     !snapshot ||
     typeof snapshot !== 'object' ||
     Array.isArray(snapshot) ||
@@ -177,9 +177,9 @@ export class PrismaOrderingQuotesDelegate {
         return undefined;
       }
 
-      const versions = resolveAllNoneFinalQuoteVersions(
+      const versions = resolveFinalQuoteVersions(
         order.status,
-        'PENDING_FINAL_QUOTE',
+        'prepare',
         await lockQuoteRingItems(tx, params.orderId),
       );
       assertQuoteLinesBelongToOrder(versions, params.items);
@@ -217,9 +217,7 @@ export class PrismaOrderingQuotesDelegate {
               line_amount: new Prisma.Decimal(item.lineAmount),
               price_source_type: item.priceSourceType ?? 'MANUAL',
               // Every line carries the order snapshot so order-level lines work too.
-              metadata_json: versions
-                ? { finalQuoteRingItemVersions: versions }
-                : undefined,
+              metadata_json: { finalQuoteRingItemVersions: versions },
             })),
           },
         },
@@ -276,9 +274,9 @@ export class PrismaOrderingQuotesDelegate {
         throw new ConflictException('The final quote can no longer be edited');
       }
 
-      const versions = resolveAllNoneFinalQuoteVersions(
+      const versions = resolveFinalQuoteVersions(
         order.status,
-        'PENDING_FINAL_QUOTE',
+        'prepare',
         await lockQuoteRingItems(tx, params.orderId),
       );
       await assertFinalQuoteSnapshotMatches(tx, params.quoteId, versions);
@@ -315,9 +313,7 @@ export class PrismaOrderingQuotesDelegate {
             unit_amount: new Prisma.Decimal(item.unitAmount),
             line_amount: new Prisma.Decimal(item.lineAmount),
             price_source_type: item.priceSourceType ?? 'MANUAL',
-            metadata_json: versions
-              ? { finalQuoteRingItemVersions: versions }
-              : undefined,
+            metadata_json: { finalQuoteRingItemVersions: versions },
           })),
         });
       }
@@ -351,9 +347,9 @@ export class PrismaOrderingQuotesDelegate {
           'The final quote can no longer be published',
         );
       }
-      const versions = resolveAllNoneFinalQuoteVersions(
+      const versions = resolveFinalQuoteVersions(
         order.status,
-        'PENDING_FINAL_QUOTE',
+        'prepare',
         await lockQuoteRingItems(tx, orderId),
       );
       await assertFinalQuoteSnapshotMatches(tx, quoteId, versions);
@@ -388,10 +384,9 @@ export class PrismaOrderingQuotesDelegate {
     orderId: string,
     quoteId: string,
     customerIdentityId: string,
-    nextOrderStatus: string,
-  ): Promise<OrderingFinalConfirmationRecord> {
-    const { confirmation, ringItems } = await this.prisma.$transaction(
-      async (tx) => {
+  ): Promise<OrderingFinalConfirmationRecord & { nextOrderStatus: string }> {
+    const { confirmation, ringItems, nextOrderStatus } =
+      await this.prisma.$transaction(async (tx) => {
         const order = await lockQuoteOrder(tx, orderId);
         if (
           order?.status !== 'AWAITING_FINAL_CONFIRMATION' ||
@@ -403,9 +398,9 @@ export class PrismaOrderingQuotesDelegate {
           );
         }
         const items = await lockQuoteRingItems(tx, orderId);
-        const versions = resolveAllNoneFinalQuoteVersions(
+        const versions = resolveFinalQuoteVersions(
           order.status,
-          'AWAITING_FINAL_CONFIRMATION',
+          'confirm',
           items,
         );
         await assertFinalQuoteSnapshotMatches(tx, quoteId, versions);
@@ -469,7 +464,9 @@ export class PrismaOrderingQuotesDelegate {
           include: { final_confirmation_items: true },
         });
 
-        if (versions) {
+        const allNone =
+          resolveFinalQuotePreparationStatus(items) === 'PENDING_FINAL_QUOTE';
+        if (allNone) {
           const assignments = await findCertifiedGemstoneAssignments(
             tx,
             confirmationItems.map(
@@ -490,19 +487,22 @@ export class PrismaOrderingQuotesDelegate {
           }
         }
 
+        const nextOrderStatus = allNone
+          ? 'AWAITING_FINAL_CONFIRMATION'
+          : 'AWAITING_P2';
         await tx.orders.update({
           where: { id: orderId },
           data: { status: nextOrderStatus },
         });
 
-        return { confirmation: created, ringItems: items };
-      },
-    );
+        return { confirmation: created, ringItems: items, nextOrderStatus };
+      });
 
     return {
       id: confirmation.id,
       orderId: confirmation.order_id,
       quoteId: confirmation.quote_id,
+      nextOrderStatus,
       quoteNo: '',
       quoteTotalAmount: 0,
       confirmedByCustomerIdentityId:
@@ -522,13 +522,9 @@ export class PrismaOrderingQuotesDelegate {
     };
   }
 
-  async rejectFinalQuote(orderId: string, quoteId: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM ordering.orders WHERE id = ${orderId}::uuid FOR UPDATE`;
-      const order = await tx.orders.findUnique({
-        where: { id: orderId },
-        select: { current_quote_id: true, status: true },
-      });
+  async rejectFinalQuote(orderId: string, quoteId: string): Promise<string> {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await lockQuoteOrder(tx, orderId);
       if (
         order?.status !== 'AWAITING_FINAL_CONFIRMATION' ||
         order.current_quote_id !== quoteId
@@ -552,10 +548,14 @@ export class PrismaOrderingQuotesDelegate {
           'The final quote can no longer be rejected',
         );
 
+      const status = resolveFinalQuotePreparationStatus(
+        await lockQuoteRingItems(tx, orderId),
+      );
       await tx.orders.update({
         where: { id: orderId },
-        data: { status: 'PENDING_FINAL_QUOTE' },
+        data: { status },
       });
+      return status;
     });
   }
 

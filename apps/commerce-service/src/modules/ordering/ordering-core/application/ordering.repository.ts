@@ -2,6 +2,14 @@ import type { RingItemSummary } from '@app/contracts';
 
 export const ORDERING_REPOSITORY = Symbol('ORDERING_REPOSITORY');
 
+export interface RingItemReviewTransitionInput {
+  readonly orderId: string;
+  readonly ringItemId: string;
+  readonly ringItemVersionId: string;
+  readonly from: 'DRAFT' | 'READY_FOR_REVIEW' | 'SUBMITTED';
+  readonly to: 'READY_FOR_REVIEW' | 'SUBMITTED' | 'MANAGER_APPROVED';
+}
+
 export interface OrderingDraftRecord {
   readonly id: string;
   readonly cartId?: string;
@@ -328,6 +336,9 @@ export interface OrderingRepository {
       }
     | undefined
   >;
+  applyRingItemReviewTransition(
+    input: RingItemReviewTransitionInput,
+  ): Promise<{ ringItemVersionId: string; status: string }>;
   updateCurrentRingItemVersion(
     versionId: string,
     data: {
@@ -411,13 +422,12 @@ export interface OrderingRepository {
     orderId: string,
     quoteId: string,
     actorId: string,
-    nextOrderStatus: string,
-  ): Promise<OrderingFinalConfirmationRecord>;
+  ): Promise<OrderingFinalConfirmationRecord & { nextOrderStatus: string }>;
   rejectFinalQuote(
     orderId: string,
     quoteId: string,
     reason?: string,
-  ): Promise<void>;
+  ): Promise<string>;
   findFinalConfirmations(
     orderId: string,
   ): Promise<OrderingFinalConfirmationRecord[]>;

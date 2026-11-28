@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   assertOrderCancellable,
   assertValidOrderStatusTransition,
-  resolveAllNoneFinalQuoteVersions,
+  resolveFinalQuoteVersions,
   resolveOrderNextPayment,
   resolveOrderStageGates,
 } from './ordering-state';
@@ -28,7 +28,7 @@ describe('ordering-state', () => {
     });
   });
 
-  describe('resolveAllNoneFinalQuoteVersions', () => {
+  describe('resolveFinalQuoteVersions', () => {
     const ready = {
       id: 'ring-1',
       version: {
@@ -41,29 +41,23 @@ describe('ordering-state', () => {
 
     it('captures the current version of every ready ring in an All-NONE order', () => {
       expect(
-        resolveAllNoneFinalQuoteVersions(
-          'PENDING_FINAL_QUOTE',
-          'PENDING_FINAL_QUOTE',
-          [
-            ready,
-            {
-              id: 'ring-2',
-              version: {
-                ...ready.version,
-                id: 'version-2',
-                ringItemId: 'ring-2',
-              },
+        resolveFinalQuoteVersions('PENDING_FINAL_QUOTE', 'prepare', [
+          ready,
+          {
+            id: 'ring-2',
+            version: {
+              ...ready.version,
+              id: 'version-2',
+              ringItemId: 'ring-2',
             },
-          ],
-        ),
+          },
+        ]),
       ).toEqual({ 'ring-1': 'version-1', 'ring-2': 'version-2' });
     });
 
     it('rejects an All-NONE order at the wrong status', () => {
       expect(() =>
-        resolveAllNoneFinalQuoteVersions('CANCELLED', 'PENDING_FINAL_QUOTE', [
-          ready,
-        ]),
+        resolveFinalQuoteVersions('CANCELLED', 'prepare', [ready]),
       ).toThrow(ConflictException);
     });
 
@@ -78,33 +72,46 @@ describe('ordering-state', () => {
       'rejects the order when a second current version is %s',
       (_case, version) => {
         expect(() =>
-          resolveAllNoneFinalQuoteVersions(
-            'AWAITING_FINAL_CONFIRMATION',
-            'AWAITING_FINAL_CONFIRMATION',
-            [ready, { id: 'ring-2', version }],
-          ),
+          resolveFinalQuoteVersions('AWAITING_FINAL_CONFIRMATION', 'confirm', [
+            ready,
+            { id: 'ring-2', version },
+          ]),
         ).toThrow(ConflictException);
       },
     );
 
-    it('leaves personalized orders to their separate workflow', () => {
+    const fingerprint = {
+      id: 'ring-2',
+      version: {
+        id: 'version-2',
+        ringItemId: 'ring-2',
+        status: 'MANAGER_APPROVED',
+        personalizationPackage: 'FINGERPRINT',
+      },
+    };
+
+    it('accepts mixed orders only when each current version is ready', () => {
       expect(
-        resolveAllNoneFinalQuoteVersions(
-          'DESIGN_IN_PROGRESS',
-          'PENDING_FINAL_QUOTE',
-          [
-            ready,
-            {
-              id: 'ring-2',
-              version: {
-                ...ready.version,
-                ringItemId: 'ring-2',
-                personalizationPackage: 'FINGERPRINT',
-              },
-            },
-          ],
-        ),
-      ).toBeUndefined();
+        resolveFinalQuoteVersions('DESIGN_IN_PROGRESS', 'prepare', [
+          ready,
+          fingerprint,
+        ]),
+      ).toEqual({ 'ring-1': 'version-1', 'ring-2': 'version-2' });
+      expect(() =>
+        resolveFinalQuoteVersions('DESIGN_IN_PROGRESS', 'prepare', [
+          ready,
+          {
+            ...fingerprint,
+            version: { ...fingerprint.version, status: 'SUBMITTED' },
+          },
+        ]),
+      ).toThrow(ConflictException);
+      expect(() =>
+        resolveFinalQuoteVersions('AWAITING_P1', 'prepare', [
+          ready,
+          fingerprint,
+        ]),
+      ).toThrow(ConflictException);
     });
   });
 

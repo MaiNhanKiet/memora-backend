@@ -37,38 +37,55 @@ export function assertValidOrderStatusTransition(
   }
 }
 
-export function resolveAllNoneFinalQuoteVersions(
-  orderStatus: string,
-  expectedOrderStatus: 'PENDING_FINAL_QUOTE' | 'AWAITING_FINAL_CONFIRMATION',
-  items: readonly {
-    id: string;
-    version: {
-      id: string;
-      ringItemId: string;
-      status: string;
-      personalizationPackage: string;
-    } | null;
-  }[],
-): Record<string, string> | undefined {
-  if (
-    items.some(
-      ({ version }) => version && version.personalizationPackage !== 'NONE',
-    )
-  ) {
-    return undefined;
-  }
+interface FinalQuoteRingItem {
+  readonly id: string;
+  readonly version: {
+    readonly id: string;
+    readonly ringItemId: string;
+    readonly status: string;
+    readonly personalizationPackage: string;
+  } | null;
+}
 
-  if (orderStatus !== expectedOrderStatus || items.length === 0) {
+export function resolveFinalQuotePreparationStatus(
+  items: readonly FinalQuoteRingItem[],
+) {
+  return items.some(
+    ({ version }) =>
+      version?.personalizationPackage === 'FINGERPRINT' ||
+      version?.personalizationPackage === 'SOUNDWAVE',
+  )
+    ? 'DESIGN_IN_PROGRESS'
+    : 'PENDING_FINAL_QUOTE';
+}
+
+export function resolveFinalQuoteVersions(
+  orderStatus: string,
+  action: 'prepare' | 'confirm',
+  items: readonly FinalQuoteRingItem[],
+): Record<string, string> {
+  const expectedStatus =
+    action === 'confirm'
+      ? 'AWAITING_FINAL_CONFIRMATION'
+      : resolveFinalQuotePreparationStatus(items);
+  if (orderStatus !== expectedStatus || items.length === 0) {
     throw new ConflictException(
-      `The order must contain ring items and be in ${expectedOrderStatus} for this final quote action`,
+      `The order must contain ring items and be in ${expectedStatus} for this final quote action`,
     );
   }
 
   return Object.fromEntries(
     items.map(({ id, version }) => {
+      const expectedVersionStatus =
+        version?.personalizationPackage === 'NONE'
+          ? 'REVIEW_NOT_REQUIRED'
+          : 'MANAGER_APPROVED';
       if (
         version?.ringItemId !== id ||
-        version.status !== 'REVIEW_NOT_REQUIRED'
+        version.status !== expectedVersionStatus ||
+        !['NONE', 'FINGERPRINT', 'SOUNDWAVE'].includes(
+          version.personalizationPackage,
+        )
       ) {
         throw new ConflictException(
           `Ring item ${id} does not have a current version ready for the final quote`,
