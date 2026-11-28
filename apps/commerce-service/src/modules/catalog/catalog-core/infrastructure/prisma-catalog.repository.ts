@@ -279,6 +279,8 @@ export class PrismaCatalogRepository implements CatalogRepository {
       where: {
         ring_template_id: templateId,
         ...(materialId ? { material_id: materialId } : {}),
+        ring_templates: { status: 'ACTIVE' },
+        materials: { status: 'ACTIVE' },
         status,
       },
       orderBy: { standard_size: 'asc' },
@@ -296,6 +298,8 @@ export class PrismaCatalogRepository implements CatalogRepository {
         ring_template_id: templateId,
         material_id: materialId,
         standard_size: standardSize,
+        ring_templates: { status: 'ACTIVE' },
+        materials: { status: 'ACTIVE' },
         status: 'ACTIVE',
       },
     });
@@ -455,6 +459,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
       where: {
         gemstone_groups: {
           ring_template_id: templateId,
+          ring_templates: { status: 'ACTIVE' },
         },
       },
       include: {
@@ -480,6 +485,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
       where: {
         template_variant_id: variantId,
         gemstone_option_id: { in: gemstoneOptionIds },
+        gemstone_options: { status: 'ACTIVE' },
       },
     });
     return rows.map((r) => toCompatibilityRecord(r));

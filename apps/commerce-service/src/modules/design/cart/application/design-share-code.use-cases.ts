@@ -28,7 +28,7 @@ export class CreateDesignShareLinkUseCase {
       throw new NotFoundException(`Draft ${request.draftId} not found`);
     }
 
-    assertShareLinkDraftOwnership(draft, actor, true);
+    assertShareLinkDraftOwnership(draft, actor);
 
     const days =
       request.expiresInDays && request.expiresInDays > 0
@@ -71,7 +71,7 @@ export class RevokeDesignShareLinkUseCase {
       throw new NotFoundException(`Draft ${request.draftId} not found`);
     }
 
-    assertShareLinkDraftOwnership(draft, actor, false);
+    assertShareLinkDraftOwnership(draft, actor);
 
     const designCode = await this.repository.findDesignCodeById(
       request.linkId,

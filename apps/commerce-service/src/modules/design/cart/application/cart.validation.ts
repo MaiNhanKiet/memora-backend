@@ -83,17 +83,15 @@ export function assertDraftOwnership(
 export function assertShareLinkDraftOwnership(
   draft: CartDraftRecord,
   actor: CartActor,
-  requireGuestMatch = false,
 ): void {
-  if (actor.userId && draft.ownerUserId && draft.ownerUserId !== actor.userId) {
-    throw new ForbiddenException('You do not own this design draft');
-  }
-  if (
-    requireGuestMatch &&
+  const ownsUserDraft =
+    actor.userId && draft.ownerUserId === actor.userId && !draft.guestSessionId;
+  const ownsGuestDraft =
     actor.guestSessionId &&
-    draft.guestSessionId &&
-    draft.guestSessionId !== actor.guestSessionId
-  ) {
+    draft.guestSessionId === actor.guestSessionId &&
+    !draft.ownerUserId;
+
+  if (!ownsUserDraft && !ownsGuestDraft) {
     throw new ForbiddenException('You do not own this design draft');
   }
 }

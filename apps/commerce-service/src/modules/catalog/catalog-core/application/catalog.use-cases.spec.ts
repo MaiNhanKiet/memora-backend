@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CATALOG_REPOSITORY } from './catalog.repository';
 import { GetResizePoliciesUseCase } from './resize-policy.use-cases';
+import { validateGemstoneSlotSelections } from './gemstone-selection.validation';
 import { ValidateConfigurationUseCase } from './validate-configuration.use-case';
 import { CreateVariantUseCase } from './variant.use-cases';
 
@@ -105,6 +106,59 @@ describe('Catalog validation, variants & resize policies', () => {
       expect(result.isValid).toBe(true);
       expect(result.validationErrors).toHaveLength(0);
       expect(result.templateVariantId).toBe('v-1');
+    });
+  });
+
+  describe('gemstone configuration', () => {
+    it.each([
+      { compatibilities: [] },
+      {
+        compatibilities: [
+          { gemstoneOptionId: 'option-1', gemstoneGroupId: 'wrong-group' },
+        ],
+      },
+    ])(
+      'rejects a stone unless its option is compatible with the selected slot group',
+      ({ compatibilities }) => {
+        const result = validateGemstoneSlotSelections(
+          [
+            {
+              id: 'slot-1',
+              slotIndex: 1,
+              gemstoneGroupId: 'group-1',
+              isRequired: true,
+            },
+          ],
+          compatibilities,
+          [{ gemstoneOptionId: 'option-1', slotNumber: 1 }],
+        );
+        expect(result.errors.map(({ code }) => code)).toEqual([
+          'GEMSTONE_INCOMPATIBLE',
+          'REQUIRED_SLOT_EMPTY',
+        ]);
+      },
+    );
+
+    it('rejects repeated physical slots and accepts a valid selection', () => {
+      const slots = [
+        {
+          id: 'slot-1',
+          slotIndex: 1,
+          gemstoneGroupId: 'group-1',
+          isRequired: true,
+        },
+      ];
+      const options = [
+        { gemstoneGroupId: 'group-1', gemstoneOptionId: 'option-1' },
+      ];
+      const selection = { gemstoneOptionId: 'option-1', slotNumber: 1 };
+      expect(
+        validateGemstoneSlotSelections(slots, options, [selection]),
+      ).toEqual({ slotIds: ['slot-1'], errors: [] });
+      expect(
+        validateGemstoneSlotSelections(slots, options, [selection, selection])
+          .errors,
+      ).toHaveLength(1);
     });
   });
 

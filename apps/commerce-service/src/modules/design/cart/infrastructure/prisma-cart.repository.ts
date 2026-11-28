@@ -6,6 +6,7 @@ import {
 import type { GemstoneSelectionItem } from '@app/contracts';
 import type { Prisma } from '../../../../../generated/prisma/client';
 import { PrismaService } from '../../../../persistence/prisma/prisma.service';
+import { validateGemstoneSlotSelections } from '../../../catalog/catalog-core/application/gemstone-selection.validation';
 import { availableCertifiedGemstones } from '../../../inventory/inventory-core/infrastructure/prisma-certified-gemstone-allocations';
 import type {
   CartActor,
@@ -24,8 +25,6 @@ export async function resolveGemstoneSelections(
   selections: readonly GemstoneSelectionItem[],
   at = new Date(),
 ): Promise<ValidatedGemstoneSelection[]> {
-  if (!selections.length) return [];
-
   const optionIds = selections.map(({ gemstoneOptionId }) =>
     gemstoneOptionId.toLowerCase(),
   );
@@ -37,20 +36,64 @@ export async function resolveGemstoneSelections(
       'A certified gemstone can only be selected once',
     );
   }
-  const compatibilities = await db.template_compatibilities.findMany({
+  const variant = await db.template_variants.findFirst({
     where: {
-      template_variant_id: variantId,
-      gemstone_option_id: { in: optionIds },
-      gemstone_options: { status: 'ACTIVE' },
+      id: variantId,
+      status: 'ACTIVE',
+      ring_templates: { status: 'ACTIVE' },
+      materials: { status: 'ACTIVE' },
     },
     select: {
-      gemstone_option_id: true,
-      gemstone_options: { select: { certified_required: true } },
-      gemstone_groups: {
-        select: { gemstone_slots: { select: { id: true, slot_index: true } } },
+      ring_templates: {
+        select: {
+          gemstone_groups: {
+            select: {
+              id: true,
+              is_required: true,
+              gemstone_slots: { select: { id: true, slot_index: true } },
+            },
+          },
+        },
       },
     },
   });
+  if (!variant)
+    throw new BadRequestException(
+      'The ring template or variant is no longer active',
+    );
+
+  const compatibilities = optionIds.length
+    ? await db.template_compatibilities.findMany({
+        where: {
+          template_variant_id: variantId,
+          gemstone_option_id: { in: optionIds },
+          gemstone_options: { status: 'ACTIVE' },
+        },
+        select: {
+          gemstone_option_id: true,
+          gemstone_group_id: true,
+          gemstone_options: { select: { certified_required: true } },
+        },
+      })
+    : [];
+  const slots = variant.ring_templates.gemstone_groups.flatMap((group) =>
+    group.gemstone_slots.map((slot) => ({
+      id: slot.id,
+      slotIndex: slot.slot_index,
+      gemstoneGroupId: group.id,
+      isRequired: group.is_required,
+    })),
+  );
+  const { slotIds, errors } = validateGemstoneSlotSelections(
+    slots,
+    compatibilities.map((option) => ({
+      gemstoneOptionId: option.gemstone_option_id,
+      gemstoneGroupId: option.gemstone_group_id,
+    })),
+    selections,
+  );
+  if (errors[0]) throw new BadRequestException(errors[0].message);
+
   const gems = certifiedIds.length
     ? await db.certified_gemstones.findMany({
         where: {
@@ -66,9 +109,7 @@ export async function resolveGemstoneSelections(
           status: 'ACTIVE',
           currency: 'VND',
           OR: [{ effective_from: null }, { effective_from: { lte: at } }],
-          AND: [
-            { OR: [{ effective_to: null }, { effective_to: { gt: at } }] },
-          ],
+          AND: [{ OR: [{ effective_to: null }, { effective_to: { gt: at } }] }],
           price_items: {
             price_type: 'CERTIFIED_GEMSTONE',
             certified_gemstone_id: { in: certifiedIds },
@@ -83,56 +124,42 @@ export async function resolveGemstoneSelections(
       })
     : [];
 
-  const usedSlots = new Set<string>();
-  return selections.map(
-    ({ slotNumber, gemstoneOptionId, certifiedGemstoneId }) => {
-      const optionId = gemstoneOptionId.toLowerCase();
-      const matches = compatibilities
-        .filter(({ gemstone_option_id }) => gemstone_option_id === optionId)
-        .flatMap(({ gemstone_options, gemstone_groups }) =>
-          gemstone_groups.gemstone_slots
-            .filter(({ slot_index }) => slot_index === slotNumber)
-            .map(({ id }) => ({
-              id,
-              certifiedRequired: gemstone_options.certified_required,
-            })),
-        );
-      const slot = matches.length === 1 ? matches[0] : undefined;
-      if (!slot || usedSlots.has(slot.id)) {
-        throw new BadRequestException(
-          'Gemstone option does not match a unique template slot',
-        );
-      }
-      usedSlots.add(slot.id);
-      if (slot.certifiedRequired !== Boolean(certifiedGemstoneId)) {
-        throw new BadRequestException(
-          'Select an exact inventory gemstone only for a certified option',
-        );
-      }
-      if (!certifiedGemstoneId) return { slotId: slot.id, optionId };
-      const certifiedId = certifiedGemstoneId.toLowerCase();
-      const gem = gems.find(({ id }) => id === certifiedId);
-      if (!gem || gem.gemstone_option_id !== optionId) {
-        throw new ConflictException(
-          'Selected certified gemstone is unavailable or does not match the option',
-        );
-      }
-      const price = prices.find(
-        ({ price_items }) => price_items.certified_gemstone_id === certifiedId,
+  return selections.map(({ gemstoneOptionId, certifiedGemstoneId }, index) => {
+    const optionId = gemstoneOptionId.toLowerCase();
+    const slotId = slotIds[index];
+    const requiresCertificate = compatibilities.some(
+      (option) =>
+        option.gemstone_option_id === optionId &&
+        option.gemstone_options.certified_required,
+    );
+    if (requiresCertificate !== Boolean(certifiedGemstoneId)) {
+      throw new BadRequestException(
+        'Select an exact inventory gemstone only for a certified option',
       );
-      if (!price)
-        throw new ConflictException(
-          'Selected certified gemstone has no active price',
-        );
-      return {
-        slotId: slot.id,
-        optionId,
-        certifiedGemstoneId: certifiedId,
-        priceVersionId: price.id,
-        certifiedPrice: Number(price.amount),
-      };
-    },
-  );
+    }
+    if (!certifiedGemstoneId) return { slotId, optionId };
+    const certifiedId = certifiedGemstoneId.toLowerCase();
+    const gem = gems.find(({ id }) => id === certifiedId);
+    if (!gem || gem.gemstone_option_id !== optionId) {
+      throw new ConflictException(
+        'Selected certified gemstone is unavailable or does not match the option',
+      );
+    }
+    const price = prices.find(
+      ({ price_items }) => price_items.certified_gemstone_id === certifiedId,
+    );
+    if (!price)
+      throw new ConflictException(
+        'Selected certified gemstone has no active price',
+      );
+    return {
+      slotId,
+      optionId,
+      certifiedGemstoneId: certifiedId,
+      priceVersionId: price.id,
+      certifiedPrice: Number(price.amount),
+    };
+  });
 }
 
 const VARIANT_INCLUDE = {

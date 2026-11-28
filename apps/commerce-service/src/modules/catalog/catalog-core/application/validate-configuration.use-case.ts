@@ -8,6 +8,7 @@ import {
   CATALOG_REPOSITORY,
   type CatalogRepository,
 } from './catalog.repository';
+import { validateGemstoneSlotSelections } from './gemstone-selection.validation';
 
 @Injectable()
 export class ValidateConfigurationUseCase {
@@ -81,49 +82,22 @@ export class ValidateConfigurationUseCase {
       });
     }
 
-    const rawSlots = await this.repository.findGemstoneSlotsByTemplateId(
-      request.templateId,
+    const selections = request.gemstoneSelections ?? [];
+    const [slots, compatibilities] = await Promise.all([
+      this.repository.findGemstoneSlotsByTemplateId(request.templateId),
+      selections.length
+        ? this.repository.findCompatibilities(
+            variant.id,
+            selections.map(({ gemstoneOptionId }) =>
+              gemstoneOptionId.toLowerCase(),
+            ),
+          )
+        : [],
+    ]);
+    validationErrors.push(
+      ...validateGemstoneSlotSelections(slots, compatibilities, selections)
+        .errors,
     );
-    const requiredSlots = rawSlots.filter((s) => s.isRequired);
-
-    for (const reqSlot of requiredSlots) {
-      const selected = request.gemstoneSelections?.find(
-        (sel) => sel.slotNumber === reqSlot.slotIndex,
-      );
-      if (!selected || !selected.gemstoneOptionId) {
-        validationErrors.push({
-          code: 'REQUIRED_SLOT_EMPTY',
-          message: `Slot #${reqSlot.slotIndex} is required for this template`,
-          field: `gemstoneSelections[slotNumber=${reqSlot.slotIndex}]`,
-        });
-      }
-    }
-
-    const selectedOptionIds = (request.gemstoneSelections || [])
-      .map((s) => s.gemstoneOptionId)
-      .filter(Boolean);
-
-    if (selectedOptionIds.length > 0) {
-      const compatibilities = await this.repository.findCompatibilities(
-        variant.id,
-        selectedOptionIds,
-      );
-      const compatibleOptionIds = new Set(
-        compatibilities.map((c) => c.gemstoneOptionId),
-      );
-
-      if (compatibilities.length > 0) {
-        for (const sel of request.gemstoneSelections) {
-          if (!compatibleOptionIds.has(sel.gemstoneOptionId)) {
-            validationErrors.push({
-              code: 'GEMSTONE_INCOMPATIBLE',
-              message: `Gemstone option ${sel.gemstoneOptionId} is not compatible with variant ${variant.id}`,
-              field: `gemstoneSelections[slotNumber=${sel.slotNumber}]`,
-            });
-          }
-        }
-      }
-    }
 
     const allowedPackages =
       template.designSupportedPersonalizationPackages.length > 0

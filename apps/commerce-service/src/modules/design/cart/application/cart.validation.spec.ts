@@ -1,6 +1,10 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { CartDraftRecord } from './cart.repository';
-import { assertDraftOwnership, validateCartActor } from './cart.validation';
+import {
+  assertDraftOwnership,
+  assertShareLinkDraftOwnership,
+  validateCartActor,
+} from './cart.validation';
 
 describe('cart.validation', () => {
   const userId = '11111111-1111-4111-8111-111111111111';
@@ -22,7 +26,7 @@ describe('cart.validation', () => {
     });
   });
 
-  describe('assertDraftOwnership', () => {
+  describe('draft ownership', () => {
     const baseDraft: CartDraftRecord = {
       id: 'draft-1',
       cartOwnerUserId: 'user-1',
@@ -37,6 +41,31 @@ describe('cart.validation', () => {
       status: 'IN_CART',
       createdAt: new Date(),
     };
+
+    it('requires the share actor to match the explicit draft owner and actor type', () => {
+      const owned = { ...baseDraft, ownerUserId: 'user-1' };
+      const guest = { ...baseDraft, guestSessionId: 'guest-1' };
+      expect(() =>
+        assertShareLinkDraftOwnership(owned, { userId: 'user-1' }),
+      ).not.toThrow();
+      expect(() =>
+        assertShareLinkDraftOwnership(guest, { guestSessionId: 'guest-1' }),
+      ).not.toThrow();
+      expect(() =>
+        assertShareLinkDraftOwnership(guest, {
+          guestSessionId: 'different-guest',
+        }),
+      ).toThrow(ForbiddenException);
+      expect(() =>
+        assertShareLinkDraftOwnership(guest, { userId: 'user-1' }),
+      ).toThrow(ForbiddenException);
+      expect(() =>
+        assertShareLinkDraftOwnership(owned, { guestSessionId: 'guest-1' }),
+      ).toThrow(ForbiddenException);
+      expect(() =>
+        assertShareLinkDraftOwnership(baseDraft, { userId: 'user-1' }),
+      ).toThrow(ForbiddenException);
+    });
 
     it('should allow matching user or guest owner', () => {
       expect(() =>

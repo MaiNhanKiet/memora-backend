@@ -18,7 +18,11 @@ import {
   ensureActiveCart,
   type CartRepository,
 } from './cart.repository';
-import { assertDraftOwnership, validateCartActor } from './cart.validation';
+import {
+  assertDraftOwnership,
+  priceCartSelections,
+  validateCartActor,
+} from './cart.validation';
 
 @Injectable()
 export class GetDesignDraftUseCase {
@@ -65,19 +69,22 @@ export class DuplicateDesignDraftUseCase {
 
     assertDraftOwnership(sourceDraft, actor);
 
-    const cart = await ensureActiveCart(this.repository, actor);
-
     const currentGemstones = parseGemstoneSelections(
       sourceDraft.gemstoneConfigJson,
     );
     const currentPlan = extractMaintenancePlan(sourceDraft.gemstoneConfigJson);
-    const pricing = await this.estimatePriceUseCase.execute({
-      templateVariantId: sourceDraft.templateVariantId,
-      targetSize: sourceDraft.targetSize,
-      gemstoneOptionIds: currentGemstones.map((g) => g.gemstoneOptionId),
-      personalizationPackage: sourceDraft.personalizationPackage || 'NONE',
-      maintenancePlan: currentPlan ?? 'NONE',
-    });
+    const pricing = await priceCartSelections(
+      this.repository,
+      this.estimatePriceUseCase,
+      {
+        templateVariantId: sourceDraft.templateVariantId,
+        targetSize: sourceDraft.targetSize,
+        personalizationPackage: sourceDraft.personalizationPackage || 'NONE',
+        maintenancePlan: currentPlan ?? 'NONE',
+      },
+      currentGemstones,
+    );
+    const cart = await ensureActiveCart(this.repository, actor);
 
     const newDraft = await this.repository.createDraft({
       cartId: cart.id,
@@ -88,10 +95,11 @@ export class DuplicateDesignDraftUseCase {
       gemstoneConfigJson: buildGemstoneConfigJson(
         currentGemstones,
         currentPlan ?? 'NONE',
+        pricing.certifiedPriceVersionIds,
       ),
       personalizationPackage: sourceDraft.personalizationPackage,
       memoryEnabled: sourceDraft.memoryEnabled,
-      estimatedPrice: pricing.estimatedTotal,
+      estimatedPrice: pricing.total,
       currency: pricing.currency,
     });
 
