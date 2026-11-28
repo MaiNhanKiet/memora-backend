@@ -1,3 +1,5 @@
+import { FULFILLMENT_PACKAGE } from '@app/contracts';
+
 /**
  * gRPC protos hosted by operations-service.
  * To expose a business API: add ONE entry for its proto here. main.ts reads this
@@ -9,4 +11,5 @@ export const OPERATIONS_GRPC_PROTOS = [
     package: 'memora.personalization.v1',
     file: 'personalization/v1/personalization.proto',
   },
+  { package: FULFILLMENT_PACKAGE, file: 'operations/v1/fulfillment.proto' },
 ] as const;

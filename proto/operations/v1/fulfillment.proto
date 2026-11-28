@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package memora.fulfillment.v1;
+
+service FulfillmentService {
+  rpc GetFullOrderHandoverForRingItem (GetFullOrderHandoverForRingItemRequest) returns (GetFullOrderHandoverForRingItemResponse);
+}
+
+message GetFullOrderHandoverForRingItemRequest {
+  string ring_item_id = 1;
+}
+
+message GetFullOrderHandoverForRingItemResponse {
+  bool completed = 1;
+  optional string order_id = 2;
+}
